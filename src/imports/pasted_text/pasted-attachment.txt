@@ -1,0 +1,676 @@
+Absolutely. If your ambition is **to build LEGITIFY into a company one day**, then don't ask Figma to build "an app."
+
+Ask it to build **the operating system for recruitment trust and cyber intelligence**.
+
+Below is the kind of master prompt I would personally use if I were designing a startup intended to compete with enterprise cybersecurity products.
+
+---
+
+# MASTER FIGMA MAKE PROMPT — LEGITIFY ENTERPRISE v1.0
+
+## ROLE
+
+You are the **Lead Product Designer, UX Architect, Design Systems Lead, Enterprise SaaS Designer, and Creative Director** for a billion-dollar cybersecurity startup.
+
+You are NOT designing a simple dashboard.
+
+You are designing the complete operating system for **LEGITIFY**, the world's first **Enterprise Trust Intelligence Platform** that detects recruitment fraud, fake job offers, recruiter impersonation, malicious domains, phishing campaigns, and hiring scams.
+
+The final result should feel like software built by a company worth billions of dollars—not a student project or AI-generated admin template.
+
+---
+
+# DESIGN PHILOSOPHY
+
+DO NOT create:
+
+* Generic AI dashboards
+* Glassmorphism
+* Heavy gradients
+* Rounded pastel cards
+* Dribbble concepts
+* Bootstrap admin templates
+* Generic SaaS layouts
+* ChatGPT clone UI
+* Generic analytics dashboards
+
+Instead create something that feels like a mix of
+
+• Microsoft Defender XDR
+
+• CrowdStrike Falcon
+
+• Palantir Foundry
+
+• Linear
+
+• Stripe Dashboard
+
+• Vercel Dashboard
+
+• GitHub Enterprise
+
+• Atlassian Jira
+
+• Datadog
+
+• Grafana
+
+• Apple Human Interface Guidelines
+
+while remaining completely original.
+
+---
+
+# PRODUCT IDENTITY
+
+LEGITIFY is NOT an AI chatbot.
+
+LEGITIFY is NOT an ATS.
+
+LEGITIFY is NOT a resume checker.
+
+LEGITIFY is an Enterprise Trust Intelligence Platform.
+
+It combines
+
+Recruitment Intelligence
+
+Threat Intelligence
+
+Digital Forensics
+
+Identity Verification
+
+Document Intelligence
+
+Company Intelligence
+
+Domain Intelligence
+
+Registry Intelligence
+
+Community Intelligence
+
+Behavioral Analysis
+
+Explainable AI
+
+Fraud Campaign Detection
+
+Case Management
+
+Enterprise Analytics
+
+Audit Compliance
+
+into one unified ecosystem.
+
+---
+
+# DESIGN LANGUAGE
+
+Theme
+
+Executive Cyber Intelligence
+
+Professional
+
+Minimal
+
+Premium
+
+Elegant
+
+Timeless
+
+No flashy gaming aesthetics.
+
+No excessive neon.
+
+No overuse of gradients.
+
+Every component should feel expensive.
+
+---
+
+# COLOR SYSTEM
+
+Use a completely custom enterprise color palette.
+
+Primary Background
+
+Graphite Black
+
+Carbon Gray
+
+Deep Slate
+
+Surface Colors
+
+Layered dark surfaces
+
+Different elevations
+
+Soft contrast
+
+Accent Colors
+
+Cyber Emerald
+
+Electric Cyan (minimal)
+
+Enterprise Blue (minimal)
+
+Amber Warning
+
+Critical Crimson
+
+Muted Purple for AI only
+
+Use accent colors only to communicate meaning.
+
+Avoid colorful dashboards.
+
+---
+
+# TYPOGRAPHY
+
+Use a typography hierarchy comparable to Apple, Linear, and Stripe.
+
+Large executive headings
+
+Elegant body typography
+
+Monospaced font for technical logs
+
+Perfect spacing
+
+High readability
+
+---
+
+# DESIGN SYSTEM
+
+Create a complete enterprise design system including
+
+Color Tokens
+
+Spacing Tokens
+
+Radius Tokens
+
+Elevation Tokens
+
+Motion Tokens
+
+Shadow Tokens
+
+Typography Scale
+
+Iconography
+
+Component Library
+
+Grid System
+
+Responsive Breakpoints
+
+Interaction States
+
+Accessibility States
+
+Dark Theme
+
+Light Theme
+
+Everything should be reusable.
+
+---
+
+# INFORMATION ARCHITECTURE
+
+Design the application as an operating system rather than a dashboard.
+
+Primary Navigation
+
+Mission Control
+
+Investigations
+
+Live Scans
+
+Reports
+
+Evidence Explorer
+
+Cases
+
+Threat Intelligence
+
+Registry Intelligence
+
+Community Intelligence
+
+Behavior Analysis
+
+Analytics
+
+Organizations
+
+Universities
+
+Placement Cells
+
+Recruiters
+
+Users
+
+Notifications
+
+API Keys
+
+Audit Logs
+
+Administration
+
+Settings
+
+Support
+
+---
+
+# MISSION CONTROL
+
+This is NOT a dashboard.
+
+It is a Security Operations Center.
+
+Include
+
+Global Trust Score
+
+Realtime Activity Feed
+
+Critical Alerts
+
+Threat Feed
+
+Engine Health
+
+Processing Queue
+
+Investigations
+
+Live Metrics
+
+Organization Status
+
+System Health
+
+Performance
+
+Notifications
+
+Everything should feel alive.
+
+---
+
+# INVESTIGATION WORKSPACE
+
+Design the most advanced report page possible.
+
+Sections
+
+Executive Summary
+
+AI Investigation Summary
+
+Trust Radar
+
+Category Scores
+
+Evidence Explorer
+
+Timeline
+
+Entity Relationship Graph
+
+Company Intelligence
+
+Domain Intelligence
+
+Registry Intelligence
+
+Threat Intelligence
+
+Recruiter Intelligence
+
+Behavior Analysis
+
+Community Signals
+
+OCR Results
+
+Metadata Analysis
+
+Digital Signature Validation
+
+Recommendations
+
+Downloads
+
+Audit Trail
+
+Every section should be collapsible and interactive.
+
+---
+
+# EVIDENCE EXPLORER
+
+Think VSCode Explorer + Microsoft Defender.
+
+Nested hierarchy
+
+Search
+
+Filters
+
+Severity
+
+Confidence
+
+Source
+
+Evidence
+
+Expandable
+
+Timeline linked
+
+Everything searchable.
+
+---
+
+# CASE MANAGEMENT
+
+Build something comparable to Jira Service Management.
+
+Kanban
+
+Case Queue
+
+Assignment
+
+Analyst Workspace
+
+Notes
+
+Evidence
+
+Timeline
+
+Status
+
+Priority
+
+Comments
+
+Attachments
+
+Escalation
+
+Resolution
+
+---
+
+# ANALYTICS
+
+Do NOT use simple charts.
+
+Include
+
+Radar Charts
+
+Treemaps
+
+Heatmaps
+
+Force Graphs
+
+Dependency Graphs
+
+Relationship Maps
+
+Attack Chains
+
+Timeline Charts
+
+Distribution Graphs
+
+Interactive Filters
+
+Cross Filtering
+
+Hover Details
+
+Export
+
+---
+
+# VISUALIZATION
+
+Create beautiful enterprise visualizations.
+
+Entity Graph
+
+Company ↔ Recruiter
+
+Recruiter ↔ Domain
+
+Domain ↔ Threat
+
+Threat ↔ Campaign
+
+Campaign ↔ Cases
+
+Relationship Graph
+
+Timeline
+
+Risk Matrix
+
+Attack Flow
+
+Trust Distribution
+
+Confidence Distribution
+
+Heatmaps
+
+Everything interactive.
+
+---
+
+# MICROINTERACTIONS
+
+Premium only.
+
+Fade
+
+Slide
+
+Scale
+
+Opacity
+
+Hover Elevation
+
+Animated Status Indicators
+
+Loading Skeletons
+
+Progressive Loading
+
+Realtime Updates
+
+No bouncy animations.
+
+---
+
+# RESPONSIVE
+
+Perfect Desktop
+
+Perfect Tablet
+
+Perfect Mobile
+
+Adaptive Layout
+
+No broken components.
+
+---
+
+# ACCESSIBILITY
+
+WCAG AA
+
+Keyboard Navigation
+
+High Contrast
+
+Readable Typography
+
+Screen Reader Support
+
+Focus Indicators
+
+---
+
+# BRANDING
+
+Create a complete visual identity.
+
+Logo Concepts
+
+App Icon
+
+Favicons
+
+Illustration Style
+
+Pattern Language
+
+Icon System
+
+Enterprise Marketing Style
+
+Professional Imagery
+
+---
+
+# LANDING WEBSITE
+
+Build a world-class landing page.
+
+Hero
+
+Animated Product Demo
+
+Interactive Screens
+
+Problem Statement
+
+Solution
+
+Features
+
+Enterprise Customers
+
+Universities
+
+Testimonials
+
+Security
+
+Pricing
+
+Documentation
+
+FAQ
+
+CTA
+
+Footer
+
+Everything should feel premium.
+
+---
+
+# DESIGN QUALITY
+
+Every pixel must look intentional.
+
+No generic layouts.
+
+No copied templates.
+
+No placeholder graphics.
+
+No duplicated sections.
+
+Every screen should have its own identity.
+
+---
+
+# FINAL OUTPUT
+
+Generate a complete enterprise design system and clickable prototype for:
+
+* Landing Website
+* Authentication
+* Dashboard (Mission Control)
+* Investigation Workspace
+* Report Viewer
+* Live Scan
+* Upload Flow
+* Evidence Explorer
+* Threat Intelligence
+* Domain Intelligence
+* Company Intelligence
+* Registry Intelligence
+* Recruiter Intelligence
+* Community Intelligence
+* Behavioral Intelligence
+* AI Summary
+* OCR Workspace
+* Campaign Intelligence
+* Case Management
+* Notifications
+* Analytics
+* Administration
+* User Profile
+* Settings
+* API Management
+* Audit Logs
+* Organization Management
+* Mobile Views
+* Tablet Views
+* Empty States
+* Loading States
+* Error States
+* Success States
+* Component Library
+* Design Tokens
+* Complete Responsive System
+
+---
+
+## FINAL INSTRUCTION (MOST IMPORTANT)
+
+**Do NOT generate a typical AI dashboard or admin template. Create a timeless enterprise operating system with a unique visual identity that could realistically be presented to investors, Fortune 500 companies, universities, and government organizations as a production-ready cybersecurity platform. Every screen should be original, cohesive, information-rich, highly usable, and polished to the standard of Microsoft, Apple, Stripe, Linear, Palantir, and CrowdStrike—while remaining a distinctive LEGITIFY product rather than a copy of any existing interface. Build for scalability, professionalism, and long-term product evolution, not just visual appeal.**
+
+---
+
+**One final tip:** Figma Make is excellent for generating an initial concept, but it won't produce a truly distinctive enterprise product in a single pass. The strongest results come from generating the design system first, then iteratively refining individual modules (Mission Control, Investigation Workspace, Case Management, Analytics, etc.) until they share a consistent visual language. That's how products at large organizations are actually designed.

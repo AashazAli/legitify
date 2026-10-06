@@ -1,0 +1,864 @@
+You are NOT redesigning a dashboard.
+
+You are designing the complete Enterprise Operating System for LEGITIFY.
+
+LEGITIFY is an AI-powered Trust Intelligence Platform that detects fake companies, fake recruiters, phishing domains, scam job offers, fraudulent documents, malicious websites, identity fraud, and corporate impersonation.
+
+The final result should look like a combination of:
+
+• Microsoft Defender XDR
+• CrowdStrike Falcon
+• SentinelOne
+• Datadog
+• Splunk Enterprise Security
+• Palo Alto Cortex XSIAM
+• Stripe Dashboard
+• Linear
+• Vercel
+• Raycast
+• Notion AI
+• Cloudflare Zero Trust
+
+The product should feel like software used by SOC analysts, Fortune 500 security teams, enterprise recruiters, banks, HR departments, compliance officers, government cyber cells, and investigators.
+
+DO NOT create a simple dashboard.
+
+Design a complete operating system.
+
+==================================================
+
+OVERALL DESIGN PHILOSOPHY
+
+==================================================
+
+Everything should communicate:
+
+Enterprise
+
+Premium
+
+Mission Critical
+
+Fast
+
+Reliable
+
+Intelligent
+
+Modern
+
+Professional
+
+Dense
+
+Minimal
+
+Powerful
+
+Every screen should look like millions of dollars were invested into UX.
+
+Users should instantly believe this software belongs in Microsoft Azure Marketplace.
+
+Avoid:
+
+Large empty spaces
+
+Generic cards
+
+Template dashboards
+
+Bootstrap layouts
+
+Admin dashboard appearance
+
+Toy animations
+
+Bright gradients everywhere
+
+Neumorphism
+
+Cheap glassmorphism
+
+Oversized icons
+
+Rounded childish UI
+
+==================================================
+
+VISUAL STYLE
+
+==================================================
+
+Dark Mode Only
+
+Enterprise Security Theme
+
+Primary Background
+
+#07090D
+
+Secondary Background
+
+#0D1117
+
+Elevated Panels
+
+#131A24
+
+Borders
+
+1px subtle
+
+Layered elevations
+
+Multiple elevation levels
+
+Very subtle shadows
+
+Never flat
+
+Corners
+
+12px
+
+Buttons
+
+10px
+
+Inputs
+
+12px
+
+Tables
+
+8px
+
+Typography
+
+Inter
+
+IBM Plex Sans
+
+SF Pro
+
+Use a complete typography scale.
+
+Every font size should have hierarchy.
+
+Use proper spacing rhythm.
+
+==================================================
+
+COLOR SYSTEM
+
+==================================================
+
+Trust Green
+
+Warnings
+
+Amber
+
+Critical
+
+Red
+
+Info
+
+Blue
+
+AI
+
+Purple
+
+Success
+
+Emerald
+
+Neutral
+
+Slate
+
+Never use random colors.
+
+Everything must follow semantic enterprise color tokens.
+
+==================================================
+
+LOGO
+
+==================================================
+
+The uploaded LEGITIFY logo currently has whitespace.
+
+DO NOT place the uploaded image directly.
+
+Instead:
+
+Recreate the logo as a native vector.
+
+Preserve the shield identity.
+
+Redraw it using the current design language.
+
+Create multiple versions:
+
+Navigation logo
+
+App icon
+
+Favicon
+
+Monochrome
+
+Dark mode
+
+Light mode
+
+Small icon
+
+Large hero version
+
+Animated loading version
+
+SVG only.
+
+==================================================
+
+LAYOUT SYSTEM
+
+==================================================
+
+Create a complete layout system.
+
+Resizable panels
+
+Dockable widgets
+
+Adaptive grids
+
+Multi-monitor support
+
+Sticky navigation
+
+Collapsible sidebar
+
+Command palette
+
+Workspace tabs
+
+Persistent filters
+
+Resizable tables
+
+Split view
+
+Inspector panel
+
+Context panel
+
+Floating utilities
+
+Breadcrumb navigation
+
+Global search
+
+Pinned investigations
+
+Saved layouts
+
+Workspace presets
+
+==================================================
+
+SIDEBAR
+
+==================================================
+
+The sidebar should feel alive.
+
+Hover animations
+
+Active indicator
+
+Animated icon glow
+
+Notification dots
+
+Live pulse
+
+Keyboard shortcut labels
+
+Unread counters
+
+Expandable sections
+
+Favorites
+
+Pinned items
+
+Organization switcher
+
+Workspace switcher
+
+Quick Actions
+
+==================================================
+
+TOP NAVIGATION
+
+==================================================
+
+Global search
+
+Command Palette
+
+Notifications
+
+Live alerts
+
+Background jobs
+
+Workspace selector
+
+Theme switcher
+
+Profile
+
+Help
+
+API status
+
+Keyboard shortcuts
+
+Realtime sync indicator
+
+==================================================
+
+MICRO INTERACTIONS
+
+==================================================
+
+Everything should animate.
+
+Cards
+
+Lift slightly
+
+Shadow increases
+
+Border glows
+
+Icons animate
+
+Buttons
+
+Spring animation
+
+Ripple
+
+Loading state
+
+Hover
+
+Progress
+
+Elastic interactions
+
+Tables
+
+Rows animate
+
+Sorting
+
+Filtering
+
+Expansion
+
+Side panels
+
+Slide
+
+Fade
+
+Scale
+
+Charts
+
+Smooth interpolation
+
+Animated numbers
+
+Live updates
+
+Skeleton loading
+
+Empty states
+
+Progressive reveal
+
+Every transition
+
+200-350ms
+
+Spring based
+
+60FPS
+
+==================================================
+
+REALTIME EXPERIENCE
+
+==================================================
+
+The application should always feel alive.
+
+Live scan progress
+
+Streaming AI summary
+
+Animated trust score
+
+Realtime notifications
+
+Threat feed updates
+
+Ticker
+
+Background sync
+
+Provider health
+
+Heartbeat indicator
+
+Queue progress
+
+WebSocket style animations
+
+Status changes
+
+Timeline updates
+
+==================================================
+
+INVESTIGATION EXPERIENCE
+
+==================================================
+
+Investigation should be the heart.
+
+Create:
+
+Evidence Graph
+
+Entity Relationship Graph
+
+Timeline
+
+Raw JSON
+
+Registry
+
+Threat
+
+WHOIS
+
+DNS
+
+SSL
+
+Emails
+
+Documents
+
+OCR
+
+ML
+
+AI Reasoning
+
+Recommendations
+
+Confidence
+
+Evidence
+
+Risk Matrix
+
+Trust Breakdown
+
+MITRE Mapping
+
+Attack Chain
+
+Related Cases
+
+Analyst Notes
+
+Comments
+
+Attachments
+
+Version History
+
+==================================================
+
+TABLES
+
+==================================================
+
+Enterprise tables only.
+
+Sticky headers
+
+Column resizing
+
+Sorting
+
+Filtering
+
+Grouping
+
+Infinite scroll
+
+Virtualization
+
+Bulk actions
+
+Row expansion
+
+Pinned columns
+
+Density controls
+
+Column chooser
+
+CSV export
+
+Search
+
+Quick filters
+
+Keyboard navigation
+
+==================================================
+
+CHARTS
+
+==================================================
+
+Replace static charts.
+
+Use:
+
+Animated Line
+
+Radar
+
+Treemap
+
+Heatmap
+
+Sankey
+
+Force Graph
+
+Network Graph
+
+Sunburst
+
+Timeline
+
+Area
+
+Stacked Bar
+
+Geo Map
+
+Scatter Plot
+
+Confidence Distribution
+
+Risk Matrix
+
+Provider Health
+
+Trust Evolution
+
+==================================================
+
+AI EXPERIENCE
+
+==================================================
+
+Create AI Copilot.
+
+Docked assistant
+
+Streaming output
+
+Thinking state
+
+Reasoning tree
+
+Explain score
+
+Generate report
+
+Recommend actions
+
+Ask questions
+
+Summarize investigation
+
+Export
+
+Voice ready
+
+==================================================
+
+MOTION DESIGN
+
+==================================================
+
+Professional.
+
+Nothing flashy.
+
+Everything intentional.
+
+Hover
+
+120ms
+
+Page transition
+
+250ms
+
+Panel
+
+300ms
+
+Graph
+
+500ms
+
+Numbers
+
+Count animation
+
+Progress rings
+
+Sweep animation
+
+Threat pulses
+
+Breathing glow
+
+Live dots
+
+Subtle pulse
+
+Network lines
+
+Flow animation
+
+==================================================
+
+LOADING EXPERIENCE
+
+==================================================
+
+Never show spinners.
+
+Use skeletons.
+
+Animated placeholders.
+
+Progressive hydration.
+
+Streaming sections.
+
+==================================================
+
+EMPTY STATES
+
+==================================================
+
+Illustrated
+
+Helpful
+
+Professional
+
+Action oriented
+
+Never blank.
+
+==================================================
+
+RESPONSIVE
+
+==================================================
+
+Desktop
+
+Laptop
+
+Ultrawide
+
+Tablet
+
+Large monitors
+
+Multiple monitor workflows
+
+==================================================
+
+DESIGN SYSTEM
+
+==================================================
+
+Generate a complete design system.
+
+Buttons
+
+Inputs
+
+Dropdowns
+
+Tables
+
+Cards
+
+Badges
+
+Alerts
+
+Avatars
+
+Progress
+
+Charts
+
+Tabs
+
+Dialogs
+
+Drawers
+
+Tooltips
+
+Accordions
+
+Steppers
+
+Command palette
+
+Date picker
+
+Search
+
+Notification center
+
+Timeline
+
+Tags
+
+Tokens
+
+Spacing
+
+Typography
+
+Elevation
+
+Shadows
+
+Animations
+
+Icons
+
+Illustrations
+
+==================================================
+
+DELIVERABLES
+
+==================================================
+
+Create every screen at production quality.
+
+Mission Control
+
+Live Scan
+
+Investigation Workspace
+
+Company Intelligence
+
+Threat Intelligence
+
+Registry Intelligence
+
+Recruiter Intelligence
+
+Document Analysis
+
+Domain Intelligence
+
+Analytics Hub
+
+Case Operations
+
+AI Copilot
+
+Developer Portal
+
+Organization Management
+
+Team Management
+
+Audit Logs
+
+Notifications
+
+API Keys
+
+Billing
+
+Settings
+
+Integrations
+
+Marketplace
+
+Reports
+
+Exports
+
+Profile
+
+Onboarding
+
+Authentication
+
+404
+
+Maintenance
+
+Loading
+
+Empty States
+
+==================================================
+
+FINAL GOAL
+
+==================================================
+
+The final result should NOT look like a Figma template.
+
+It should look like software designed by a team of senior designers from Microsoft, Stripe, Datadog, Linear, CrowdStrike, and Apple over multiple years.
+
+Every interaction, spacing, transition, animation, component, and layout must be production-ready, enterprise-grade, pixel-perfect, and suitable for a Fortune 500 cybersecurity platform.
