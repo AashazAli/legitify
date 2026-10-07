@@ -22,7 +22,7 @@ export async function sendReportNotificationEmail(params: SendReportNotification
     const emailSubject = `[LEGITIFY ALERT] Investigation Dossier: ${params.report.entity_name} (${params.report.verdict})`;
     const emailHtml = `
       <div style="background: #07090D; color: #F1F5F9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 24px; border-radius: 8px; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #00C880; margin-top: 0;">🛡️ LEGITIFY Trust Intelligence Alert</h2>
+        <h2 style="color: #00C880; margin-top: 0;">LEGITIFY Trust Intelligence Alert</h2>
         <p>Dear ${params.recipientName || 'Applicant'},</p>
         <p>Your requested forensic verification scan for <strong>${params.report.entity_name}</strong> has completed.</p>
         

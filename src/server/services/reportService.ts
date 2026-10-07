@@ -261,14 +261,14 @@ export function compileFullReport(params: CompileReportParams): LegitifyReport {
       score: r.score_impact || 0.5,
     })),
     next_steps: documentData?.next_steps || (scoreResult.trust_score <= 40 ? [
-      "🚨 Do NOT share any personal documents (Aadhaar, PAN, bank details) with this organization.",
+      "Do NOT share any personal documents (Aadhaar, PAN, bank details) with this organization.",
       "Report this offer letter to your college placement cell immediately.",
       "If you found this on Internshala or LinkedIn, report the listing on the platform.",
       "File a complaint on the National Cyber Crime Portal (cybercrime.gov.in) if you've already shared any information.",
       "Do NOT pay any 'registration fee', 'security deposit', or 'training charges'. Legitimate companies never ask candidates for money.",
       `Search for '${entityName}' on MCA21 (mca.gov.in) to check if it's a registered company.`,
     ] : [
-      "✅ This letter appears to have authentic structural characteristics.",
+      "This letter appears to have authentic structural characteristics.",
       "Verify recruiter email alignment with the official corporate domain before accepting.",
       "Confirm the offer letter reference ID through the official employee recruitment portal.",
       "Prepare standard onboarding documents (educational transcripts and ID proofs).",

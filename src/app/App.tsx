@@ -7,7 +7,7 @@ import {
   Sparkles, Layers, Activity, ChevronRight, BarChart2, Database,
   Code2, AlertCircle, ChevronLeft, Search, Eye, Filter, Check, Copy, Flame,
   HelpCircle, MessageSquare, Swords, CheckSquare, FileSearch, Edit3, Save,
-  FileCheck
+  FileCheck, Building2, CreditCard, Mail, Globe, Info
 } from "lucide-react";
 
 import { supabase } from "../lib/supabase/client";
@@ -59,10 +59,10 @@ function getVerdictTheme(verdict?: string, score?: number) {
     return {
       label: "Critical Risk · Likely Scam",
       shortLabel: "Likely Scam",
-      emoji: "🚨",
-      color: "#FF3B5C",
-      glowColor: "rgba(255, 59, 92, 0.4)",
-      badgeClass: "bg-red-500/20 text-[#FF3B5C] border-2 border-red-500/50 shadow-[0_0_20px_rgba(255,59,92,0.4)]",
+      emoji: "",
+      color: "#F43F5E",
+      glowColor: "rgba(244, 63, 94, 0.15)",
+      badgeClass: "bg-rose-500/10 text-rose-400 border border-rose-500/30",
       description: "This opportunity exhibits critical fraud patterns (unauthorized payment request, lookalike domain, or unverified webmail). Exercise extreme caution.",
     };
   }
@@ -70,20 +70,20 @@ function getVerdictTheme(verdict?: string, score?: number) {
     return {
       label: "Moderate Risk · Suspicious",
       shortLabel: "Suspicious",
-      emoji: "⚠️",
+      emoji: "",
       color: "#F59E0B",
-      glowColor: "rgba(245, 158, 11, 0.4)",
-      badgeClass: "bg-amber-500/20 text-amber-300 border-2 border-amber-500/50 shadow-[0_0_20px_rgba(245,158,11,0.4)]",
+      glowColor: "rgba(245, 158, 11, 0.15)",
+      badgeClass: "bg-amber-500/10 text-amber-400 border border-amber-500/30",
       description: "Document contains multiple structural anomalies. Independent verification through official corporate channels is strongly advised.",
     };
   }
   return {
     label: "Low Risk · Likely Genuine",
     shortLabel: "Likely Genuine",
-    emoji: "✅",
-    color: "#00FF87",
-    glowColor: "rgba(0, 255, 135, 0.4)",
-    badgeClass: "bg-emerald-500/20 text-[#00FF87] border-2 border-emerald-500/50 shadow-[0_0_20px_rgba(0,255,135,0.4)]",
+    emoji: "",
+    color: "#10B981",
+    glowColor: "rgba(16, 185, 129, 0.15)",
+    badgeClass: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30",
     description: "Our forensic analysis confirms authentic corporate identifiers, corporate domain alignment, and absence of candidate payment demands.",
   };
 }
@@ -128,51 +128,54 @@ function FormattedCopilotMessage({ text }: { text: string }) {
   const renderFormattedChunk = (content: string) => {
     return content.split(/(\*\*.*?\*\*|\[Doc-P\d+-C\d+\]|\[Ext-[A-Za-z0-9_-]+\]|\[E-\d+\]|`.*?`)/g).map((chunk, cIdx) => {
       if (chunk.startsWith("**") && chunk.endsWith("**")) {
-        return <strong key={cIdx} className="text-slate-100 font-extrabold">{chunk.slice(2, -2)}</strong>;
+        return <strong key={cIdx} className="text-slate-100 font-semibold">{chunk.slice(2, -2)}</strong>;
       }
       if (/^\[Doc-P\d+-C\d+\]$/.test(chunk)) {
         return (
-          <span key={cIdx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-cyan-500/20 text-[#00F0FF] font-mono text-xs font-bold border border-cyan-500/40 mx-1 shadow-sm" title="Verified Document RAG Citation">
-            <span>📄</span> {chunk.slice(1, -1)}
+          <span key={cIdx} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-sky-500/10 text-sky-300 font-mono text-xs font-medium border border-sky-500/30 mx-1" title="Verified Document Citation">
+            <FileText className="w-3 h-3 text-sky-400" />
+            <span>{chunk.slice(1, -1)}</span>
           </span>
         );
       }
       if (/^\[Ext-[A-Za-z0-9_-]+\]$/.test(chunk)) {
         return (
-          <span key={cIdx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-purple-500/20 text-purple-300 font-mono text-xs font-bold border border-purple-500/40 mx-1 shadow-sm" title="Verified External Intelligence Citation">
-            <span>🌐</span> {chunk.slice(1, -1)}
+          <span key={cIdx} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-purple-500/10 text-purple-300 font-mono text-xs font-medium border border-purple-500/30 mx-1" title="External Intelligence Citation">
+            <Globe className="w-3 h-3 text-purple-400" />
+            <span>{chunk.slice(1, -1)}</span>
           </span>
         );
       }
       if (/^\[E-\d+\]$/.test(chunk)) {
         return (
-          <span key={cIdx} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-500/20 text-indigo-300 font-mono text-xs font-bold border border-indigo-500/40 mx-1 shadow-sm" title="Evidence Locker Record">
-            <span>🛡️</span> {chunk.slice(1, -1)}
+          <span key={cIdx} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 font-mono text-xs font-medium border border-indigo-500/30 mx-1" title="Evidence Locker Record">
+            <ShieldCheck className="w-3 h-3 text-indigo-400" />
+            <span>{chunk.slice(1, -1)}</span>
           </span>
         );
       }
       if (chunk.startsWith("`") && chunk.endsWith("`")) {
-        return <code key={cIdx} className="px-2 py-0.5 rounded-lg bg-slate-800 text-[#00FF87] font-mono text-xs md:text-sm font-bold border border-[#00FF87]/30">{chunk.slice(1, -1)}</code>;
+        return <code key={cIdx} className="px-1.5 py-0.5 rounded bg-slate-800 text-emerald-400 font-mono text-xs border border-slate-700">{chunk.slice(1, -1)}</code>;
       }
       return chunk;
     });
   };
 
   return (
-    <div className="space-y-3.5 text-sm md:text-base leading-relaxed text-slate-200">
+    <div className="space-y-3 text-sm md:text-base leading-relaxed text-slate-200">
       {lines.map((line, idx) => {
         const trimmed = line.trim();
         if (!trimmed) return <div key={idx} className="h-1.5" />;
 
         if (trimmed === "---") {
-          return <hr key={idx} className="border-[#1E2838] my-3" />;
+          return <hr key={idx} className="border-slate-800 my-3" />;
         }
 
         if (trimmed.startsWith("###")) {
           const content = trimmed.replace(/^###\s*/, "");
           return (
-            <div key={idx} className="pt-3 pb-1 border-b border-[#1E2838] flex items-center gap-2.5">
-              <span className="text-lg md:text-xl font-black text-[#00FF87] text-glow-emerald tracking-wide">
+            <div key={idx} className="pt-3 pb-1 border-b border-slate-800 flex items-center gap-2">
+              <span className="text-base md:text-lg font-bold text-slate-100 tracking-wide">
                 {content}
               </span>
             </div>
@@ -182,8 +185,8 @@ function FormattedCopilotMessage({ text }: { text: string }) {
         if (trimmed.startsWith("##")) {
           const content = trimmed.replace(/^##\s*/, "");
           return (
-            <div key={idx} className="pt-4 pb-1.5 border-b border-[#1E2838] flex items-center gap-2.5">
-              <span className="text-xl md:text-2xl font-black text-slate-100 tracking-wide">
+            <div key={idx} className="pt-4 pb-1.5 border-b border-slate-800 flex items-center gap-2">
+              <span className="text-lg md:text-xl font-bold text-slate-100 tracking-wide">
                 {content}
               </span>
             </div>
@@ -193,7 +196,7 @@ function FormattedCopilotMessage({ text }: { text: string }) {
         if (trimmed.startsWith(">")) {
           const content = trimmed.replace(/^>\s*/, "");
           return (
-            <div key={idx} className="pl-4 py-2 my-2 border-l-4 border-[#00FF87] bg-[#0A0D14] rounded-r-xl text-slate-300 italic">
+            <div key={idx} className="pl-3 py-2 my-2 border-l-2 border-slate-600 bg-slate-900/60 rounded-r-lg text-slate-300 italic text-sm">
               {renderFormattedChunk(content)}
             </div>
           );
@@ -204,8 +207,8 @@ function FormattedCopilotMessage({ text }: { text: string }) {
           const title = parts[0].replace(/\*\*/g, "");
           const rest = parts.slice(1).join(":**");
           return (
-            <div key={idx} className="pt-1.5 font-bold text-slate-100">
-              <span className="text-[#00F0FF] text-glow-cyan font-extrabold">{title}:</span> {renderFormattedChunk(rest)}
+            <div key={idx} className="pt-1.5 font-medium text-slate-100">
+              <span className="text-sky-400 font-semibold">{title}:</span> {renderFormattedChunk(rest)}
             </div>
           );
         }
@@ -213,8 +216,8 @@ function FormattedCopilotMessage({ text }: { text: string }) {
         if (trimmed.startsWith("*") || trimmed.startsWith("-")) {
           const content = trimmed.replace(/^[*-]\s*/, "");
           return (
-            <div key={idx} className="flex items-start gap-2.5 pl-2 text-slate-200">
-              <div className="w-2 h-2 rounded-full bg-[#00FF87] mt-2 flex-shrink-0 shadow-[0_0_8px_#00FF87]" />
+            <div key={idx} className="flex items-start gap-2.5 pl-1 text-slate-200">
+              <div className="w-1.5 h-1.5 rounded-full bg-slate-500 mt-2 flex-shrink-0" />
               <div className="flex-1 leading-relaxed">{renderFormattedChunk(content)}</div>
             </div>
           );
@@ -227,7 +230,7 @@ function FormattedCopilotMessage({ text }: { text: string }) {
             const content = match[2];
             return (
               <div key={idx} className="flex items-start gap-2.5 pl-1 text-slate-200">
-                <span className="w-6 h-6 rounded-lg bg-[#1E2838] text-xs font-mono font-black text-[#00FF87] flex items-center justify-center flex-shrink-0 mt-0.5 border border-[#00FF87]/40 shadow-sm">
+                <span className="w-5 h-5 rounded bg-slate-800 text-[11px] font-mono font-medium text-slate-400 flex items-center justify-center flex-shrink-0 mt-0.5 border border-slate-700">
                   {num}
                 </span>
                 <div className="flex-1 leading-relaxed">{renderFormattedChunk(content)}</div>
@@ -252,71 +255,67 @@ function AuthGatewayLanding({
   onSelectRole: (screen: "candidate_login" | "admin_login") => void;
 }) {
   return (
-    <div className="min-h-screen bg-[#060709] text-slate-100 flex flex-col items-center justify-center p-6 relative overflow-hidden">
-      <div className="absolute -top-40 -left-40 w-[600px] h-[600px] bg-gradient-to-br from-[#00FF87]/20 to-[#00F0FF]/15 rounded-full blur-[140px] pointer-events-none animate-pulse" />
-      <div className="absolute -bottom-40 -right-40 w-[600px] h-[600px] bg-gradient-to-br from-[#8B5CF6]/20 to-[#FF3B5C]/15 rounded-full blur-[140px] pointer-events-none animate-pulse" />
-      <div className="absolute inset-0 bg-[radial-gradient(#1E2838_1.5px,transparent_1.5px)] [background-size:32px_32px] opacity-50 pointer-events-none" />
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-6 relative overflow-hidden">
+      <div className="absolute inset-0 bg-[radial-gradient(#1E293B_1px,transparent_1px)] [background-size:24px_24px] opacity-40 pointer-events-none" />
 
-      <div className="max-w-3xl w-full space-y-10 relative z-10 text-center">
-        <div className="space-y-4">
-          <div className="inline-flex items-center gap-3 px-5 py-2 rounded-full bg-[#0F131A]/90 border-2 border-[#00FF87]/40 shadow-[0_0_30px_rgba(0,255,135,0.3)]">
-            <Shield className="w-6 h-6 text-[#00FF87]" />
-            <span className="text-sm font-mono font-black tracking-widest text-[#00FF87] text-glow-emerald uppercase">
-              LEGITIFY EVIDENCE-GROUNDED TRUST PLATFORM
-            </span>
+      <div className="max-w-3xl w-full space-y-8 relative z-10 text-center">
+        <div className="space-y-3">
+          <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-slate-300 text-xs font-mono font-semibold tracking-wider uppercase">
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <span>LEGITIFY Forensic Trust Architecture</span>
           </div>
 
-          <h1 className="text-4xl sm:text-6xl font-black text-slate-100 tracking-tight leading-none text-shadow-subtle">
-            Select Your Security Portal
+          <h1 className="text-3xl sm:text-5xl font-bold text-slate-100 tracking-tight">
+            Institutional Verification Portal
           </h1>
 
-          <p className="text-lg sm:text-xl text-slate-300 max-w-2xl mx-auto leading-relaxed">
-            Multi-factor verification platform with automated role isolation for Students and Security Operations.
+          <p className="text-sm sm:text-base text-slate-400 max-w-xl mx-auto leading-relaxed">
+            Multi-source document forensic analysis with role-isolated workspaces for Candidates and Security Operations.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
           <div
             onClick={() => onSelectRole("candidate_login")}
-            className="p-8 rounded-3xl bg-gradient-to-b from-[#0F141E] to-[#0A0D14] border-2 border-[#00FF87]/40 hover:border-[#00FF87] shadow-[0_15px_40px_rgba(0,255,135,0.15)] hover:shadow-[0_20px_60px_rgba(0,255,135,0.35)] transition-all duration-300 cursor-pointer transform hover:-translate-y-2 group space-y-6 flex flex-col justify-between"
+            className="p-7 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-emerald-500/50 transition-all duration-200 cursor-pointer group space-y-5 flex flex-col justify-between hover:bg-slate-900 shadow-xl"
           >
-            <div className="space-y-4">
-              <div className="w-16 h-16 rounded-2xl bg-[#00FF87]/20 border-2 border-[#00FF87] text-[#00FF87] flex items-center justify-center text-3xl shadow-[0_0_25px_rgba(0,255,135,0.4)]">
-                🎓
+            <div className="space-y-3">
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center">
+                <GraduationCap className="w-6 h-6" />
               </div>
-              <h3 className="text-2xl font-black text-slate-100 group-hover:text-[#00FF87] transition-colors text-glow-emerald">
-                Student / Candidate Portal
+              <h3 className="text-xl font-bold text-slate-100 group-hover:text-emerald-400 transition-colors">
+                Candidate / Student Portal
               </h3>
-              <p className="text-base text-slate-300 leading-relaxed">
-                Verify internship offer letters, inspect recruiter email domains, detect upfront fee scams, and interrogate evidence with Trust AI Copilot.
+              <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+                Verify internship offer letters, inspect recruiter email domains, detect upfront fee scams, and interrogate evidence with the Forensic Assistant.
               </p>
             </div>
 
-            <div className="flex items-center justify-between pt-4 border-t border-[#1E2838] text-base font-extrabold text-[#00FF87]">
-              <span>Sign In with Google Account →</span>
-              <ArrowRight className="w-6 h-6 transform group-hover:translate-x-2 transition-transform" />
+            <div className="flex items-center justify-between pt-4 border-t border-slate-800/80 text-xs font-semibold text-emerald-400 font-mono">
+              <span>Sign In with Account</span>
+              <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
             </div>
           </div>
 
           <div
             onClick={() => onSelectRole("admin_login")}
-            className="p-8 rounded-3xl bg-gradient-to-b from-[#0F141E] to-[#0A0D14] border-2 border-[#00F0FF]/40 hover:border-[#00F0FF] shadow-[0_15px_40px_rgba(0,240,255,0.15)] hover:shadow-[0_20px_60px_rgba(0,240,255,0.35)] transition-all duration-300 cursor-pointer transform hover:-translate-y-2 group space-y-6 flex flex-col justify-between"
+            className="p-7 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-sky-500/50 transition-all duration-200 cursor-pointer group space-y-5 flex flex-col justify-between hover:bg-slate-900 shadow-xl"
           >
-            <div className="space-y-4">
-              <div className="w-16 h-16 rounded-2xl bg-[#00F0FF]/20 border-2 border-[#00F0FF] text-[#00F0FF] flex items-center justify-center text-3xl shadow-[0_0_25px_rgba(0,240,255,0.4)]">
-                🛡️
+            <div className="space-y-3">
+              <div className="w-12 h-12 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-400 flex items-center justify-center">
+                <ShieldCheck className="w-6 h-6" />
               </div>
-              <h3 className="text-2xl font-black text-slate-100 group-hover:text-[#00F0FF] transition-colors text-glow-cyan">
-                Security Ops / Admin Portal
+              <h3 className="text-xl font-bold text-slate-100 group-hover:text-sky-400 transition-colors">
+                Security Operations / Admin
               </h3>
-              <p className="text-base text-slate-300 leading-relaxed">
+              <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
                 Access forensic telemetry, threat intelligence feeds, global case audits, and verification review tools.
               </p>
             </div>
 
-            <div className="flex items-center justify-between pt-4 border-t border-[#1E2838] text-base font-extrabold text-[#00F0FF]">
-              <span>Enter Security Center →</span>
-              <Lock className="w-6 h-6 transform group-hover:scale-110 transition-transform" />
+            <div className="flex items-center justify-between pt-4 border-t border-slate-800/80 text-xs font-semibold text-sky-400 font-mono">
+              <span>Security Operations Access</span>
+              <Lock className="w-4 h-4 transform group-hover:scale-105 transition-transform" />
             </div>
           </div>
         </div>
@@ -359,7 +358,6 @@ function CandidateLoginPage({
     const isUnconfiguredOrMock = !configuredUrl || configuredUrl.includes("nsvcphlhezykbbducxip");
 
     if (isUnconfiguredOrMock) {
-      // Offline / Local development mode: Authenticate directly without broken external redirect
       setTimeout(() => {
         authenticateAsCandidate(customEmail || "candidate@legitify.org");
       }, 300);
@@ -381,25 +379,25 @@ function CandidateLoginPage({
   };
 
   return (
-    <div className="min-h-screen bg-[#0B0F17] text-slate-100 flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-6 relative overflow-hidden">
       <div className="max-w-md w-full space-y-6 relative z-10">
         <button
           onClick={onBack}
-          className="text-sm font-semibold text-slate-400 hover:text-white flex items-center gap-2 transition-colors cursor-pointer"
+          className="text-xs font-mono font-medium text-slate-400 hover:text-slate-200 flex items-center gap-2 transition-colors cursor-pointer"
         >
           <ChevronLeft className="w-4 h-4" /> Back to Portal Selection
         </button>
 
-        <div className="p-8 md:p-10 rounded-2xl bg-[#0E1420] border border-[#1E293B] shadow-2xl space-y-6 text-center">
+        <div className="p-8 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-2xl space-y-6 text-center">
           <div className="space-y-2">
-            <div className="w-16 h-16 rounded-2xl bg-teal-500/10 border border-teal-500/30 text-teal-400 flex items-center justify-center text-3xl mx-auto">
-              🎓
+            <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mx-auto">
+              <GraduationCap className="w-6 h-6" />
             </div>
-            <h2 className="text-2xl font-bold text-white tracking-tight">
-              Student / Candidate Portal
+            <h2 className="text-xl font-bold text-slate-100">
+              Candidate Workspace Login
             </h2>
-            <p className="text-sm text-slate-400 leading-relaxed">
-              Authenticate to access the forensic file ingestion engine and verification workspace.
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Authenticate to access the deterministic file ingestion engine and verification workspace.
             </p>
           </div>
 
@@ -407,19 +405,19 @@ function CandidateLoginPage({
             <div>
               <input
                 type="email"
-                placeholder="Student / Institutional Email (Optional)"
+                placeholder="Institutional / Personal Email (Optional)"
                 value={customEmail}
                 onChange={(e) => setCustomEmail(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-[#141B2D] border border-[#1E293B] text-slate-200 placeholder-slate-500 text-sm focus:outline-none focus:border-teal-500 transition-colors"
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 placeholder-slate-600 text-xs font-mono focus:outline-none focus:border-slate-700 transition-colors"
               />
             </div>
 
             <button
               onClick={handleGoogleOAuth}
               disabled={loading}
-              className="w-full py-3.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-semibold text-sm transition-all flex items-center justify-center gap-3 cursor-pointer shadow-lg shadow-teal-500/10"
+              className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-semibold text-xs font-mono uppercase tracking-wider transition-all flex items-center justify-center gap-2.5 cursor-pointer shadow-sm"
             >
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
+              <svg className="w-4 h-4" viewBox="0 0 24 24">
                 <path fill="#0F172A" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
                 <path fill="#0F172A" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
                 <path fill="#0F172A" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
@@ -430,15 +428,15 @@ function CandidateLoginPage({
           </div>
 
           {error && (
-            <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-400 font-medium flex items-center gap-2">
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-300 font-medium flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 flex-shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
-          <div className="p-3 rounded-xl bg-[#141B2D]/60 border border-[#1E293B] text-xs font-mono text-slate-400 flex items-center justify-center gap-2">
-            <Lock className="w-3.5 h-3.5 text-teal-400" />
-            <span>Local Secure Authentication • Zero External Tracking</span>
+          <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-[11px] font-mono text-slate-400 flex items-center justify-center gap-2">
+            <Lock className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Secure Authentication · Zero External Tracking</span>
           </div>
         </div>
       </div>
@@ -477,68 +475,65 @@ function AdminLoginPage({
   };
 
   return (
-    <div className="min-h-screen bg-[#060709] text-slate-100 flex flex-col items-center justify-center p-6 relative overflow-hidden font-['Plus_Jakarta_Sans',sans-serif]">
-      <div className="absolute top-10 right-10 w-96 h-96 bg-[#00F0FF]/20 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-10 left-10 w-96 h-96 bg-[#8B5CF6]/20 rounded-full blur-[120px] pointer-events-none" />
-
-      <div className="max-w-xl w-full space-y-6 relative z-10">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-6 relative overflow-hidden">
+      <div className="max-w-md w-full space-y-6 relative z-10">
         <button
           onClick={onBack}
-          className="text-base font-bold text-slate-400 hover:text-[#00F0FF] flex items-center gap-2 transition-colors cursor-pointer"
+          className="text-xs font-mono font-medium text-slate-400 hover:text-slate-200 flex items-center gap-2 transition-colors cursor-pointer"
         >
-          <ChevronLeft className="w-5 h-5" /> Back to Portal Selection
+          <ChevronLeft className="w-4 h-4" /> Back to Portal Selection
         </button>
 
-        <div className="p-8 md:p-10 rounded-3xl bg-[#0D1117]/95 border-2 border-[#00F0FF]/40 shadow-[0_20px_60px_rgba(0,240,255,0.2)] space-y-6">
+        <div className="p-8 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-2xl space-y-6">
           <div className="space-y-2 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-[#00F0FF]/20 border-2 border-[#00F0FF] text-[#00F0FF] flex items-center justify-center text-3xl mx-auto shadow-[0_0_20px_rgba(0,240,255,0.4)]">
-              🛡️
+            <div className="w-12 h-12 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-400 flex items-center justify-center mx-auto">
+              <ShieldCheck className="w-6 h-6" />
             </div>
-            <h2 className="text-3xl font-black text-slate-100 text-glow-cyan">
+            <h2 className="text-xl font-bold text-slate-100">
               Security Operations Clearance
             </h2>
-            <p className="text-base text-slate-300">
+            <p className="text-xs text-slate-400">
               Enter authorized administrator credentials and security passkey.
             </p>
           </div>
 
           <form onSubmit={handleAdminAuth} className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-200">Security Officer Email (optional)</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono font-semibold text-slate-300">Officer Email (optional)</label>
               <input
                 type="email"
                 placeholder="officer@security.internal"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-5 py-3.5 rounded-2xl bg-[#131822] border-2 border-[#1E2838] text-base text-slate-100 placeholder-slate-600 focus:outline-none focus:border-[#00F0FF]"
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-100 placeholder-slate-600 focus:outline-none focus:border-slate-700"
               />
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-200">Security Passkey</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono font-semibold text-slate-300">Security Passkey</label>
               <input
                 type="password"
-                placeholder="Enter security passkey..."
+                placeholder="Enter passkey (e.g. admin2026)..."
                 value={passkey}
                 onChange={(e) => setPasskey(e.target.value)}
                 autoFocus
-                className="w-full px-5 py-3.5 rounded-2xl bg-[#131822] border-2 border-[#1E2838] text-base text-slate-100 placeholder-slate-600 focus:outline-none focus:border-[#00F0FF] font-mono"
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-100 placeholder-slate-600 focus:outline-none focus:border-slate-700"
               />
             </div>
 
             {error && (
-              <div className="p-4 rounded-2xl bg-red-500/15 border border-red-500/40 text-sm text-[#FF3B5C] font-bold flex items-center gap-3">
-                <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-300 font-medium flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
                 <span>{error}</span>
               </div>
             )}
 
             <button
               type="submit"
-              className="w-full py-4 rounded-2xl font-black text-base bg-[#00F0FF] hover:bg-[#38BDF8] text-black transition-all shadow-[0_0_25px_rgba(0,240,255,0.4)] flex items-center justify-center gap-3 cursor-pointer"
+              className="w-full py-3 rounded-xl font-semibold text-xs font-mono uppercase tracking-wider bg-sky-600 hover:bg-sky-500 text-slate-950 transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer"
             >
-              <Lock className="w-5 h-5" />
-              <span>Authenticate & Enter Security Operations Center</span>
+              <Lock className="w-4 h-4" />
+              <span>Authenticate & Enter SOC</span>
             </button>
           </form>
         </div>
@@ -626,7 +621,7 @@ function UserSidebar({ active, onNav }: { active: UserView; onNav: (v: UserView)
   const ITEMS: { id: UserView; label: string; icon: any; badge?: string }[] = [
     { id: "user_scan",    label: "Forensic Analysis",    icon: Cpu, badge: "DETERMINISTIC" },
     { id: "user_report",  label: "Inspection Report",    icon: FileText },
-    { id: "user_copilot", label: "Trust AI Assistant",   icon: Brain, badge: "AI" },
+    { id: "user_copilot", label: "Forensic Assistant",   icon: Brain, badge: "ASSISTANT" },
     { id: "user_safety",  label: "Safety & Directives",  icon: ShieldCheck },
     { id: "user_settings",label: "Account Settings",     icon: Settings },
   ];
@@ -1209,23 +1204,23 @@ function UserReportView({
       ) : (
         <div className="space-y-8">
           {/* Top Header Dossier */}
-          <div className="p-8 rounded-3xl bg-gradient-to-r from-[#0F141E] via-[#0D1117] to-[#0F141E] border-2 border-[#1E2838] flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-2xl">
-        <div className="space-y-2">
-          <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-[#131822] border border-[#00FF87]/40 text-xs font-mono font-black text-[#00FF87] tracking-wider text-glow-emerald uppercase">
-            <Shield className="w-4 h-4" /> LEGITIFY RAG FORENSIC INTELLIGENCE REPORT
+          <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-sm">
+        <div className="space-y-1.5">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-slate-950 border border-slate-800 text-xs font-mono font-medium text-emerald-400 tracking-wider uppercase">
+            <Shield className="w-3.5 h-3.5" /> LEGITIFY RAG FORENSIC INTELLIGENCE REPORT
           </div>
-          <h1 className="text-3xl sm:text-4xl font-black text-slate-100 tracking-tight text-shadow-subtle">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-100 tracking-tight">
             {cleanCompany}
           </h1>
-          <p className="text-sm font-mono text-slate-400">
-            CASE ID: <strong className="text-[#00F0FF]">{scanId}</strong> · GENERATED: {new Date().toLocaleDateString()} · INPUT: {inputType}
+          <p className="text-xs font-mono text-slate-400">
+            CASE ID: <strong className="text-sky-400 font-mono">{scanId}</strong> · GENERATED: {new Date().toLocaleDateString()} · INPUT: {inputType}
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <button
             onClick={handleDownloadPDF}
-            className="px-6 py-3.5 rounded-2xl bg-[#00FF87] hover:bg-[#D4FF00] text-black font-black text-sm transition-all shadow-[0_0_20px_rgba(0,255,135,0.35)] flex items-center gap-2 cursor-pointer"
+            className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-semibold text-xs font-mono transition-all shadow-sm flex items-center gap-2 cursor-pointer"
           >
             <Download className="w-4 h-4" />
             <span>{downloading ? "Exporting PDF..." : "Export Official PDF"}</span>
@@ -1235,45 +1230,46 @@ function UserReportView({
 
       {/* Section 1: Executive Overview & Score Meter */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
-        <div className="md:col-span-4 flex flex-col items-center justify-center p-8 rounded-3xl bg-[#0D1117] border-2 border-[#1E2838] shadow-2xl text-center space-y-4">
+        <div className="md:col-span-4 flex flex-col items-center justify-center p-6 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm text-center space-y-4">
           <div className="relative w-48 h-48 flex items-center justify-center">
             <svg viewBox="0 0 200 200" className="w-full h-full transform -rotate-90">
               <circle cx="100" cy="100" r={radius} fill="none" stroke="rgba(255, 255, 255, 0.05)" strokeWidth="16" />
               <circle
                 cx="100" cy="100" r={radius} fill="none" stroke={theme.color} strokeWidth="16" strokeLinecap="round"
                 strokeDasharray={`${circumference} ${circumference}`} strokeDashoffset={strokeDashoffset}
-                style={{ filter: `drop-shadow(0 0 12px ${theme.color})` }}
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-5xl font-black text-shadow-subtle" style={{ color: theme.color }}>
+              <span className="text-5xl font-black" style={{ color: theme.color }}>
                 {trustScore}
               </span>
-              <span className="text-[10px] font-mono font-black tracking-widest text-slate-400 uppercase mt-1">
+              <span className="text-[10px] font-mono font-semibold tracking-widest text-slate-400 uppercase mt-1">
                 TRUST INDEX / 100
               </span>
             </div>
           </div>
           <div className="space-y-1">
-            <span className={`px-4 py-1.5 rounded-full text-xs font-black font-mono ${theme.badgeClass}`}>
-              {theme.emoji} {theme.shortLabel.toUpperCase()}
+            <span className={`px-3 py-1 rounded-md text-xs font-mono font-semibold ${theme.badgeClass}`}>
+              {theme.shortLabel.toUpperCase()}
             </span>
             <p className="text-xs text-slate-400 font-mono pt-1">Assessment Confidence: <strong className="text-slate-200">{confidence}%</strong></p>
           </div>
         </div>
 
-        <div className="md:col-span-8 p-8 rounded-3xl bg-[#0D1117] border-2 border-[#1E2838] space-y-4 shadow-2xl flex flex-col justify-between">
+        <div className="md:col-span-8 p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 shadow-sm flex flex-col justify-between">
           <div>
-            <h3 className="text-xl font-black text-slate-100 flex items-center gap-2">
-              <span>🚨</span> Primary Executive Assessment:
+            <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-rose-400" />
+              <span>Primary Executive Assessment</span>
             </h3>
-            <p className="text-base text-slate-300 mt-3 leading-relaxed font-semibold">
+            <p className="text-sm text-slate-300 mt-3 leading-relaxed">
               {report.ai_synthesis?.summary || theme.description}
             </p>
           </div>
 
-          <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-xs md:text-sm text-slate-200 font-bold">
-            💡 <strong>Mandatory Safety Rule:</strong> No legitimate employer charges candidate registration fees or caution deposits. Any demand for upfront payment is an immediate scam indicator.
+          <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-200 font-medium flex items-center gap-2">
+            <Info className="w-4 h-4 text-rose-400 flex-shrink-0" />
+            <span><strong>Mandatory Safety Rule:</strong> No legitimate employer charges candidate registration fees or caution deposits. Any demand for upfront payment is an immediate scam indicator.</span>
           </div>
         </div>
       </div>
@@ -1282,52 +1278,53 @@ function UserReportView({
       {dynamicClaims.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-xl font-black text-slate-100 text-glow-cyan flex items-center gap-2">
-              <span>🔍</span> Dynamic Document Claims vs. Retrieved Reality (RAG Engine)
+            <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+              <Search className="w-4 h-4 text-sky-400" />
+              <span>Dynamic Document Claims vs. Retrieved Reality (RAG Engine)</span>
             </h3>
-            <span className="text-xs font-mono px-3 py-1 rounded-full bg-[#131822] text-[#00F0FF] border border-[#00F0FF]/30 font-bold">
+            <span className="text-xs font-mono px-2.5 py-0.5 rounded-md bg-slate-950 text-sky-400 border border-slate-800 font-medium">
               {dynamicClaims.length} Claims Extracted
             </span>
           </div>
-          <div className="rounded-3xl border-2 border-[#1E2838] bg-[#0D1117] overflow-hidden shadow-2xl">
+          <div className="rounded-2xl border border-slate-800 bg-slate-900 overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead className="bg-[#131822] text-slate-400 font-mono text-xs">
+                <thead className="bg-slate-950 text-slate-400 font-mono text-xs">
                   <tr>
-                    <th className="px-6 py-4">Claimed in Document</th>
-                    <th className="px-6 py-4">Verification Status</th>
-                    <th className="px-6 py-4">Retrieved Ground Truth (RAG)</th>
-                    <th className="px-6 py-4">Evidence Source</th>
+                    <th className="px-6 py-3.5">Claimed in Document</th>
+                    <th className="px-6 py-3.5">Verification Status</th>
+                    <th className="px-6 py-3.5">Retrieved Ground Truth (RAG)</th>
+                    <th className="px-6 py-3.5">Evidence Source</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#1E2838]">
+                <tbody className="divide-y divide-slate-800">
                   {dynamicClaims.map((clm, idx) => (
-                    <tr key={idx} className="hover:bg-[#131822]/60 transition-colors">
-                      <td className="px-6 py-4 font-bold text-slate-100 max-w-xs">
+                    <tr key={idx} className="hover:bg-slate-800/40 transition-colors">
+                      <td className="px-6 py-4 font-medium text-slate-100 max-w-xs">
                         <div className="space-y-1">
-                          <span className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider block">
+                          <span className="text-[11px] font-mono font-semibold text-slate-400 uppercase tracking-wider block">
                             {clm.claim_type.replace(/_/g, " ")}
                           </span>
-                          <p className="text-sm text-slate-200">{clm.raw_claim_text}</p>
+                          <p className="text-xs text-slate-200">{clm.raw_claim_text}</p>
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold font-mono ${
+                        <span className={`px-2.5 py-1 rounded-md text-xs font-medium font-mono ${
                           clm.verification_status === "VERIFIED"
-                            ? "bg-emerald-500/20 text-[#00FF87] border border-emerald-500/40"
+                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
                             : clm.verification_status === "CONTRADICTED"
-                            ? "bg-red-500/20 text-[#FF3B5C] border border-red-500/40"
+                            ? "bg-rose-500/10 text-rose-400 border border-rose-500/30"
                             : clm.verification_status === "SUSPICIOUS"
-                            ? "bg-orange-500/20 text-orange-400 border border-orange-500/40"
-                            : "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                            ? "bg-amber-500/10 text-amber-300 border border-amber-500/30"
+                            : "bg-slate-800 text-slate-300 border border-slate-700"
                         }`}>
                           {clm.verification_status}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-slate-300 font-semibold max-w-sm leading-relaxed">
+                      <td className="px-6 py-4 text-slate-300 text-xs leading-relaxed max-w-sm">
                         {clm.retrieved_reality || clm.explanation}
                       </td>
-                      <td className="px-6 py-4 text-[#00F0FF] font-mono text-xs font-bold">
+                      <td className="px-6 py-4 text-sky-400 font-mono text-xs font-medium">
                         {clm.evidence_source || "[E-001] Verified Intelligence"}
                       </td>
                     </tr>
@@ -1339,205 +1336,206 @@ function UserReportView({
         </div>
       )}
 
-            {/* Section 1.5: WHY THIS RESULT? (Top 3 Key Evidentiary Drivers) */}
-      <div className="p-6 rounded-3xl bg-[#0D1117] border-2 border-[#1E2838] shadow-xl space-y-4">
+      {/* Section 1.5: WHY THIS RESULT? (Top 3 Key Evidentiary Drivers) */}
+      <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-black text-slate-100 flex items-center gap-2">
-            <span>💡</span> Why This Assessment? (Key Forensic Drivers)
+          <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+            <Info className="w-4 h-4 text-emerald-400" />
+            <span>Why This Assessment? (Key Forensic Drivers)</span>
           </h3>
-          <span className="text-xs font-mono px-3 py-1 rounded-full bg-[#131822] text-[#00FF87] border border-[#00FF87]/30 font-bold">
+          <span className="text-xs font-mono px-2.5 py-0.5 rounded-md bg-slate-950 text-emerald-400 border border-slate-800 font-medium">
             Evidence Trace Active
           </span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {hasFeeDemand ? (
-            <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/30 space-y-1.5">
+            <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 space-y-1.5">
               <div className="flex items-center gap-2">
-                <span className="text-base">🚨</span>
-                <span className="text-xs font-bold text-red-300 uppercase tracking-wider">Payment Demand</span>
+                <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+                <span className="text-xs font-semibold text-rose-300 uppercase tracking-wider font-mono">Payment Demand</span>
               </div>
-              <p className="text-xs text-slate-200 font-medium">Candidate registration fee or caution deposit requested. Standard corporate hiring strictly prohibits applicant fees.</p>
+              <p className="text-xs text-slate-200">Candidate registration fee or caution deposit requested. Standard corporate hiring strictly prohibits applicant fees.</p>
             </div>
           ) : (
-            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-1.5">
+            <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 space-y-1.5">
               <div className="flex items-center gap-2">
-                <span className="text-base">✅</span>
-                <span className="text-xs font-bold text-emerald-300 uppercase tracking-wider">Zero-Fee Compliance</span>
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                <span className="text-xs font-semibold text-emerald-300 uppercase tracking-wider font-mono">Zero-Fee Compliance</span>
               </div>
-              <p className="text-xs text-slate-200 font-medium">No upfront monetary demands or deposit clauses detected across document text.</p>
+              <p className="text-xs text-slate-200">No upfront monetary demands or deposit clauses detected across document text.</p>
             </div>
           )}
 
           {report.domain_analysis?.lookalike_detected ? (
-            <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/30 space-y-1.5">
+            <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 space-y-1.5">
               <div className="flex items-center gap-2">
-                <span className="text-base">🚨</span>
-                <span className="text-xs font-bold text-red-300 uppercase tracking-wider">Lookalike Domain</span>
+                <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+                <span className="text-xs font-semibold text-rose-300 uppercase tracking-wider font-mono">Lookalike Domain</span>
               </div>
-              <p className="text-xs text-slate-200 font-medium">Communication domain appears to impersonate {report.domain_analysis.lookalike_target || 'official brand'}.</p>
+              <p className="text-xs text-slate-200">Communication domain appears to impersonate {report.domain_analysis.lookalike_target || 'official brand'}.</p>
             </div>
           ) : report.recruiter_analysis?.domain_alignment === 'EXACT_MATCH' ? (
-            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-1.5">
+            <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 space-y-1.5">
               <div className="flex items-center gap-2">
-                <span className="text-base">✅</span>
-                <span className="text-xs font-bold text-emerald-300 uppercase tracking-wider">Domain Aligned</span>
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                <span className="text-xs font-semibold text-emerald-300 uppercase tracking-wider font-mono">Domain Aligned</span>
               </div>
-              <p className="text-xs text-slate-200 font-medium">Recruiter sender domain aligns with corporate domain index.</p>
+              <p className="text-xs text-slate-200">Recruiter sender domain aligns with corporate domain index.</p>
             </div>
           ) : (
-            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-1.5">
+            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-1.5">
               <div className="flex items-center gap-2">
-                <span className="text-base">⚠️</span>
-                <span className="text-xs font-bold text-amber-300 uppercase tracking-wider">Domain Unverified</span>
+                <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                <span className="text-xs font-semibold text-amber-300 uppercase tracking-wider font-mono">Domain Unverified</span>
               </div>
-              <p className="text-xs text-slate-200 font-medium">Sender domain could not be independently linked to official corporate web registry.</p>
+              <p className="text-xs text-slate-200">Sender domain could not be independently linked to official corporate web registry.</p>
             </div>
           )}
 
           {report.company_verification?.status === 'ACTIVE' || (report.company_verification as any)?.status === 'LOCAL_REFERENCE_FOUND' ? (
-            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-1.5">
+            <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 space-y-1.5">
               <div className="flex items-center gap-2">
-                <span className="text-base">✅</span>
-                <span className="text-xs font-bold text-emerald-300 uppercase tracking-wider">Entity Matched</span>
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                <span className="text-xs font-semibold text-emerald-300 uppercase tracking-wider font-mono">Entity Matched</span>
               </div>
-              <p className="text-xs text-slate-200 font-medium">Company legal name indexed in corporate reference dataset ({report.company_verification.legal_name || cleanCompany}).</p>
+              <p className="text-xs text-slate-200">Company legal name indexed in corporate reference dataset ({report.company_verification.legal_name || cleanCompany}).</p>
             </div>
           ) : (
-            <div className="p-4 rounded-2xl bg-slate-800/40 border border-slate-700/40 space-y-1.5">
+            <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/40 space-y-1.5">
               <div className="flex items-center gap-2">
-                <span className="text-base">ℹ️</span>
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Registry Search</span>
+                <Info className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider font-mono">Registry Search</span>
               </div>
-              <p className="text-xs text-slate-300 font-medium">Organization not matched in local index (Note: live statutory registry query unavailable; absence != fraud).</p>
+              <p className="text-xs text-slate-300">Organization not matched in local index (live statutory registry query unavailable; absence != fraud).</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Section 1.8: VISUAL & SIGNATORY FORENSICS (Accurate Observation != Verification) */}
-      <div className="p-6 rounded-3xl bg-[#0D1117] border-2 border-[#1E2838] shadow-xl space-y-4">
+      {/* Section 1.8: VISUAL & SIGNATORY FORENSICS */}
+      <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="text-2xl">✍️</span>
+            <FileCheck className="w-5 h-5 text-sky-400" />
             <div>
-              <h4 className="text-base font-black text-slate-100">Signatory & Visual Forensics</h4>
+              <h4 className="text-sm font-bold text-slate-100">Signatory & Visual Forensics</h4>
               <p className="text-xs text-slate-400">Independent visual inspection of signatures, seals, and authority blocks</p>
             </div>
           </div>
-          <span className={`text-xs font-mono font-bold px-3 py-1 rounded-full ${
+          <span className={`text-xs font-mono font-medium px-2.5 py-1 rounded-md ${
             (report.signatory_forensics?.signature_detected || report.document_analysis?.visual_forensics?.signature_detected)
-              ? "bg-emerald-500/20 text-[#00FF87] border border-emerald-500/40"
+              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
               : "bg-slate-800 text-slate-400 border border-slate-700"
           }`}>
             {(report.signatory_forensics?.identity_state || (report.document_analysis?.visual_forensics?.signature_detected ? "SIGNATORY_OBSERVED" : "NO_SIGNATURE_DETECTED")).replace(/_/g, " ")}
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-[#1E2838]">
-          <div className="p-4 rounded-2xl bg-[#131822] border border-[#1E2838]">
-            <span className="text-[11px] font-mono text-slate-400 uppercase">Signature Type</span>
-            <p className="text-sm font-bold text-slate-100 mt-1">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-slate-800">
+          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
+            <span className="text-[10px] font-mono text-slate-400 uppercase">Signature Type</span>
+            <p className="text-xs font-semibold text-slate-100 mt-1">
               {(report.signatory_forensics?.signature_type || (report.document_analysis?.visual_forensics?.signature_detected ? "VISUAL_SIGNATURE" : "ABSENT")).replace(/_/g, " ")}
             </p>
-            <p className="text-[10px] text-slate-400 mt-0.5">
+            <p className="text-[10px] text-slate-500 mt-0.5">
               {report.signatory_forensics?.signature_type === 'CRYPTOGRAPHIC_SIGNATURE' ? "Cryptographic cert validated" : "Visual observation only"}
             </p>
           </div>
 
-          <div className="p-4 rounded-2xl bg-[#131822] border border-[#1E2838]">
-            <span className="text-[11px] font-mono text-slate-400 uppercase">Signatory Identity</span>
-            <p className="text-sm font-bold text-slate-100 mt-1">
+          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
+            <span className="text-[10px] font-mono text-slate-400 uppercase">Signatory Identity</span>
+            <p className="text-xs font-semibold text-slate-100 mt-1">
               {report.signatory_forensics?.signatory_name || report.document_analysis?.visual_forensics?.signatory_name || (report.signatory_forensics?.signature_detected ? "Signature Observed (Name Unstated)" : "Not Stated in Document")}
             </p>
-            <p className="text-[10px] text-slate-400 mt-0.5">
+            <p className="text-[10px] text-slate-500 mt-0.5">
               {report.signatory_forensics?.signatory_title || report.document_analysis?.visual_forensics?.signatory_title || (report.signatory_forensics?.signature_detected ? "Signatory Block Present" : "No Signatory Listed")}
             </p>
           </div>
 
-          <div className="p-4 rounded-2xl bg-[#131822] border border-[#1E2838]">
-            <span className="text-[11px] font-mono text-slate-400 uppercase">Evidentiary Rule</span>
-            <p className="text-xs font-semibold text-amber-300 mt-1">
+          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
+            <span className="text-[10px] font-mono text-slate-400 uppercase">Evidentiary Rule</span>
+            <p className="text-xs font-medium text-amber-300 mt-1">
               {(report.signatory_forensics?.signature_detected || report.document_analysis?.visual_forensics?.signature_detected)
-                ? "Observed in document. Does NOT automatically increase trust."
-                : "Absence of signature is NOT proof of fraud. Standard offer review recommended."}
+                ? "Observed in document. Does not automatically imply legitimacy."
+                : "Absence of signature is not proof of fraud. Standard offer review recommended."}
             </p>
           </div>
         </div>
       </div>
 
       {/* Section 1.8: Extracted Internship / Job Offer Parameters Card */}
-      <div className="p-6 md:p-8 rounded-3xl bg-[#0D1117] border-2 border-[#1E2838] space-y-5 shadow-2xl">
-        <div className="flex items-center justify-between pb-3 border-b border-[#1E2838] flex-wrap gap-2">
+      <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 shadow-sm">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-800 flex-wrap gap-2">
           <div className="flex items-center gap-2.5">
-            <span className="text-xl">📋</span>
-            <h3 className="text-lg font-black text-slate-100 tracking-tight">
+            <FileText className="w-4 h-4 text-slate-300" />
+            <h3 className="text-sm font-bold text-slate-100">
               Extracted Internship & Job Offer Audit Parameters
             </h3>
           </div>
-          <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold ${
+          <span className={`px-2.5 py-0.5 rounded-md text-xs font-mono font-medium ${
             trustScore >= 75
-              ? "bg-emerald-500/20 text-[#00FF87] border border-emerald-500/40"
-              : "bg-red-500/20 text-[#FF3B5C] border border-red-500/50"
+              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+              : "bg-rose-500/10 text-rose-400 border border-rose-500/30"
           }`}>
             {trustScore >= 75 ? "CONVENTIONS VERIFIED" : "STRUCTURAL ANOMALIES DETECTED"}
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 font-mono text-xs">
-          <div className="p-4 rounded-2xl bg-[#131822] border border-[#1E2838] space-y-1.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 font-mono text-xs">
+          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
             <span className="text-slate-400 uppercase tracking-wider text-[10px]">Claimed Organization</span>
-            <p className="font-bold text-slate-100 text-sm truncate">{cleanCompany}</p>
-            <span className="text-[10px] text-slate-400 block">
+            <p className="font-semibold text-slate-100 text-xs truncate">{cleanCompany}</p>
+            <span className="text-[10px] text-slate-500 block">
               {fSemantics?.hasCinNumber ? `CIN: ${fSemantics.detectedCin}` : "CIN / ROC: Not Stated on Document"}
             </span>
           </div>
 
-          <div className="p-4 rounded-2xl bg-[#131822] border border-[#1E2838] space-y-1.5">
+          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
             <span className="text-slate-400 uppercase tracking-wider text-[10px]">Recruiter Channel & Email</span>
-            <p className={`font-bold text-sm truncate ${fSemantics?.isFreeWebmail ? "text-[#FF3B5C]" : "text-slate-100"}`}>
+            <p className={`font-semibold text-xs truncate ${fSemantics?.isFreeWebmail ? "text-rose-400" : "text-slate-100"}`}>
               {fSemantics?.recruiterEmail || report.recruiter_analysis?.email || "No contact email listed"}
             </p>
-            <span className={`text-[10px] font-bold block ${
-              fSemantics?.isFreeWebmail ? "text-[#FF3B5C]" : "text-[#00FF87]"
+            <span className={`text-[10px] font-medium block ${
+              fSemantics?.isFreeWebmail ? "text-rose-400" : "text-emerald-400"
             }`}>
-              {fSemantics?.isFreeWebmail ? "🚨 Free Personal Webmail (@gmail.com)" : "✅ Corporate Domain Aligned"}
+              {fSemantics?.isFreeWebmail ? "Personal Webmail Domain (@gmail.com)" : "Corporate Domain Aligned"}
             </span>
           </div>
 
-          <div className="p-4 rounded-2xl bg-[#131822] border border-[#1E2838] space-y-1.5">
+          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
             <span className="text-slate-400 uppercase tracking-wider text-[10px]">Opportunity Title / Role</span>
-            <p className="font-bold text-slate-100 text-sm truncate">{fSemantics?.detectedRole || "Internship / Employment"}</p>
-            <span className="text-[10px] text-slate-400 block">
+            <p className="font-semibold text-slate-100 text-xs truncate">{fSemantics?.detectedRole || "Internship / Employment"}</p>
+            <span className="text-[10px] text-slate-500 block">
               Stipend: {fSemantics?.detectedStipend || "Unstated / Disclosed in separate terms"}
             </span>
           </div>
 
-          <div className="p-4 rounded-2xl bg-[#131822] border border-[#1E2838] space-y-1.5">
+          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
             <span className="text-slate-400 uppercase tracking-wider text-[10px]">Selection Mechanism</span>
-            <p className={`font-bold text-sm truncate ${fSemantics?.hasDirectSelectionNoInterview ? "text-[#FF3B5C]" : "text-slate-100"}`}>
-              {fSemantics?.hasDirectSelectionNoInterview ? "🚨 Direct Selection (No Interview)" : "Formal Interview & Screening"}
+            <p className={`font-semibold text-xs truncate ${fSemantics?.hasDirectSelectionNoInterview ? "text-rose-400" : "text-slate-100"}`}>
+              {fSemantics?.hasDirectSelectionNoInterview ? "Direct Selection (No Interview)" : "Formal Interview & Screening"}
             </p>
-            <span className="text-[10px] text-slate-400 block">
-              {fSemantics?.hasDirectSelectionNoInterview ? "Known scam trope (unverified candidate intake)" : "Standard corporate HR workflow"}
+            <span className="text-[10px] text-slate-500 block">
+              {fSemantics?.hasDirectSelectionNoInterview ? "Unverified intake without evaluation" : "Standard corporate HR workflow"}
             </span>
           </div>
 
-          <div className="p-4 rounded-2xl bg-[#131822] border border-[#1E2838] space-y-1.5">
+          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
             <span className="text-slate-400 uppercase tracking-wider text-[10px]">Monetary Requirement / Fee</span>
-            <p className={`font-bold text-sm truncate ${hasFeeDemand ? "text-[#FF3B5C]" : "text-[#00FF87]"}`}>
-              {hasFeeDemand ? "🚨 Caution Deposit / Fee Demanded" : "✅ 100% Zero-Fee Compliant"}
+            <p className={`font-semibold text-xs truncate ${hasFeeDemand ? "text-rose-400" : "text-emerald-400"}`}>
+              {hasFeeDemand ? "Caution Deposit / Fee Demanded" : "Zero-Fee Compliant"}
             </p>
-            <span className="text-[10px] text-slate-400 block">
-              {hasFeeDemand ? "Strict violation of statutory recruitment norms" : "Legitimate zero-cost employment"}
+            <span className="text-[10px] text-slate-500 block">
+              {hasFeeDemand ? "Violation of statutory recruitment norms" : "Legitimate zero-cost employment"}
             </span>
           </div>
 
-          <div className="p-4 rounded-2xl bg-[#131822] border border-[#1E2838] space-y-1.5">
+          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
             <span className="text-slate-400 uppercase tracking-wider text-[10px]">Communication Platform</span>
-            <p className={`font-bold text-sm truncate ${fSemantics?.hasInformalChannels ? "text-[#FF3B5C]" : "text-slate-100"}`}>
-              {fSemantics?.hasInformalChannels ? `🚨 Informal (${fSemantics.informalChannels.join(", ")})` : "Official Enterprise Channel"}
+            <p className={`font-semibold text-xs truncate ${fSemantics?.hasInformalChannels ? "text-rose-400" : "text-slate-100"}`}>
+              {fSemantics?.hasInformalChannels ? `Informal (${fSemantics.informalChannels.join(", ")})` : "Official Enterprise Channel"}
             </p>
-            <span className="text-[10px] text-slate-400 block">
+            <span className="text-[10px] text-slate-500 block">
               {fSemantics?.hasInformalChannels ? "Evasion of verifiable corporate audit trail" : "Trackable corporate routing"}
             </span>
           </div>
@@ -1547,10 +1545,11 @@ function UserReportView({
       {/* Section 2: MULTI-DIMENSIONAL FORENSIC BREAKDOWN */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-xl font-black text-slate-100 text-glow-emerald flex items-center gap-2">
-            <span>🛡️</span> Multi-Dimensional Forensic Breakdown
+          <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <span>Multi-Dimensional Forensic Breakdown</span>
           </h3>
-          <span className="text-xs font-mono px-3 py-1 rounded-full bg-[#131822] text-[#00FF87] border border-[#00FF87]/30 font-bold">
+          <span className="text-xs font-mono px-2.5 py-0.5 rounded-md bg-slate-950 text-emerald-400 border border-slate-800 font-medium">
             5 Diagnostic Vectors Evaluated
           </span>
         </div>
@@ -1568,42 +1567,42 @@ function UserReportView({
             const isAnomalous = card1Score >= 50 && card1Score < 75;
 
             return (
-              <div className={`p-6 rounded-3xl border-2 space-y-3 shadow-xl ${
+              <div className={`p-5 rounded-xl border space-y-3 shadow-sm ${
                 !isVerified && !isAnomalous
-                  ? "bg-red-500/10 border-red-500/40"
+                  ? "bg-rose-500/10 border-rose-500/30"
                   : isAnomalous
-                  ? "bg-amber-500/10 border-amber-500/40"
-                  : "bg-[#0D1117] border-[#1E2838]"
+                  ? "bg-amber-500/10 border-amber-500/30"
+                  : "bg-slate-900 border-slate-800"
               }`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <span className="text-2xl">🔬</span>
+                    <Layers className="w-5 h-5 text-indigo-400" />
                     <div>
-                      <span className="text-base font-black text-slate-100 block">Document Authenticity & Visual Forensics</span>
+                      <span className="text-sm font-bold text-slate-100 block">Document Authenticity & Visual Forensics</span>
                       <span className="text-[10px] font-mono text-slate-400">Enterprise Structure Compliance & Canvas ELA Tamper Grid</span>
                     </div>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold ${
+                  <span className={`px-2.5 py-0.5 rounded-md text-xs font-mono font-medium ${
                     isVerified
-                      ? "bg-emerald-500/20 text-[#00FF87] border border-emerald-500/40"
+                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
                       : isAnomalous
-                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                      : "bg-red-500/20 text-[#FF3B5C] border border-red-500/50"
+                      ? "bg-amber-500/10 text-amber-300 border border-amber-500/30"
+                      : "bg-rose-500/10 text-rose-400 border border-rose-500/30"
                   }`}>
-                    {isVerified ? `VERIFIED FORMAT (${card1Score}%)` : isAnomalous ? `STRUCTURAL ANOMALIES (${card1Score}%)` : `DEFICIENT / FAKE FORMAT (${card1Score}%)`}
+                    {isVerified ? `VERIFIED FORMAT (${card1Score}%)` : isAnomalous ? `STRUC ANOMALIES (${card1Score}%)` : `DEFICIENT FORMAT (${card1Score}%)`}
                   </span>
                 </div>
                 <div className="space-y-2">
-                  <p className="text-xs text-slate-300 font-medium leading-relaxed">
+                  <p className="text-xs text-slate-300 leading-relaxed">
                     {card1Struct ? (
                       <>
                         <strong className="text-slate-100">{card1Struct.passedChecksCount}/{card1Struct.totalChecksCount} Enterprise Standards Verified.</strong>{" "}
                         {card1Struct.missingElements && card1Struct.missingElements.length > 0 ? (
-                          <span className="text-red-400">
+                          <span className="text-rose-400">
                             Missing mandatory organizational requirements: {card1Struct.missingElements.slice(0, 3).join(", ")}.
                           </span>
                         ) : (
-                          <span className="text-[#00FF87]">
+                          <span className="text-emerald-400">
                             Document conforms to legitimate organizational formatting: reference number, corporate address, specific job role, and executive signatory block.
                           </span>
                         )}
@@ -1621,12 +1620,12 @@ function UserReportView({
                           key={chk.id}
                           className={`text-[10px] font-mono px-2 py-0.5 rounded-md border flex items-center gap-1 ${
                             chk.passed
-                              ? "bg-emerald-500/10 text-[#00FF87] border-emerald-500/30"
-                              : "bg-red-500/10 text-red-400 border-red-500/30"
+                              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                              : "bg-rose-500/10 text-rose-400 border-rose-500/30"
                           }`}
                           title={chk.details}
                         >
-                          <span>{chk.passed ? "✓" : "✗"}</span>
+                          {chk.passed ? <Check className="w-3 h-3 inline mr-1" /> : <X className="w-3 h-3 inline mr-1" />}
                           <span>{chk.name}</span>
                         </span>
                       ))}
@@ -1638,90 +1637,90 @@ function UserReportView({
           })()}
 
           {/* Card 2: Financial Safety & Non-Fee Verification */}
-          <div className={`p-6 rounded-3xl border-2 space-y-3 shadow-xl ${
+          <div className={`p-5 rounded-xl border space-y-3 shadow-sm ${
             hasFeeDemand
-              ? "bg-red-500/10 border-red-500/40"
-              : "bg-[#0D1117] border-[#1E2838]"
+              ? "bg-rose-500/10 border-rose-500/30"
+              : "bg-slate-900 border-slate-800"
           }`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <span className="text-2xl">💳</span>
+                <CreditCard className="w-5 h-5 text-rose-400" />
                 <div>
-                  <span className="text-base font-black text-slate-100 block">Financial & Fee Safety Verification</span>
+                  <span className="text-sm font-bold text-slate-100 block">Financial & Fee Safety Verification</span>
                   <span className="text-[10px] font-mono text-slate-400">Zero-Fee Statutory Compliance Guarantee</span>
                 </div>
               </div>
-              <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold ${
+              <span className={`px-2.5 py-0.5 rounded-md text-xs font-mono font-medium ${
                 hasFeeDemand
-                  ? "bg-red-500/20 text-[#FF3B5C] border border-red-500/50"
-                  : "bg-emerald-500/20 text-[#00FF87] border border-emerald-500/40"
+                  ? "bg-rose-500/10 text-rose-400 border border-rose-500/30"
+                  : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
               }`}>
-                {hasFeeDemand ? "🚨 FEE DEMAND DETECTED" : "✅ ZERO-FEE COMPLIANT"}
+                {hasFeeDemand ? "FEE DEMAND DETECTED" : "ZERO-FEE COMPLIANT"}
               </span>
             </div>
-            <p className="text-xs text-slate-300 font-medium leading-relaxed">
+            <p className="text-xs text-slate-300 leading-relaxed">
               {hasFeeDemand
-                ? "Document explicitly demands candidate payments, training kits, or caution deposits. Legitimate employers NEVER solicit candidate funds."
+                ? "Document explicitly demands candidate payments, training kits, or caution deposits. Legitimate employers never solicit candidate funds."
                 : "No upfront fees, equipment deposits, or non-corporate monetary requirements detected in letter."}
             </p>
           </div>
 
           {/* Card 3: Sender Communication & Email Security */}
-          <div className={`p-6 rounded-3xl border-2 space-y-3 shadow-xl ${
+          <div className={`p-5 rounded-xl border space-y-3 shadow-sm ${
             fSemantics?.isFreeWebmail
-              ? "bg-red-500/10 border-red-500/40"
-              : "bg-[#0D1117] border-[#1E2838]"
+              ? "bg-rose-500/10 border-rose-500/30"
+              : "bg-slate-900 border-slate-800"
           }`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <span className="text-2xl">🌐</span>
+                <Globe className="w-5 h-5 text-sky-400" />
                 <div>
-                  <span className="text-base font-black text-slate-100 block">Sender Communication & Email Security</span>
+                  <span className="text-sm font-bold text-slate-100 block">Sender Communication & Email Security</span>
                   <span className="text-[10px] font-mono text-slate-400">Corporate Domain Alignment vs Personal Webmail</span>
                 </div>
               </div>
-              <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold ${
+              <span className={`px-2.5 py-0.5 rounded-md text-xs font-mono font-medium ${
                 fSemantics?.isFreeWebmail
-                  ? "bg-red-500/20 text-[#FF3B5C] border border-red-500/50"
+                  ? "bg-rose-500/10 text-rose-400 border border-rose-500/30"
                   : fSemantics?.recruiterEmail
-                  ? "bg-emerald-500/20 text-[#00FF87] border border-emerald-500/40"
-                  : "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                  : "bg-amber-500/10 text-amber-300 border border-amber-500/30"
               }`}>
-                {fSemantics?.isFreeWebmail ? "🚨 FREE WEBMAIL GMAIL" : fSemantics?.recruiterEmail ? "DOMAIN ALIGNED" : "UNVERIFIED CHANNEL"}
+                {fSemantics?.isFreeWebmail ? "FREE WEBMAIL GMAIL" : fSemantics?.recruiterEmail ? "DOMAIN ALIGNED" : "UNVERIFIED CHANNEL"}
               </span>
             </div>
-            <p className="text-xs text-slate-300 font-medium leading-relaxed">
+            <p className="text-xs text-slate-300 leading-relaxed">
               {fSemantics?.isFreeWebmail
-                ? `Recruiter utilizes public personal webmail (${fSemantics.recruiterEmail}). Corporate employers NEVER issue official offers from Gmail.`
+                ? `Recruiter utilizes public personal webmail (${fSemantics.recruiterEmail}). Corporate employers never issue official offers from Gmail.`
                 : "Recruiter contact evaluated for official corporate MX records and corporate domain alignment."}
             </p>
           </div>
 
           {/* Card 4: Offer Terms & Linguistic Integrity */}
-          <div className={`p-6 rounded-3xl border-2 space-y-3 shadow-xl ${
+          <div className={`p-5 rounded-xl border space-y-3 shadow-sm ${
             fSemantics?.hasDirectSelectionNoInterview || fSemantics?.hasInformalChannels
-              ? "bg-amber-500/10 border-amber-500/40"
-              : "bg-[#0D1117] border-[#1E2838]"
+              ? "bg-amber-500/10 border-amber-500/30"
+              : "bg-slate-900 border-slate-800"
           }`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <span className="text-2xl">📜</span>
+                <FileText className="w-5 h-5 text-slate-400" />
                 <div>
-                  <span className="text-base font-black text-slate-100 block">Offer Letter Terms & Linguistic Tone</span>
+                  <span className="text-sm font-bold text-slate-100 block">Offer Letter Terms & Linguistic Tone</span>
                   <span className="text-[10px] font-mono text-slate-400">Legal Clauses vs Direct-Appointment Trope</span>
                 </div>
               </div>
-              <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold ${
+              <span className={`px-2.5 py-0.5 rounded-md text-xs font-mono font-medium ${
                 fSemantics?.hasDirectSelectionNoInterview
-                  ? "bg-red-500/20 text-[#FF3B5C] border border-red-500/50"
+                  ? "bg-rose-500/10 text-rose-400 border border-rose-500/30"
                   : fSemantics?.hasLegalTerms
-                  ? "bg-emerald-500/20 text-[#00FF87] border border-emerald-500/40"
-                  : "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                  : "bg-amber-500/10 text-amber-300 border border-amber-500/30"
               }`}>
-                {fSemantics?.hasDirectSelectionNoInterview ? "🚨 NO-INTERVIEW SCAM" : "STANDARD CLAUSES"}
+                {fSemantics?.hasDirectSelectionNoInterview ? "NO-INTERVIEW SCAM" : "STANDARD CLAUSES"}
               </span>
             </div>
-            <p className="text-xs text-slate-300 font-medium leading-relaxed">
+            <p className="text-xs text-slate-300 leading-relaxed">
               {fSemantics?.hasDirectSelectionNoInterview
                 ? "Offer claims direct appointment without formal technical or HR interview. Reputable employers always conduct screening."
                 : "Document features standard formal employment structures, confidentiality terms, and appointment clauses."}
@@ -1729,20 +1728,20 @@ function UserReportView({
           </div>
 
           {/* Card 5: Statutory Organization Identity & Registry */}
-          <div className="p-6 rounded-3xl bg-[#0D1117] border-2 border-[#1E2838] space-y-3 shadow-xl md:col-span-2">
+          <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-3 shadow-sm md:col-span-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <span className="text-2xl">🏛️</span>
+                <Building2 className="w-5 h-5 text-slate-400" />
                 <div>
-                  <span className="text-base font-black text-slate-100 block">Organization Identity & Statutory Registry Cross-Check</span>
+                  <span className="text-sm font-bold text-slate-100 block">Organization Identity & Statutory Registry Cross-Check</span>
                   <span className="text-[10px] font-mono text-slate-400">MCA21 & ROC Directory Reference Matching</span>
                 </div>
               </div>
-              <span className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-[#00F0FF]/20 text-[#00F0FF] border border-[#00F0FF]/40">
+              <span className="px-2.5 py-0.5 rounded-md text-xs font-mono font-medium bg-sky-500/10 text-sky-400 border border-sky-500/30">
                 {cleanCompany ? cleanCompany.slice(0, 28) : "CORPORATE REGISTRY"}
               </span>
             </div>
-            <p className="text-xs text-slate-300 font-medium leading-relaxed">
+            <p className="text-xs text-slate-300 leading-relaxed">
               Target organization cross-referenced against statutory registration registries and public enterprise directories.
               {fSemantics?.hasCinNumber ? ` Verified MCA Corporate Identification Number: ${fSemantics.detectedCin}.` : " Formal registration code absent in document letterhead."}
             </p>
@@ -1754,10 +1753,11 @@ function UserReportView({
       {triggeredFlags.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-xl font-black text-slate-100 flex items-center gap-2">
-              <span>🚩</span> Detected Risks & Mitigation Action ({triggeredFlags.length})
+            <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-rose-400" />
+              <span>Detected Risks & Mitigation Action ({triggeredFlags.length})</span>
             </h3>
-            <span className="text-xs font-mono px-3 py-1 rounded-full bg-red-500/10 text-red-400 border border-red-500/30 font-bold">
+            <span className="text-xs font-mono px-2.5 py-0.5 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/30 font-medium">
               Action Required
             </span>
           </div>
@@ -1766,26 +1766,24 @@ function UserReportView({
             {triggeredFlags.map((flag: any, idx: number) => (
               <div
                 key={idx}
-                className={`p-5 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+                className={`p-4 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-4 ${
                   flag.severity === "critical"
-                    ? "bg-red-500/10 border-red-500/40 text-red-300"
+                    ? "bg-rose-500/10 border-rose-500/30 text-rose-300"
                     : flag.severity === "high"
-                    ? "bg-orange-500/10 border-orange-500/40 text-orange-300"
-                    : "bg-amber-500/10 border-amber-500/40 text-amber-300"
+                    ? "bg-amber-500/10 border-amber-500/30 text-amber-300"
+                    : "bg-yellow-500/10 border-yellow-500/30 text-yellow-300"
                 }`}
               >
-                <div className="space-y-2 flex-1">
+                <div className="space-y-1.5 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-base">
-                      {flag.severity === "critical" ? "🔴" : flag.severity === "high" ? "🟠" : "🟡"}
-                    </span>
-                    <span className="text-xs font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-black/40 border border-current">
+                    <span className={`w-2 h-2 rounded-full ${flag.severity === "critical" ? "bg-rose-500" : flag.severity === "high" ? "bg-amber-500" : "bg-yellow-500"}`} />
+                    <span className="text-xs font-mono font-medium uppercase tracking-wider px-2 py-0.5 rounded bg-slate-950 border border-current">
                       {flag.severity} RISK · {flag.rule?.replace(/_/g, " ")}
                     </span>
                   </div>
-                  <p className="text-sm font-bold text-slate-100 leading-snug">{flag.message}</p>
-                  <div className="text-xs text-slate-200 bg-black/40 p-3 rounded-xl border border-slate-700/60 flex items-start gap-2.5 mt-1">
-                    <span className="text-amber-400 font-bold flex-shrink-0">💡 MITIGATION:</span>
+                  <p className="text-xs font-semibold text-slate-100 leading-snug">{flag.message}</p>
+                  <div className="text-xs text-slate-300 bg-slate-950 p-2.5 rounded-lg border border-slate-800 flex items-start gap-2 mt-1">
+                    <span className="text-amber-400 font-mono font-semibold flex-shrink-0">MITIGATION:</span>
                     <span className="leading-relaxed">{flag.mitigation || "Contact the company's verified HR team through their official careers portal before signing or paying."}</span>
                   </div>
                 </div>
@@ -1797,37 +1795,38 @@ function UserReportView({
 
       {/* Section 4: Multi-Source Evidence Locker (Live Dynamic Records) */}
       <div className="space-y-4">
-        <h3 className="text-xl font-black text-slate-100 text-glow-emerald flex items-center gap-2">
-          <span>📁</span> Auditable Multi-Source Evidence Locker
+        <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+          <Database className="w-4 h-4 text-sky-400" />
+          <span>Auditable Multi-Source Evidence Locker</span>
         </h3>
-        <div className="rounded-3xl border-2 border-[#1E2838] bg-[#0D1117] overflow-hidden shadow-2xl">
+        <div className="rounded-2xl border border-slate-800 bg-slate-900 overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-[#131822] text-slate-400 font-mono text-xs">
+              <thead className="bg-slate-950 text-slate-400 font-mono text-xs">
                 <tr>
-                  <th className="px-6 py-4">ID</th>
-                  <th className="px-6 py-4">Category</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4">Source</th>
-                  <th className="px-6 py-4">Claim / Finding</th>
-                  <th className="px-6 py-4 text-right">Confidence</th>
+                  <th className="px-6 py-3.5">ID</th>
+                  <th className="px-6 py-3.5">Category</th>
+                  <th className="px-6 py-3.5">Status</th>
+                  <th className="px-6 py-3.5">Source</th>
+                  <th className="px-6 py-3.5">Claim / Finding</th>
+                  <th className="px-6 py-3.5 text-right">Confidence</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#1E2838]">
+              <tbody className="divide-y divide-slate-800">
                 {dynamicEvidence.map((item, idx) => (
-                  <tr key={idx} className="hover:bg-[#131822]/60 transition-colors">
-                    <td className="px-6 py-4 font-mono font-bold text-indigo-400">{item.id}</td>
+                  <tr key={idx} className="hover:bg-slate-800/40 transition-colors">
+                    <td className="px-6 py-4 font-mono font-medium text-sky-400 text-xs">{item.id}</td>
                     <td className="px-6 py-4 font-mono text-xs text-slate-400">{item.type}</td>
                     <td className="px-6 py-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                        item.status === "VERIFIED" ? "bg-emerald-500/20 text-[#00FF87]" : item.status === "CRITICAL" ? "bg-red-500/20 text-[#FF3B5C]" : "bg-amber-500/20 text-amber-400"
+                      <span className={`px-2.5 py-0.5 rounded-md text-xs font-mono font-medium ${
+                        item.status === "VERIFIED" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30" : item.status === "CRITICAL" ? "bg-rose-500/10 text-rose-400 border border-rose-500/30" : "bg-amber-500/10 text-amber-300 border border-amber-500/30"
                       }`}>
                         {item.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-slate-300 font-semibold">{item.source}</td>
-                    <td className="px-6 py-4 text-slate-200 max-w-xs leading-relaxed">{item.claim}</td>
-                    <td className="px-6 py-4 text-right font-mono font-bold text-[#00FF87]">{formatConfidence(item.confidence)}%</td>
+                    <td className="px-6 py-4 text-slate-300 text-xs">{item.source}</td>
+                    <td className="px-6 py-4 text-slate-200 text-xs max-w-xs leading-relaxed">{item.claim}</td>
+                    <td className="px-6 py-4 text-right font-mono font-medium text-emerald-400 text-xs">{formatConfidence(item.confidence)}%</td>
                   </tr>
                 ))}
               </tbody>
@@ -1868,13 +1867,14 @@ function UserReportView({
       <div className="flex flex-wrap items-center gap-4 pt-4">
         <button
           onClick={() => onOpenCopilot()}
-          className="flex-1 py-4 rounded-2xl bg-[#0F131A] hover:bg-[#151B26] border-2 border-[#00FF87]/40 text-base font-black text-[#00FF87] flex items-center justify-center gap-3 transition-all cursor-pointer shadow-lg"
+          className="flex-1 py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-mono font-medium text-slate-200 flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer"
         >
-          <Brain className="w-5 h-5" /> Full Copilot Workspace
+          <Brain className="w-4 h-4 text-sky-400" />
+          <span>Forensic Assistant Workspace</span>
         </button>
         <button
           onClick={onNewScan}
-          className="px-8 py-4 rounded-2xl bg-[#00FF87] hover:bg-[#D4FF00] text-black font-black text-base transition-all shadow-[0_0_20px_rgba(0,255,135,0.4)] cursor-pointer"
+          className="px-6 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-semibold text-xs font-mono transition-all shadow-sm cursor-pointer"
         >
           Verify Another Letter
         </button>
@@ -1909,12 +1909,12 @@ function ReportCopilotInline({
   const [copied, setCopied] = useState(false);
 
   const SUGGESTIONS = [
-    { label: "🎯 Why this score?", prompt: "Why did LEGITIFY assign this score and verdict?" },
-    { label: "📧 Is recruiter real?", prompt: "Is this recruiter email domain authentic or a lookalike?" },
-    { label: "💰 Stipend plausibility?", prompt: "Is the offered stipend normal or suspiciously high?" },
-    { label: "🏢 MCA registration", prompt: "Is this company registered with the Ministry of Corporate Affairs?" },
-    { label: "⚠️ What if I paid money?", prompt: "What emergency steps should I take if I already paid a deposit?" },
-    { label: "✉️ Draft verification email", prompt: "Generate verification questions I should send to this recruiter." },
+    { label: "Why this score?", prompt: "Why did LEGITIFY assign this score and verdict?" },
+    { label: "Recruiter authenticity", prompt: "Is this recruiter email domain authentic or a lookalike?" },
+    { label: "Stipend plausibility", prompt: "Is the offered stipend normal or suspiciously high?" },
+    { label: "MCA registration", prompt: "Is this company registered with the Ministry of Corporate Affairs?" },
+    { label: "Paid money procedure", prompt: "What emergency steps should I take if I already paid a deposit?" },
+    { label: "Draft verification email", prompt: "Generate verification questions I should send to this recruiter." },
   ];
 
   const handleAsk = async (questionText?: string) => {
@@ -1930,10 +1930,10 @@ function ReportCopilotInline({
       setAnswer(res);
     } catch {
       setAnswer(
-        `### 🛡️ Evidence Summary for ${companyName}\n\n` +
+        `### Evidence Summary for ${companyName}\n\n` +
         `* **Trust Score:** **${report.trust_score ?? 26}/100**\n` +
         `* **Verdict:** **${report.verdict || "ANALYSIS COMPLETE"}**\n` +
-        `* **Fee Requirement:** ${report.has_fee_demand ? "⚠️ Caution/training deposit demanded (Scam Indicator)" : "✅ No fee detected"}\n\n` +
+        `* **Fee Requirement:** ${report.has_fee_demand ? "Caution/training deposit demanded (Scam Indicator)" : "No fee detected"}\n\n` +
         `*Genuine organizations never request upfront payments or security deposits from job applicants.*`
       );
     } finally {
@@ -1949,32 +1949,32 @@ function ReportCopilotInline({
   };
 
   return (
-    <div className="p-8 rounded-3xl bg-gradient-to-br from-[#0D1117] via-[#101622] to-[#0A0D14] border-2 border-[#1E2838] shadow-2xl space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#1E2838] pb-5">
-        <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-[#00FF87]/20 border-2 border-[#00FF87] flex items-center justify-center text-2xl shadow-[0_0_15px_rgba(0,255,135,0.3)]">
-            🤖
+    <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm space-y-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center text-sky-400">
+            <Brain className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-xl font-black text-slate-100">
-                Interrogate Report with Trust AI Copilot
+              <h3 className="text-base font-bold text-slate-100">
+                Interrogate Report with Forensic Assistant
               </h3>
-              <span className="px-2.5 py-0.5 rounded-full bg-[#00FF87]/20 text-[#00FF87] text-xs font-mono font-bold border border-[#00FF87]/40">
-                LIVE
+              <span className="px-2 py-0.5 rounded-md bg-slate-950 text-emerald-400 text-[10px] font-mono font-medium border border-slate-800">
+                ACTIVE
               </span>
             </div>
-            <p className="text-sm text-slate-400">
-              Ask anything about {companyName}'s offer letter, domain checks, or fee clauses.
+            <p className="text-xs text-slate-400">
+              Query evidence records, domain checks, or fee clauses for {companyName}.
             </p>
           </div>
         </div>
 
         <button
           onClick={() => onOpenFullscreenCopilot(lastQuestion || undefined)}
-          className="px-4 py-2.5 rounded-2xl bg-[#131822] hover:bg-[#1A2232] border border-[#1E2838] text-xs font-bold text-[#00F0FF] hover:text-white flex items-center gap-2 transition-all cursor-pointer shadow-sm hover:border-[#00F0FF]/50 flex-shrink-0"
+          className="px-3.5 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-xs font-mono font-medium text-slate-300 hover:text-white flex items-center gap-2 transition-all cursor-pointer shadow-sm flex-shrink-0"
         >
-          <Brain className="w-4 h-4" /> Full Copilot Workspace
+          <Brain className="w-3.5 h-3.5 text-sky-400" /> Full Assistant Workspace
         </button>
       </div>
 
@@ -1984,7 +1984,7 @@ function ReportCopilotInline({
           <button
             key={idx}
             onClick={() => handleAsk(item.prompt)}
-            className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-[#131822] hover:bg-[#1C2536] border border-[#1E2838] text-slate-300 hover:text-[#00FF87] transition-all cursor-pointer shadow-sm hover:border-[#00FF87]/50"
+            className="px-3 py-1.5 rounded-lg text-xs font-mono font-medium bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-slate-100 transition-all cursor-pointer"
           >
             {item.label}
           </button>
@@ -1992,54 +1992,54 @@ function ReportCopilotInline({
       </div>
 
       {/* Input Box */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2.5">
         <input
           type="text"
           placeholder={`Ask any question about ${companyName} (e.g. 'Why is the joining date urgent?' or 'Is this stipend real?')...`}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleAsk()}
-          className="flex-1 px-5 py-3.5 rounded-2xl bg-[#131822] border-2 border-[#1E2838] text-sm md:text-base text-slate-100 placeholder-slate-500 focus:outline-none focus:border-[#00FF87]"
+          className="flex-1 px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-100 placeholder-slate-600 focus:outline-none focus:border-slate-700"
         />
         <button
           onClick={() => handleAsk()}
           disabled={loading || !query.trim()}
-          className="px-6 py-3.5 rounded-2xl bg-[#00FF87] hover:bg-[#D4FF00] text-black font-black text-sm md:text-base transition-all shadow-[0_0_15px_rgba(0,255,135,0.4)] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex-shrink-0 flex items-center gap-2"
+          className="px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-slate-950 font-semibold text-xs font-mono transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex-shrink-0 flex items-center gap-1.5"
         >
-          {loading ? <Sparkles className="w-4 h-4 animate-spin" /> : "Ask"}
+          {loading ? <Sparkles className="w-3.5 h-3.5 animate-spin" /> : "Query"}
         </button>
       </div>
 
       {/* Loading state */}
       {loading && (
-        <div className="p-6 rounded-2xl bg-[#0D1117] border border-[#1E2838] flex items-center gap-3 text-sm text-[#00FF87]">
-          <Sparkles className="w-5 h-5 animate-spin flex-shrink-0" />
-          <span className="font-bold">Interrogating evidence locker and running evidence-grounded synthesis...</span>
+        <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex items-center gap-2.5 text-xs text-sky-400 font-mono">
+          <Sparkles className="w-4 h-4 animate-spin flex-shrink-0" />
+          <span>Interrogating evidence locker and running evidence-grounded synthesis...</span>
         </div>
       )}
 
       {/* Answer display */}
       {answer && !loading && (
-        <div className="p-6 rounded-2xl bg-[#0A0D14] border-2 border-[#1E2838] space-y-4">
-          <div className="flex items-center justify-between border-b border-[#1E2838] pb-3">
+        <div className="p-5 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-mono font-black text-[#00F0FF] uppercase tracking-wider">
+              <span className="text-xs font-mono font-semibold text-sky-400 uppercase tracking-wider">
                 Question:
               </span>
-              <span className="text-sm font-bold text-slate-200">
+              <span className="text-xs font-medium text-slate-200">
                 "{lastQuestion}"
               </span>
             </div>
             <button
               onClick={handleCopy}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#131822] text-xs font-bold text-slate-400 hover:text-slate-200 border border-[#1E2838] cursor-pointer"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-900 text-xs font-mono text-slate-400 hover:text-slate-200 border border-slate-800 cursor-pointer"
             >
-              {copied ? <Check className="w-3.5 h-3.5 text-[#00FF87]" /> : <Copy className="w-3.5 h-3.5" />}
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
               <span>{copied ? "Copied" : "Copy"}</span>
             </button>
           </div>
 
-          <div className="max-h-[380px] overflow-y-auto pr-2">
+          <div className="max-h-[380px] overflow-y-auto pr-2 text-xs">
             <FormattedCopilotMessage text={answer} />
           </div>
         </div>
@@ -2067,7 +2067,7 @@ function UserCopilotView({
 }) {
   const report: LegitifyReport = (rawReport as any)?.report || rawReport || {};
   const activeFReport = forensicReport || (rawReport as any)?.forensicAnalysis;
-  const rawDocText = activeFReport?.ocr?.rawText || report.document_analysis?.extracted_text || (report as any).contextText || "";
+  const rawDocText = activeFReport?.ocr?.rawText || (report.document_analysis as any)?.extracted_text || (report as any).contextText || "";
   const fSemantics = activeFReport?.semantics;
   const fStructure = activeFReport?.scoring?.structureAnalysis || fSemantics?.structure;
 
@@ -2091,35 +2091,35 @@ function UserCopilotView({
   const [messages, setMessages] = useState<{ role: "user" | "assistant"; text: string; time: string }[]>([
     {
       role: "assistant",
-      text: `Hello ${userName || "Sanjay Kumar"}! 👋\n\n### 🛡️ LEGITIFY Evidence-Grounded Investigation Copilot Active\n\n**Active Investigation Context:**\n* **Target Opportunity:** **${cleanCompany}**\n* **Trust Score:** **${trustScore}/100** (${trustScore <= 40 ? '🚨 High Risk / Scam Alert' : '✅ Low Risk Profile'})\n\nI am strictly grounded in our **Evidence Locker** and Dual RAG records. I do not guess or hallucinate. Use the quick-action investigation categories below, or type any question you have!`,
+      text: `Hello ${userName || "Candidate"}.\n\n### Forensic Investigation Assistant Active\n\n**Active Investigation Context:**\n* **Target Entity:** **${cleanCompany}**\n* **Trust Score:** **${trustScore}/100** (${trustScore <= 40 ? 'High Risk Profile' : 'Low Risk Profile'})\n\nResponses are strictly grounded in our Evidence Locker and RAG corpus. Select an investigative check below, or enter a specific query.`,
       time: "Just now",
     }
   ]);
   const [loading, setLoading] = useState(false);
 
   const CATEGORIES = [
-    { id: "all", label: "🔥 All Quick Checks" },
-    { id: "score", label: "🔍 Forensic Scoring" },
-    { id: "recruiter", label: "👤 Recruiter & Domain" },
-    { id: "financial", label: "💰 Stipend & Fee" },
-    { id: "legal", label: "🏢 MCA21 & Legal" },
-    { id: "emergency", label: "🚨 Emergency Actions" },
+    { id: "all", label: "All Quick Checks" },
+    { id: "score", label: "Forensic Scoring" },
+    { id: "recruiter", label: "Recruiter & Domain" },
+    { id: "financial", label: "Stipend & Fee" },
+    { id: "legal", label: "MCA21 & Legal" },
+    { id: "emergency", label: "Emergency Actions" },
   ];
 
   const QUICK_TOOLS = [
-    { cat: "score", label: "🔍 Explain Decision", query: "Why did LEGITIFY give this score and verdict?" },
-    { cat: "legal", label: "🏢 Verify Company", query: "Is the company actually registered and legally active in MCA21?" },
-    { cat: "recruiter", label: "👤 Verify Recruiter", query: "Is this recruiter email really associated with the company?" },
-    { cat: "financial", label: "💰 Stipend Plausibility", query: "Is the offered stipend normal or suspiciously inflated?" },
-    { cat: "financial", label: "⚠️ Deposit Clauses", query: "Can a genuine company ask candidates to pay a laptop deposit or training fee?" },
-    { cat: "recruiter", label: "📜 Certificate Check", query: "The certificate appears genuine. Why is the internship still risky?" },
-    { cat: "score", label: "🌎 Community Evidence", query: "What did people online and public forums say about this company?" },
-    { cat: "score", label: "⚠️ Find Red Flags", query: "Show me the strongest warning signals and evidence IDs." },
-    { cat: "score", label: "🛡️ False Positive Check", query: "Could this assessment be a false positive?" },
-    { cat: "recruiter", label: "❓ Generate HR Questions", query: "Generate verification questions I should send to this recruiter." },
-    { cat: "emergency", label: "⏱️ 30s Parent Summary", query: "Give me a 30-second simple explanation I can tell my parents." },
-    { cat: "emergency", label: "🚨 What If I Paid?", query: "What emergency steps should I take if I already paid a deposit?" },
-    { cat: "score", label: "⚔️ Challenge Result", query: "I know this company personally and want to challenge this result." },
+    { cat: "score", label: "Explain Decision", query: "Why did LEGITIFY give this score and verdict?" },
+    { cat: "legal", label: "Verify Company", query: "Is the company actually registered and legally active in MCA21?" },
+    { cat: "recruiter", label: "Verify Recruiter", query: "Is this recruiter email really associated with the company?" },
+    { cat: "financial", label: "Stipend Plausibility", query: "Is the offered stipend normal or suspiciously inflated?" },
+    { cat: "financial", label: "Deposit Clauses", query: "Can a genuine company ask candidates to pay a laptop deposit or training fee?" },
+    { cat: "recruiter", label: "Certificate Check", query: "The certificate appears genuine. Why is the internship still risky?" },
+    { cat: "score", label: "Community Evidence", query: "What did people online and public forums say about this company?" },
+    { cat: "score", label: "Find Red Flags", query: "Show me the strongest warning signals and evidence IDs." },
+    { cat: "score", label: "False Positive Check", query: "Could this assessment be a false positive?" },
+    { cat: "recruiter", label: "Generate HR Questions", query: "Generate verification questions I should send to this recruiter." },
+    { cat: "emergency", label: "Executive Summary", query: "Give me a simple structured explanation of the risks." },
+    { cat: "emergency", label: "Incident Protocol", query: "What emergency steps should I take if I already paid a deposit?" },
+    { cat: "score", label: "Challenge Result", query: "I know this company personally and want to challenge this result." },
   ];
 
   const filteredTools = categoryFilter === "all" ? QUICK_TOOLS : QUICK_TOOLS.filter(t => t.cat === categoryFilter);
@@ -2151,7 +2151,7 @@ function UserCopilotView({
         document_text: rawDocText,
         structureAnalysis: fStructure,
         detectedRisks: activeFReport?.scoring?.reasons?.riskIndicators || report.red_flags || [],
-        user_name: userName || "Sanjay Kumar",
+        user_name: userName || "Candidate",
       };
       const res = await askCopilot(enriched, q, userToken);
       setMessages([
@@ -2179,16 +2179,16 @@ function UserCopilotView({
       if (qLower.includes("hour") || qLower.includes("timing") || qLower.includes("schedule") || qLower.includes("shift") || qLower.includes("attendance")) {
         const matches = findDocSentences(["hour", "timing", "schedule", "shift", "am", "pm", "monday", "friday", "working day"]);
         if (matches.length > 0) {
-          dynamicAnswer = `### ⏰ Working Hours & Schedule Analysis for ${comp}\n\n` +
+          dynamicAnswer = `### Working Hours & Schedule Analysis for ${comp}\n\n` +
             `**1. Clauses Extracted from Document:**\n` +
             matches.map(m => `* *"${m.trim()}"*`).join("\n") + "\n\n" +
             `**2. Forensic Benchmark:**\n` +
             `* Authentic corporate contracts mandate a 40–45 hour work week (e.g., 9:30 AM to 6:30 PM, Monday–Friday).\n` +
             `* Ensure attendance tracking occurs on the official company enterprise portal.`;
         } else {
-          dynamicAnswer = `### ⏰ Working Hours & Schedule Analysis for ${comp}\n\n` +
+          dynamicAnswer = `### Working Hours & Schedule Analysis for ${comp}\n\n` +
             `**1. Document Finding:**\n` +
-            `* 🔍 **No explicit working hours, shift timings, or schedule clauses were found in the uploaded document.**\n\n` +
+            `* **No explicit working hours, shift timings, or schedule clauses were found in the uploaded document.**\n\n` +
             `**2. Why This Matters:**\n` +
             `* Authentic enterprise appointment letters explicitly specify weekly hours (e.g. 40 hrs/week) and reporting windows.\n` +
             `* The total absence of working hours and attendance policies is a frequent characteristic of non-standard or fabricated templates.`;
@@ -2198,7 +2198,7 @@ function UserCopilotView({
       else if (qLower.includes("signatory") || qLower.includes("signed") || qLower.includes("signature") || qLower.includes("who signed")) {
         const sigMatches = findDocSentences(["sincerely", "regards", "authorized", "signatory", "manager", "director", "human resources"]);
         const sigTitle = fStructure?.signatoryTitle || (rawDocText.match(/(?:Human Resources|HR Manager|Director|Vice President|Authorized Signatory)[\s\S]{0,30}/i)?.[0]);
-        dynamicAnswer = `### ✍️ Authorized Signatory Analysis for ${comp}\n\n` +
+        dynamicAnswer = `### Authorized Signatory Analysis for ${comp}\n\n` +
           `* **Detected Signatory Block:** **${sigTitle || "Signatory block unstated / unverified"}**\n` +
           (sigMatches.length > 0 ? `* **Closing Text Found:** *"${sigMatches[0].trim()}"*\n` : "") +
           `* **Verification Guidance:** Authentic corporate letters include the executive's full legal name, department designation, and company authorization seal. Junior HR personnel may sign internship letters, but their identity should be verifiable via the company's official corporate directory.`;
@@ -2206,7 +2206,7 @@ function UserCopilotView({
       // 3. Stipend Plausibility
       else if (qLower.includes("stipend") || qLower.includes("salary") || qLower.includes("compensation") || qLower.includes("ctc")) {
         const stipendMatch = rawDocText.match(/(?:Stipend|Salary|Compensation|CTC|Remuneration)\s*[:\-]?\s*(?:INR|Rs\.?|₹|\$|USD)?\s*([0-9,]+(?:\s*(?:per month|\/month|LPA|K))?)/i)?.[0];
-        dynamicAnswer = `### 💰 Stipend & Compensation Plausibility for ${comp}\n\n` +
+        dynamicAnswer = `### Stipend & Compensation Plausibility for ${comp}\n\n` +
           `* **Extracted Compensation Clause:** **${stipendMatch || fSemantics?.detectedStipend || "Not explicitly specified in document"}**\n` +
           `* **Standard Industry Benchmark:** Indian student internships typically provide ₹10,000–₹35,000/month for software/engineering roles.\n` +
           `* **Warning Signal:** Scams often offer unrealistically inflated figures (e.g. ₹60,000+/month for untrained beginners) or demand 'security deposits' to unlock stipends.`;
@@ -2214,28 +2214,28 @@ function UserCopilotView({
       // 4. Deposit & Fees
       else if (qLower.includes("deposit") || qLower.includes("fee") || qLower.includes("pay") || qLower.includes("money") || qLower.includes("training fee")) {
         const hasFee = fSemantics?.hasFeeDemand || report.has_fee_demand || /registration\s+fee|security\s+deposit|training\s+fee/i.test(docLower);
-        dynamicAnswer = `### 💳 Deposit & Fee Demands Analysis\n\n` +
-          `* **Finding:** ${hasFee ? "🚨 **Candidate fee or deposit requested in this document!**" : "✅ No upfront candidate payment clauses detected."}\n` +
-          `* **Statutory Law:** Under ILO Fair Recruitment Initiatives and Indian labor practices, **legitimate employers NEVER charge candidates** for interviews, training kits, laptop caution deposits, or onboarding.\n` +
+        dynamicAnswer = `### Deposit & Fee Demands Analysis\n\n` +
+          `* **Finding:** ${hasFee ? "**Candidate fee or deposit requested in this document!**" : "No upfront candidate payment clauses detected."}\n` +
+          `* **Statutory Law:** Under ILO Fair Recruitment Initiatives and Indian labor practices, **legitimate employers never charge candidates** for interviews, training kits, laptop caution deposits, or onboarding.\n` +
           `* **Rule of Thumb:** Any demand for money before or upon joining is a definitive indicator of employment fraud.`;
       }
       // 5. Parent Summary
       else if (qLower.includes("parent") || qLower.includes("family") || qLower.includes("30-second") || qLower.includes("simple")) {
-        dynamicAnswer = `### ⏱️ 30-Second Summary for Parents & Family\n\n` +
+        dynamicAnswer = `### Executive Summary for ${comp}\n\n` +
           `> *"This offer letter uses the name of **${comp}**, but LEGITIFY evaluated a Trust Score of **${trustScore}/100**.*\n` +
-          `> *${isHighRisk ? "Real companies never ask students for money or recruit exclusively via personal Gmail/WhatsApp. The Cybercrime Helpline (1930) classifies candidate fees as employment fraud. We should not pay any fee or share sensitive IDs." : "The document follows standard organizational formatting with no candidate fees detected. Standard corporate onboarding steps apply."}*"`;
+          `> *${isHighRisk ? "Real companies never ask students for money or recruit exclusively via personal Gmail/WhatsApp. The Cybercrime Helpline (1930) classifies candidate fees as employment fraud. Do not pay any fees or share sensitive documents." : "The document follows standard organizational formatting with no candidate fees detected. Standard corporate onboarding steps apply."}*"`;
       }
       // 6. Emergency Steps
       else if (qLower.includes("already paid") || qLower.includes("sent money") || qLower.includes("lost money") || qLower.includes("1930")) {
-        dynamicAnswer = `### 🚨 EMERGENCY ACTION PLAN: If You Paid Money\n\n` +
-          `1. **📞 Dial 1930 Immediately:** Call the National Cybercrime Helpline within 2 hours to freeze recipient bank accounts or UPI wallets.\n` +
-          `2. **🏦 Contact Bank Fraud Desk:** Request a payment recall / chargeback quoting the UPI UTR or bank transaction reference.\n` +
-          `3. **👮 File Formal e-FIR:** Register complaint on **[cybercrime.gov.in](https://cybercrime.gov.in)** with screenshots and chat logs.\n` +
-          `4. **🔒 Lock Biometrics:** Lock Aadhaar biometrics on UIDAI portal if copies were shared.`;
+        dynamicAnswer = `### Emergency Incident Response Procedure\n\n` +
+          `1. **Dial 1930 Immediately:** Call the National Cybercrime Helpline within 2 hours to freeze recipient bank accounts or UPI wallets.\n` +
+          `2. **Contact Bank Fraud Desk:** Request a payment recall / chargeback quoting the UPI UTR or bank transaction reference.\n` +
+          `3. **File Formal e-FIR:** Register complaint on **[cybercrime.gov.in](https://cybercrime.gov.in)** with screenshots and chat logs.\n` +
+          `4. **Lock Biometrics:** Lock Aadhaar biometrics on UIDAI portal if copies were shared.`;
       }
       // 7. Questions to Ask Recruiter
       else if (qLower.includes("question") || qLower.includes("ask recruiter") || qLower.includes("what to ask")) {
-        dynamicAnswer = `### ❓ Formal Verification Questions for ${comp} Recruiter\n\n` +
+        dynamicAnswer = `### Verification Questions for Recruiter\n\n` +
           `1. *"Please provide the direct requisition link for this job opening hosted on your official career portal."*\n` +
           `2. *"Why is this correspondence sent from ${fSemantics?.isFreeWebmail ? 'a personal Gmail address' : 'an unaligned domain'} rather than the official enterprise server?"*\n` +
           `3. *"Please provide the official corporate Requisition ID registered with your central HR system."*\n` +
@@ -2243,19 +2243,19 @@ function UserCopilotView({
       }
       // 8. Explain Decision / Why Score
       else {
-        dynamicAnswer = `### 📊 Forensic Assessment Breakdown for ${comp}\n\n` +
-          `* **Evaluated Trust Score:** **${trustScore}/100** (${isHighRisk ? '🔴 High Risk · Scam Indicators' : '🟢 Verified Authentic'})\n` +
+        dynamicAnswer = `### Forensic Assessment Breakdown for ${comp}\n\n` +
+          `* **Evaluated Trust Score:** **${trustScore}/100** (${isHighRisk ? 'High Risk · Scam Indicators' : 'Verified Authentic'})\n` +
           `* **Primary Verdict:** **${report.verdict || (isHighRisk ? 'LIKELY SCAM' : 'LIKELY LEGITIMATE')}**\n\n` +
           `**Diagnostic Pillars:**\n` +
           `1. **Document Structure & Authenticity:** ${fStructure ? `${fStructure.passedChecksCount}/${fStructure.totalChecksCount} Standards Verified` : 'Evaluated'}\n` +
-          `2. **Recruiter Domain Security:** ${fSemantics?.isFreeWebmail ? '🚨 Free personal webmail detected (@gmail.com)' : fSemantics?.recruiterEmail ? `Corporate email (${fSemantics.recruiterEmail})` : 'Unverified'}\n` +
-          `3. **Financial Safety:** ${report.has_fee_demand || fSemantics?.hasFeeDemand ? '🚨 Upfront candidate fee/deposit demanded' : '✅ Zero candidate fee'}\n\n` +
+          `2. **Recruiter Domain Security:** ${fSemantics?.isFreeWebmail ? 'Personal webmail detected (@gmail.com)' : fSemantics?.recruiterEmail ? `Corporate email (${fSemantics.recruiterEmail})` : 'Unverified'}\n` +
+          `3. **Financial Safety:** ${report.has_fee_demand || fSemantics?.hasFeeDemand ? 'Upfront candidate fee/deposit demanded' : 'Zero candidate fee'}\n\n` +
           `> **Key Rule:** A registered company name does not guarantee that this specific letter or recruiter is authorized. Always verify via official corporate channels.`;
       }
 
       setMessages([
         ...newHistory,
-        { role: "assistant", text: `Hello ${userName || "Candidate"}! 👋\n\n` + dynamicAnswer, time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }
+        { role: "assistant", text: `Hello ${userName || "Candidate"}.\n\n` + dynamicAnswer, time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }
       ]);
     } finally {
       setLoading(false);
@@ -2266,20 +2266,20 @@ function UserCopilotView({
     setMessages([
       {
         role: "assistant",
-        text: `Chat reset. Active investigation target: **${cleanCompany}** (${trustScore}/100).\n\nFeel free to ask any question grounded in the evidence records!`,
+        text: `Session cleared. Active target: **${cleanCompany}** (${trustScore}/100).\n\nEnter your query or select a standard diagnostic tool below.`,
         time: "Just now",
       }
     ]);
   };
 
   const handleDownloadTranscript = () => {
-    const transcript = `# LEGITIFY Investigation Copilot Transcript\n\nTarget: ${cleanCompany}\nCase: #${report.scan_id || "LGF-2026-000184"}\nScore: ${trustScore}/100\nDate: ${new Date().toLocaleString()}\n\n---\n\n` +
-      messages.map(m => `### ${m.role === "user" ? "Candidate" : "LEGITIFY Copilot"} (${m.time})\n\n${m.text}\n\n---\n`).join("\n");
+    const transcript = `# LEGITIFY Forensic Investigation Transcript\n\nTarget: ${cleanCompany}\nCase: #${report.scan_id || "LGF-2026-000184"}\nScore: ${trustScore}/100\nDate: ${new Date().toLocaleString()}\n\n---\n\n` +
+      messages.map(m => `### ${m.role === "user" ? "Investigator" : "LEGITIFY Assistant"} (${m.time})\n\n${m.text}\n\n---\n`).join("\n");
     const blob = new Blob([transcript], { type: "text/markdown;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `Legitify_Copilot_${(cleanCompany || "report").replace(/[^a-zA-Z0-9]/g, "_")}.md`);
+    link.setAttribute("download", `Legitify_Transcript_${(cleanCompany || "report").replace(/[^a-zA-Z0-9]/g, "_")}.md`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -2292,48 +2292,48 @@ function UserCopilotView({
   }, [initialQuestion]);
 
   return (
-    <div className="flex-1 flex flex-col bg-[#060709] overflow-hidden font-['Plus_Jakarta_Sans',sans-serif]">
+    <div className="flex-1 flex flex-col bg-slate-950 overflow-hidden font-sans">
       {/* Copilot Header */}
-      <div className="px-8 py-5 border-b border-[#1E2838] bg-[#0D1117] flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-[#00FF87]/20 border-2 border-[#00FF87] text-[#00FF87] flex items-center justify-center text-2xl shadow-[0_0_15px_rgba(0,255,135,0.3)]">
-            🤖
+      <div className="px-6 py-4 border-b border-slate-800 bg-slate-900 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-slate-950 border border-slate-800 text-sky-400 flex items-center justify-center">
+            <Brain className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="text-xl font-black text-slate-100 text-glow-emerald">
-              Evidence-Grounded Investigation Copilot
+            <h3 className="text-sm font-bold text-slate-100">
+              Forensic Investigation Assistant
             </h3>
-            <p className="text-sm text-slate-400 font-mono">Target: {cleanCompany} · Case: #{report.scan_id || "LGF-2026-000184"}</p>
+            <p className="text-xs text-slate-400 font-mono">Target: {cleanCompany} · Case: #{report.scan_id || "LGF-2026-000184"}</p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={handleDownloadTranscript}
-            className="px-4 py-2 rounded-2xl bg-[#131822] hover:bg-[#1A2232] border border-[#1E2838] text-xs font-bold text-slate-300 hover:text-[#00FF87] flex items-center gap-2 transition-all cursor-pointer"
+            className="px-3 py-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-xs font-mono font-medium text-slate-300 hover:text-slate-100 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
             title="Download Transcript"
           >
-            <Download className="w-4 h-4" /> Download Transcript
+            <Download className="w-3.5 h-3.5" /> Download Transcript
           </button>
           <button
             onClick={handleClearHistory}
-            className="px-4 py-2 rounded-2xl bg-[#131822] hover:bg-[#1A2232] border border-[#1E2838] text-xs font-bold text-slate-300 hover:text-[#FF3B5C] flex items-center gap-2 transition-all cursor-pointer"
+            className="px-3 py-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-xs font-mono font-medium text-slate-300 hover:text-rose-400 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
             title="Clear Chat"
           >
-            <RefreshCw className="w-4 h-4" /> Reset Chat
+            <RefreshCw className="w-3.5 h-3.5" /> Reset Chat
           </button>
         </div>
       </div>
 
       {/* Messages Thread */}
-      <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6 max-w-4xl mx-auto w-full">
+      <div className="flex-1 overflow-y-auto p-6 space-y-4 max-w-4xl mx-auto w-full">
         {messages.map((m, idx) => (
           <div key={idx} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
             <div
-              className={`max-w-3xl p-6 rounded-3xl ${
+              className={`max-w-2xl p-4 rounded-xl text-xs ${
                 m.role === "user"
-                  ? "bg-[#00FF87] text-black font-extrabold rounded-br-none shadow-xl text-base md:text-lg"
-                  : "bg-[#0D1117] border-2 border-[#1E2838] rounded-bl-none shadow-2xl"
+                  ? "bg-slate-800 text-slate-100 font-mono rounded-br-none border border-slate-700"
+                  : "bg-slate-900 border border-slate-800 rounded-bl-none text-slate-200"
               }`}
             >
               {m.role === "user" ? (
@@ -2342,30 +2342,30 @@ function UserCopilotView({
                 <FormattedCopilotMessage text={m.text} />
               )}
             </div>
-            <span className="text-xs text-slate-500 font-mono mt-1.5 px-2">{m.time}</span>
+            <span className="text-[10px] text-slate-500 font-mono mt-1 px-1">{m.time}</span>
           </div>
         ))}
         {loading && (
-          <div className="flex items-center gap-3 text-base text-[#00FF87] p-5 rounded-3xl bg-[#0D1117] border-2 border-[#1E2838] max-w-md">
-            <Sparkles className="w-5 h-5 animate-spin" />
-            <span className="font-bold">Retrieving Evidence Locker records & citations...</span>
+          <div className="flex items-center gap-2.5 text-xs text-sky-400 font-mono p-4 rounded-xl bg-slate-900 border border-slate-800 max-w-md">
+            <Sparkles className="w-4 h-4 animate-spin" />
+            <span>Retrieving Evidence Locker records & running synthesis...</span>
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
       {/* Quick Action Category Filters & Buttons */}
-      <div className="p-6 border-t border-[#1E2838] bg-[#0A0D14]">
+      <div className="p-4 border-t border-slate-800 bg-slate-950">
         {/* Category Filter Pills */}
-        <div className="max-w-4xl mx-auto flex items-center gap-2 mb-3 overflow-x-auto pb-1">
+        <div className="max-w-4xl mx-auto flex items-center gap-1.5 mb-2.5 overflow-x-auto pb-1">
           {CATEGORIES.map(cat => (
             <button
               key={cat.id}
               onClick={() => setCategoryFilter(cat.id)}
-              className={`px-3 py-1 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-md text-xs font-mono font-medium whitespace-nowrap transition-all cursor-pointer ${
                 categoryFilter === cat.id
-                  ? "bg-[#00FF87] text-black font-black shadow-[0_0_10px_rgba(0,255,135,0.4)]"
-                  : "bg-[#131822] text-slate-400 hover:text-slate-200 border border-[#1E2838]"
+                  ? "bg-slate-800 text-emerald-400 border border-slate-700"
+                  : "bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800"
               }`}
             >
               {cat.label}
@@ -2374,33 +2374,33 @@ function UserCopilotView({
         </div>
 
         {/* Quick Tools list */}
-        <div className="max-w-4xl mx-auto flex flex-wrap gap-2.5 mb-4">
+        <div className="max-w-4xl mx-auto flex flex-wrap gap-2 mb-3">
           {filteredTools.map((tool, i) => (
             <button
               key={i}
               onClick={() => handleSend(tool.query)}
-              className="px-4 py-2 rounded-full text-xs md:text-sm font-bold bg-[#131822] hover:bg-[#1A2232] border border-[#1E2838] text-slate-300 hover:text-[#00FF87] transition-all cursor-pointer shadow-sm hover:border-[#00FF87]/50"
+              className="px-2.5 py-1 rounded-md text-xs font-mono font-medium bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-slate-100 transition-all cursor-pointer"
             >
               {tool.label}
             </button>
           ))}
         </div>
 
-        <div className="max-w-4xl mx-auto flex items-center gap-4">
+        <div className="max-w-4xl mx-auto flex items-center gap-3">
           <input
             type="text"
-            placeholder="Ask anything grounded in evidence (e.g. 'Why is the recruiter suspicious?' or 'Generate questions')..."
+            placeholder="Ask anything grounded in evidence (e.g. 'Why is the recruiter suspicious?' or 'Generate verification questions')..."
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
-            className="flex-1 px-6 py-4 rounded-3xl bg-[#131822] border-2 border-[#1E2838] text-base text-slate-100 placeholder-slate-500 focus:outline-none focus:border-[#00FF87]"
+            className="flex-1 px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs font-mono text-slate-100 placeholder-slate-600 focus:outline-none focus:border-slate-700"
           />
           <button
             onClick={() => handleSend()}
             disabled={loading}
-            className="px-8 py-4 rounded-3xl bg-[#00FF87] hover:bg-[#D4FF00] text-black font-black text-base transition-all shadow-[0_0_20px_rgba(0,255,135,0.4)] flex-shrink-0 cursor-pointer"
+            className="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-slate-950 font-semibold text-xs font-mono transition-all shadow-sm flex-shrink-0 cursor-pointer disabled:opacity-50"
           >
-            Send
+            Query
           </button>
         </div>
       </div>
@@ -2441,7 +2441,7 @@ function FloatingCopilotWidget({
   const [messages, setMessages] = useState<{ role: "user" | "assistant"; text: string; time: string }[]>([
     {
       role: "assistant",
-      text: `Hello ${userName || "Candidate"}! 👋\n\n### 🛡️ LEGITIFY AI Copilot Active\n\nI am your evidence-grounded assistant for **${cleanCompany}**.\n\nYou can ask me any question about the offer, recruiter validity, stipend rates, MCA records, or what to do next. Type your question below or click a quick prompt!`,
+      text: `Hello ${userName || "Candidate"}.\n\n### Forensic Assistant Active\n\nI am your evidence-grounded assistant for **${cleanCompany}**.\n\nYou can query this document's structure, recruiter credentials, stipend metrics, or MCA statutory verification. Select a prompt below or type your question.`,
       time: "Just now",
     }
   ]);
@@ -2480,11 +2480,11 @@ function FloatingCopilotWidget({
         ...newHistory,
         {
           role: "assistant",
-          text: `### 📊 Forensic Assessment for ${cleanCompany}\n\n` +
-            `* **Overall Risk:** ${isHighRisk ? '🔴 **HIGH RISK (Scam Indicators Present)**' : '🟢 **LOW RISK (Verified Structure)**'}\n` +
+          text: `### Forensic Assessment for ${cleanCompany}\n\n` +
+            `* **Overall Risk:** ${isHighRisk ? '**HIGH RISK (Scam Indicators Present)**' : '**LOW RISK (Verified Structure)**'}\n` +
             `* **Evaluated Trust Score:** **${trustScore}/100**\n` +
-            `* **Fee Requirement:** ${report.has_fee_demand ? '🔴 Security/registration deposit required' : '🟢 No fee demanded'}\n\n` +
-            `> *Reminder: Real companies never charge candidates for internship selection or laptops. Call 1930 if fraud is suspected.*`,
+            `* **Fee Requirement:** ${report.has_fee_demand ? 'Security/registration deposit required' : 'No fee demanded'}\n\n` +
+            `> *Reminder: Legitimate organizations never charge candidates for internship selection or equipment. Call 1930 if fraud is suspected.*`,
           time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
         }
       ]);
@@ -2507,7 +2507,7 @@ function FloatingCopilotWidget({
     setMessages([
       {
         role: "assistant",
-        text: `Chat cleared. Ready for your questions about **${cleanCompany}**! Ask me anything about the offer letter, recruiter, or safety checks.`,
+        text: `Chat cleared. Ready for your questions about **${cleanCompany}**! Ask anything about the offer letter, recruiter, or safety checks.`,
         time: "Just now",
       }
     ]);
@@ -2519,14 +2519,11 @@ function FloatingCopilotWidget({
       <div className="fixed bottom-6 right-6 z-50">
         <button
           onClick={() => { setIsOpen(true); setIsMinimized(false); }}
-          className="group flex items-center gap-3 px-5 py-3.5 rounded-full bg-gradient-to-r from-[#00FF87] to-[#00F0FF] text-black font-black text-sm md:text-base shadow-[0_0_25px_rgba(0,255,135,0.5)] hover:shadow-[0_0_35px_rgba(0,240,255,0.7)] hover:scale-105 active:scale-95 transition-all cursor-pointer"
+          className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-700 text-slate-100 font-mono text-xs shadow-lg transition-all cursor-pointer"
         >
-          <div className="relative">
-            <span className="text-xl">🤖</span>
-            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-700 border border-white animate-pulse" />
-          </div>
-          <span className="tracking-wide">Ask AI Copilot</span>
-          <span className="hidden sm:inline-block px-2 py-0.5 rounded-full bg-black/20 text-black text-xs font-mono font-extrabold">
+          <Brain className="w-4 h-4 text-sky-400" />
+          <span className="font-semibold">Forensic Assistant</span>
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
             ONLINE
           </span>
         </button>
@@ -2538,26 +2535,26 @@ function FloatingCopilotWidget({
   if (isMinimized) {
     return (
       <div className="fixed bottom-6 right-6 z-50">
-        <div className="flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-[#0D1117] border-2 border-[#00FF87]/50 shadow-2xl">
+        <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 shadow-xl">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => setIsMinimized(false)}>
-            <span className="text-lg">🤖</span>
-            <span className="text-sm font-bold text-slate-100">Trust Copilot</span>
-            <span className="w-2 h-2 rounded-full bg-[#00FF87] animate-pulse" />
+            <Brain className="w-3.5 h-3.5 text-sky-400" />
+            <span className="text-xs font-mono font-semibold text-slate-200">Forensic Assistant</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
           </div>
-          <div className="flex items-center gap-1 pl-2 border-l border-[#1E2838]">
+          <div className="flex items-center gap-1 pl-2 border-l border-slate-800">
             <button
               onClick={() => setIsMinimized(false)}
               className="p-1 text-slate-400 hover:text-slate-100 cursor-pointer"
               title="Expand"
             >
-              <ArrowRight className="w-4 h-4 rotate-[-45deg]" />
+              <ArrowRight className="w-3.5 h-3.5 rotate-[-45deg]" />
             </button>
             <button
               onClick={() => setIsOpen(false)}
-              className="p-1 text-slate-400 hover:text-[#FF3B5C] cursor-pointer"
+              className="p-1 text-slate-400 hover:text-rose-400 cursor-pointer"
               title="Close"
             >
-              <X className="w-4 h-4" />
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
@@ -2567,58 +2564,58 @@ function FloatingCopilotWidget({
 
   // Full floating window
   return (
-    <div className="fixed bottom-6 right-6 z-50 w-[440px] max-w-[calc(100vw-32px)] h-[620px] max-h-[calc(100vh-48px)] flex flex-col rounded-3xl bg-[#0B0F17]/95 backdrop-blur-2xl border-2 border-[#1E2838] shadow-[0_25px_60px_rgba(0,0,0,0.9)] overflow-hidden font-['Plus_Jakarta_Sans',sans-serif]">
+    <div className="fixed bottom-6 right-6 z-50 w-[420px] max-w-[calc(100vw-32px)] h-[580px] max-h-[calc(100vh-48px)] flex flex-col rounded-2xl bg-slate-950 border border-slate-800 shadow-2xl overflow-hidden font-sans">
       {/* Widget Header */}
-      <div className="px-5 py-4 border-b border-[#1E2838] bg-[#0D1117] flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-[#00FF87]/20 border border-[#00FF87] flex items-center justify-center text-xl shadow-[0_0_12px_rgba(0,255,135,0.3)]">
-            🤖
+      <div className="px-4 py-3 border-b border-slate-800 bg-slate-900 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-center text-sky-400">
+            <Brain className="w-4 h-4" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h4 className="text-sm font-black text-slate-100">LEGITIFY Trust Copilot</h4>
-              <span className="w-2 h-2 rounded-full bg-[#00FF87] animate-pulse" />
+              <h4 className="text-xs font-bold text-slate-100">Forensic Assistant</h4>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
             </div>
-            <p className="text-xs text-slate-400 font-mono truncate max-w-[200px]">
+            <p className="text-[11px] text-slate-400 font-mono truncate max-w-[200px]">
               {cleanCompany} ({trustScore}/100)
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1">
           <button
             onClick={clearChat}
-            className="p-1.5 rounded-xl hover:bg-[#1A2232] text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+            className="p-1 rounded-md hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
             title="Clear Chat History"
           >
-            <RefreshCw className="w-4 h-4" />
+            <RefreshCw className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => setIsMinimized(true)}
-            className="p-1.5 rounded-xl hover:bg-[#1A2232] text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+            className="p-1 rounded-md hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
             title="Minimize"
           >
-            <ChevronRight className="w-4 h-4 rotate-90" />
+            <ChevronRight className="w-3.5 h-3.5 rotate-90" />
           </button>
           <button
             onClick={() => setIsOpen(false)}
-            className="p-1.5 rounded-xl hover:bg-[#1A2232] text-slate-400 hover:text-[#FF3B5C] transition-colors cursor-pointer"
+            className="p-1 rounded-md hover:bg-slate-800 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
             title="Close"
           >
-            <X className="w-4 h-4" />
+            <X className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
       {/* Messages Thread */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {messages.map((m, idx) => (
           <div key={idx} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
             <div
-              className={`max-w-[88%] p-4 rounded-2xl ${
+              className={`max-w-[88%] p-3 rounded-xl text-xs ${
                 m.role === "user"
-                  ? "bg-[#00FF87] text-black font-extrabold rounded-br-none text-sm shadow-md"
-                  : "bg-[#131822] border border-[#1E2838] text-slate-100 rounded-bl-none text-sm shadow-md"
+                  ? "bg-slate-800 text-slate-100 font-mono rounded-br-none border border-slate-700"
+                  : "bg-slate-900 border border-slate-800 text-slate-200 rounded-bl-none"
               }`}
             >
               {m.role === "user" ? (
@@ -2631,22 +2628,22 @@ function FloatingCopilotWidget({
           </div>
         ))}
         {loading && (
-          <div className="flex items-center gap-2 text-xs text-[#00FF87] p-3 rounded-2xl bg-[#131822] border border-[#1E2838] max-w-[80%]">
-            <Sparkles className="w-4 h-4 animate-spin flex-shrink-0" />
-            <span className="font-bold">Interrogating evidence & reasoning...</span>
+          <div className="flex items-center gap-2 text-xs text-sky-400 font-mono p-2.5 rounded-lg bg-slate-900 border border-slate-800 max-w-[80%]">
+            <Sparkles className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
+            <span>Interrogating evidence & reasoning...</span>
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
       {/* Quick Prompts Bar */}
-      <div className="px-4 py-2 border-t border-[#1E2838] bg-[#0A0D14] flex-shrink-0">
+      <div className="px-3 py-2 border-t border-slate-800 bg-slate-950 flex-shrink-0">
         <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
           {QUICK_PROMPTS.map((q, i) => (
             <button
               key={i}
               onClick={() => handleSend(q.prompt)}
-              className="px-2.5 py-1 rounded-full text-xs font-semibold bg-[#131822] hover:bg-[#1E2838] border border-[#1E2838] text-slate-300 hover:text-[#00FF87] whitespace-nowrap cursor-pointer transition-all flex-shrink-0"
+              className="px-2.5 py-1 rounded-md text-[11px] font-mono bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-300 hover:text-slate-100 whitespace-nowrap cursor-pointer transition-all flex-shrink-0"
             >
               {q.label}
             </button>
@@ -2655,7 +2652,7 @@ function FloatingCopilotWidget({
       </div>
 
       {/* Input Box */}
-      <div className="p-3 border-t border-[#1E2838] bg-[#0D1117] flex-shrink-0">
+      <div className="p-3 border-t border-slate-800 bg-slate-900 flex-shrink-0">
         <div className="flex items-center gap-2">
           <input
             type="text"
@@ -2663,14 +2660,14 @@ function FloatingCopilotWidget({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
-            className="flex-1 px-4 py-2.5 rounded-2xl bg-[#131822] border border-[#1E2838] text-xs md:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-[#00FF87]"
+            className="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-100 placeholder-slate-600 focus:outline-none focus:border-slate-700"
           />
           <button
             onClick={() => handleSend()}
             disabled={loading || !input.trim()}
-            className="px-4 py-2.5 rounded-2xl bg-[#00FF87] hover:bg-[#D4FF00] text-black font-black text-xs md:text-sm transition-all shadow-[0_0_15px_rgba(0,255,135,0.3)] disabled:opacity-40 cursor-pointer flex-shrink-0"
+            className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-slate-950 font-semibold text-xs font-mono transition-all disabled:opacity-40 cursor-pointer flex-shrink-0"
           >
-            Send
+            Query
           </button>
         </div>
       </div>
@@ -2725,110 +2722,110 @@ function AdminCasesView({
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-8 bg-[#060709] max-w-6xl mx-auto">
+    <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6 bg-slate-950 max-w-6xl mx-auto font-sans">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl md:text-4xl font-black text-slate-100 text-shadow-subtle">
-            📁 Global Case Registry & Prediction Review
+          <h2 className="text-xl font-bold text-slate-100">
+            Case Registry & Prediction Review
           </h2>
-          <p className="text-base text-slate-300 mt-1">
-            Auditable PostgreSQL repository. Security Officers can inspect cases and update/override ML predictions.
+          <p className="text-xs text-slate-400 mt-1">
+            Auditable PostgreSQL repository. Security Officers can inspect cases and update ML predictions.
           </p>
         </div>
       </div>
 
       <div className="flex items-center gap-3">
         <div className="flex-1 relative">
-          <Search className="w-5 h-5 text-slate-500 absolute left-4 top-1/2 transform -translate-y-1/2" />
+          <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 transform -translate-y-1/2" />
           <input
             type="text"
             placeholder="Search cases by entity name, user, or verdict..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-12 pr-5 py-3.5 rounded-2xl bg-[#0F131A] border-2 border-[#1E2838] text-base text-slate-100 placeholder-slate-500 focus:outline-none focus:border-[#00F0FF]"
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs font-mono text-slate-100 placeholder-slate-600 focus:outline-none focus:border-slate-700"
           />
         </div>
       </div>
 
       {editingScan && (
-        <div className="p-8 rounded-3xl bg-[#0D1117] border-2 border-[#00F0FF] shadow-[0_0_40px_rgba(0,240,255,0.25)] space-y-6">
+        <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm space-y-5">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">✏️</span>
-              <h3 className="text-2xl font-black text-slate-100 text-glow-cyan">
+            <div className="flex items-center gap-2.5">
+              <Edit3 className="w-4 h-4 text-sky-400" />
+              <h3 className="text-sm font-bold text-slate-100">
                 Admin Prediction Review & Override: {editingScan.entity_value}
               </h3>
             </div>
             <button
               onClick={() => setEditingScan(null)}
-              className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-slate-100"
+              className="p-1 rounded-md bg-slate-800 text-slate-400 hover:text-slate-100 cursor-pointer"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-3">
-              <label className="text-sm font-bold text-slate-200">Override Trust Score (0-100)</label>
-              <div className="flex items-center gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-xs font-mono font-medium text-slate-300">Override Trust Score (0-100)</label>
+              <div className="flex items-center gap-3">
                 <input
                   type="range"
                   min="0"
                   max="100"
                   value={editScore}
                   onChange={(e) => setEditScore(Number(e.target.value))}
-                  className="flex-1 accent-[#00F0FF]"
+                  className="flex-1 accent-sky-500"
                 />
-                <span className="text-2xl font-black text-[#00F0FF] font-mono w-16 text-right">
+                <span className="text-sm font-mono font-bold text-sky-400 w-16 text-right">
                   {editScore}/100
                 </span>
               </div>
             </div>
 
-            <div className="space-y-3">
-              <label className="text-sm font-bold text-slate-200">Override Verdict Classification</label>
+            <div className="space-y-2">
+              <label className="text-xs font-mono font-medium text-slate-300">Override Verdict Classification</label>
               <select
                 value={editVerdict}
                 onChange={(e) => setEditVerdict(e.target.value)}
-                className="w-full px-5 py-3 rounded-2xl bg-[#131822] border-2 border-[#1E2838] text-base text-slate-100 focus:outline-none focus:border-[#00F0FF]"
+                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-100 focus:outline-none focus:border-slate-700"
               >
-                <option value="likely_fake">🔴 LIKELY FAKE / CRITICAL SCAM</option>
-                <option value="suspicious">🟡 SUSPICIOUS / MODERATE RISK</option>
-                <option value="likely_genuine">🟢 LIKELY GENUINE / LOW RISK</option>
+                <option value="likely_fake">LIKELY FAKE / CRITICAL SCAM</option>
+                <option value="suspicious">SUSPICIOUS / MODERATE RISK</option>
+                <option value="likely_genuine">LIKELY GENUINE / LOW RISK</option>
               </select>
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-200">Forensic Audit & Correction Notes</label>
+          <div className="space-y-1.5">
+            <label className="text-xs font-mono font-medium text-slate-300">Forensic Audit & Correction Notes</label>
             <textarea
               rows={3}
               placeholder="e.g. Verified with corporate HR via phone. Recruiter domain is authorized third party..."
               value={editNotes}
               onChange={(e) => setEditNotes(e.target.value)}
-              className="w-full px-5 py-3.5 rounded-2xl bg-[#131822] border-2 border-[#1E2838] text-base text-slate-100 placeholder-slate-600 focus:outline-none focus:border-[#00F0FF] font-mono resize-none"
+              className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-100 placeholder-slate-600 focus:outline-none focus:border-slate-700 resize-none"
             />
           </div>
 
-          <div className="flex items-center justify-between pt-2">
+          <div className="flex items-center justify-between pt-1">
             {saveSuccess ? (
-              <span className="text-[#00FF87] font-black text-base flex items-center gap-2">
-                <CheckCircle2 className="w-5 h-5" /> Prediction updated and synced to Supabase!
+              <span className="text-emerald-400 text-xs font-mono font-medium flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4" /> Prediction updated and synced to database
               </span>
             ) : <span />}
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => setEditingScan(null)}
-                className="px-6 py-3 rounded-2xl bg-[#131822] text-slate-300 hover:text-slate-100 font-bold cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:text-slate-100 font-mono text-xs cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSavePrediction}
-                className="px-8 py-3 rounded-2xl bg-[#00F0FF] hover:bg-[#38BDF8] text-black font-black text-base transition-all shadow-[0_0_20px_rgba(0,240,255,0.4)] flex items-center gap-2 cursor-pointer"
+                className="px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-slate-950 font-semibold font-mono text-xs transition-all shadow-sm flex items-center gap-2 cursor-pointer"
               >
-                <Save className="w-5 h-5" />
+                <Save className="w-3.5 h-3.5" />
                 <span>Save & Update Prediction</span>
               </button>
             </div>
@@ -2836,14 +2833,14 @@ function AdminCasesView({
         </div>
       )}
 
-      <div className="rounded-3xl border-2 border-[#1E2838] bg-[#0D1117] overflow-hidden shadow-2xl">
+      <div className="rounded-2xl border border-slate-800 bg-slate-900 overflow-hidden shadow-sm">
         {loading ? (
-          <div className="p-12 text-center space-y-3">
-            <RefreshCw className="w-8 h-8 text-[#00F0FF] animate-spin mx-auto" />
-            <p className="text-base text-slate-300 font-bold">Syncing cases from Supabase...</p>
+          <div className="p-10 text-center space-y-2">
+            <RefreshCw className="w-6 h-6 text-sky-400 animate-spin mx-auto" />
+            <p className="text-xs text-slate-400 font-mono">Syncing cases from database...</p>
           </div>
         ) : filtered.length > 0 ? (
-          <div className="divide-y divide-[#1E2838]">
+          <div className="divide-y divide-slate-800">
             {filtered.map((s) => {
               const score = typeof s.trust_score === "number" ? s.trust_score : 26;
               const isClean = score >= 72;
@@ -2851,40 +2848,40 @@ function AdminCasesView({
                 <div
                   key={s.id}
                   onClick={() => onSelectScan(s.id)}
-                  className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-[#131822] cursor-pointer transition-colors"
+                  className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-800/40 cursor-pointer transition-colors"
                 >
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-3">
-                      <span className="text-xl font-black text-slate-100">{s.entity_value}</span>
-                      <span className="text-xs font-mono font-black px-3 py-1 rounded-full bg-slate-800 text-slate-300 uppercase">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-sm font-bold text-slate-100">{s.entity_value}</span>
+                      <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-slate-950 text-slate-400 uppercase border border-slate-800">
                         {s.entity_type}
                       </span>
                     </div>
-                    <p className="text-sm text-slate-400 font-mono">
-                      📅 {new Date(s.created_at).toLocaleDateString()} · ID: {s.id.slice(0, 8)}
+                    <p className="text-xs text-slate-500 font-mono">
+                      {new Date(s.created_at).toLocaleDateString()} · ID: {s.id.slice(0, 8)}
                     </p>
                   </div>
 
                   <div className="flex items-center gap-4">
                     <div className="text-right">
-                      <span className={`text-sm font-black px-4 py-1.5 rounded-full ${
+                      <span className={`text-xs font-mono font-medium px-2.5 py-0.5 rounded-md ${
                         isClean
-                          ? "bg-emerald-500/20 text-[#00FF87] border border-emerald-500/40"
-                          : "bg-red-500/20 text-[#FF3B5C] border border-red-500/40"
+                          ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                          : "bg-rose-500/10 text-rose-400 border border-rose-500/30"
                       }`}>
                         {s.verdict}
                       </span>
-                      <p className="text-sm font-mono text-slate-300 font-bold mt-1.5">
-                        Trust Index: <strong className={isClean ? "text-[#00FF87]" : "text-[#FF3B5C]"}>{score}/100</strong>
+                      <p className="text-xs font-mono text-slate-400 mt-1">
+                        Trust Index: <strong className={isClean ? "text-emerald-400" : "text-rose-400"}>{score}/100</strong>
                       </p>
                     </div>
 
                     <button
                       onClick={(e) => handleOpenEdit(s, e)}
                       title="Review & Update Prediction"
-                      className="p-3 rounded-2xl bg-[#00F0FF]/20 hover:bg-[#00F0FF]/40 text-[#00F0FF] transition-colors border border-[#00F0FF]/50 cursor-pointer"
+                      className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors border border-slate-700 cursor-pointer"
                     >
-                      <Edit3 className="w-5 h-5" />
+                      <Edit3 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -2892,8 +2889,8 @@ function AdminCasesView({
             })}
           </div>
         ) : (
-          <div className="p-16 text-center space-y-4">
-            <p className="text-base text-slate-400">No cases recorded yet.</p>
+          <div className="p-12 text-center space-y-2">
+            <p className="text-xs text-slate-500 font-mono">No cases recorded yet.</p>
           </div>
         )}
       </div>
@@ -2907,72 +2904,73 @@ function AdminCasesView({
 
 function UserSafetyHubView() {
   return (
-    <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-8 bg-[#060709] max-w-5xl mx-auto">
-      <div className="space-y-3">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-black bg-[#00FF87]/20 text-[#00FF87] border border-[#00FF87]/40 uppercase tracking-wider">
-          <Shield className="w-4 h-4" /> Official Candidate Safety Guidelines
+    <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6 bg-slate-950 max-w-5xl mx-auto font-sans">
+      <div className="space-y-2">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md text-xs font-mono font-medium bg-slate-900 text-emerald-400 border border-slate-800 uppercase tracking-wider">
+          <Shield className="w-3.5 h-3.5" /> Official Candidate Safety Guidelines
         </div>
-        <h2 className="text-4xl font-black text-slate-100 text-shadow-subtle">
-          Student Protection & Fraud Prevention Hub
+        <h2 className="text-xl md:text-2xl font-bold text-slate-100">
+          Student Protection & Fraud Prevention Directives
         </h2>
-        <p className="text-base text-slate-300">
-          Essential rules, regulatory guidelines (UGC/AICTE), and step-by-step reporting protocols.
+        <p className="text-xs text-slate-400">
+          Essential rules, regulatory standards (UGC/AICTE), and step-by-step reporting protocols.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="p-8 rounded-3xl bg-[#0D1117] border-2 border-[#1E2838] space-y-4 shadow-xl">
-          <div className="w-12 h-12 rounded-2xl bg-red-500/20 border-2 border-red-500 text-[#FF3B5C] flex items-center justify-center font-black text-xl">1</div>
-          <h3 className="text-2xl font-black text-slate-100">Zero Payment Policy</h3>
-          <p className="text-base text-slate-300 leading-relaxed font-semibold">
-            Legitimate corporate employers (TCS, Infosys, Google, Wipro, etc.) NEVER charge registration, laptop, security deposit, or uniform fees at any stage of hiring.
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-2.5 shadow-sm">
+          <div className="w-7 h-7 rounded-lg bg-slate-950 border border-slate-800 text-rose-400 flex items-center justify-center font-mono font-bold text-xs">1</div>
+          <h3 className="text-sm font-bold text-slate-100">Zero Payment Policy</h3>
+          <p className="text-xs text-slate-300 leading-relaxed">
+            Legitimate corporate employers (TCS, Infosys, Google, Wipro, etc.) never charge registration, laptop, security deposit, or uniform fees at any stage of hiring.
           </p>
         </div>
 
-        <div className="p-8 rounded-3xl bg-[#0D1117] border-2 border-[#1E2838] space-y-4 shadow-xl">
-          <div className="w-12 h-12 rounded-2xl bg-[#00FF87]/20 border-2 border-[#00FF87] text-[#00FF87] flex items-center justify-center font-black text-xl">2</div>
-          <h3 className="text-2xl font-black text-slate-100">Official Domain Emails Only</h3>
-          <p className="text-base text-slate-300 leading-relaxed font-semibold">
+        <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-2.5 shadow-sm">
+          <div className="w-7 h-7 rounded-lg bg-slate-950 border border-slate-800 text-emerald-400 flex items-center justify-center font-mono font-bold text-xs">2</div>
+          <h3 className="text-sm font-bold text-slate-100">Official Domain Emails Only</h3>
+          <p className="text-xs text-slate-300 leading-relaxed">
             Corporate HR will always write to you from their official corporate domain (e.g. <code>@tcs.com</code>), never from free public webmail addresses (<code>@gmail.com</code>, <code>@yahoo.com</code>).
           </p>
         </div>
 
-        <div className="p-8 rounded-3xl bg-[#0D1117] border-2 border-[#1E2838] space-y-4 shadow-xl">
-          <div className="w-12 h-12 rounded-2xl bg-[#00F0FF]/20 border-2 border-[#00F0FF] text-[#00F0FF] flex items-center justify-center font-black text-xl">3</div>
-          <h3 className="text-2xl font-black text-slate-100">Beware of Direct Selection</h3>
-          <p className="text-base text-slate-300 leading-relaxed font-semibold">
+        <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-2.5 shadow-sm">
+          <div className="w-7 h-7 rounded-lg bg-slate-950 border border-slate-800 text-sky-400 flex items-center justify-center font-mono font-bold text-xs">3</div>
+          <h3 className="text-sm font-bold text-slate-100">Beware of Direct Selection</h3>
+          <p className="text-xs text-slate-300 leading-relaxed">
             If you are offered an internship without any technical assessment or interview round simply based on your resume, it is an instant hallmark of recruitment fraud.
           </p>
         </div>
 
-        <div className="p-8 rounded-3xl bg-[#0D1117] border-2 border-[#1E2838] space-y-4 shadow-xl">
-          <div className="w-12 h-12 rounded-2xl bg-purple-500/20 border-2 border-purple-500 text-purple-400 flex items-center justify-center font-black text-xl">4</div>
-          <h3 className="text-2xl font-black text-slate-100">No Informal Chat Hiring</h3>
-          <p className="text-base text-slate-300 leading-relaxed font-semibold">
+        <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-2.5 shadow-sm">
+          <div className="w-7 h-7 rounded-lg bg-slate-950 border border-slate-800 text-purple-400 flex items-center justify-center font-mono font-bold text-xs">4</div>
+          <h3 className="text-sm font-bold text-slate-100">No Informal Chat Hiring</h3>
+          <p className="text-xs text-slate-300 leading-relaxed">
             Interviews conducted exclusively over WhatsApp chat, Telegram channels, or Google Forms without enterprise video conferencing are unverified.
           </p>
         </div>
       </div>
 
-      <div className="p-8 md:p-10 rounded-3xl bg-gradient-to-r from-[#131822] to-[#0D1117] border-2 border-[#1E2838] space-y-6 shadow-2xl">
-        <h3 className="text-2xl font-black text-slate-100 flex items-center gap-3">
-          <PhoneCall className="w-6 h-6 text-[#00FF87]" /> National Incident Reporting Directory
+      <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 shadow-sm">
+        <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+          <PhoneCall className="w-4 h-4 text-emerald-400" />
+          <span>National Incident Reporting Directory</span>
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          <div className="p-6 rounded-2xl bg-[#07080B] border border-[#1E2838]">
-            <p className="text-xs font-mono text-slate-400 uppercase">Cybercrime Helpline</p>
-            <p className="text-3xl font-black text-[#00FF87] mt-2 text-glow-emerald">1930</p>
-            <p className="text-sm text-slate-400 mt-1">Toll-free 24/7 (Govt of India)</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
+            <p className="text-[11px] font-mono text-slate-400 uppercase">Cybercrime Helpline</p>
+            <p className="text-2xl font-bold font-mono text-emerald-400 mt-1">1930</p>
+            <p className="text-xs text-slate-500 mt-0.5">Toll-free 24/7 (Govt of India)</p>
           </div>
-          <div className="p-6 rounded-2xl bg-[#07080B] border border-[#1E2838]">
-            <p className="text-xs font-mono text-slate-400 uppercase">Online Portal</p>
-            <p className="text-xl font-black text-slate-100 mt-2">cybercrime.gov.in</p>
-            <p className="text-sm text-slate-400 mt-1">Ministry of Home Affairs</p>
+          <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
+            <p className="text-[11px] font-mono text-slate-400 uppercase">Online Portal</p>
+            <p className="text-sm font-bold font-mono text-slate-100 mt-2">cybercrime.gov.in</p>
+            <p className="text-xs text-slate-500 mt-0.5">Ministry of Home Affairs</p>
           </div>
-          <div className="p-6 rounded-2xl bg-[#07080B] border border-[#1E2838]">
-            <p className="text-xs font-mono text-slate-400 uppercase">UGC Grievance</p>
-            <p className="text-xl font-black text-slate-100 mt-2">samadhaan.ugc.ac.in</p>
-            <p className="text-sm text-slate-400 mt-1">University Grants Commission</p>
+          <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
+            <p className="text-[11px] font-mono text-slate-400 uppercase">UGC Grievance</p>
+            <p className="text-sm font-bold font-mono text-slate-100 mt-2">samadhaan.ugc.ac.in</p>
+            <p className="text-xs text-slate-500 mt-0.5">University Grants Commission</p>
           </div>
         </div>
       </div>
@@ -3008,17 +3006,17 @@ function AdminReportView({
   const components = (report as any).components || {};
   const scoreTrace = report.score_trace;
 
-  const DIMENSIONS_DEF = [
-    { key: "document_authenticity", name: "Doc Authenticity", baseWeight: 0.10, icon: "📄", defaultScore: 85 },
-    { key: "company", name: "Company Legal Verification", baseWeight: 0.15, icon: "🏛️", defaultScore: 90 },
-    { key: "domain", name: "Domain Security Intelligence", baseWeight: 0.10, icon: "🌐", defaultScore: 80 },
-    { key: "recruiter", name: "Recruiter Authentication", baseWeight: 0.10, icon: "👤", defaultScore: 85 },
-    { key: "document", name: "Financial / Fee Safety", baseWeight: 0.20, icon: "💳", defaultScore: 90 },
-    { key: "certificate", name: "Certificate Verification", baseWeight: 0.05, icon: "📜", defaultScore: 85 },
-    { key: "ml_probability", name: "ML Fraud Classifier", baseWeight: 0.10, icon: "🤖", defaultScore: 85 },
-    { key: "threat", name: "Threat Intelligence IOC", baseWeight: 0.05, icon: "🚨", defaultScore: 90 },
-    { key: "community", name: "Community Intel & Reviews", baseWeight: 0.05, icon: "👥", defaultScore: 75 },
-    { key: "consistency", name: "Cross-Source Consistency", baseWeight: 0.10, icon: "⚖️", defaultScore: 80 },
+  const DIMENSIONS_DEF: { key: string; name: string; baseWeight: number; icon: React.ComponentType<{ className?: string }>; defaultScore: number }[] = [
+    { key: "document_authenticity", name: "Doc Authenticity", baseWeight: 0.10, icon: FileCheck, defaultScore: 85 },
+    { key: "company", name: "Company Legal Verification", baseWeight: 0.15, icon: Building2, defaultScore: 90 },
+    { key: "domain", name: "Domain Security Intelligence", baseWeight: 0.10, icon: Globe, defaultScore: 80 },
+    { key: "recruiter", name: "Recruiter Authentication", baseWeight: 0.10, icon: User, defaultScore: 85 },
+    { key: "document", name: "Financial / Fee Safety", baseWeight: 0.20, icon: CreditCard, defaultScore: 90 },
+    { key: "certificate", name: "Certificate Verification", baseWeight: 0.05, icon: FileText, defaultScore: 85 },
+    { key: "ml_probability", name: "ML Fraud Classifier", baseWeight: 0.10, icon: Cpu, defaultScore: 85 },
+    { key: "threat", name: "Threat Intelligence IOC", baseWeight: 0.05, icon: AlertTriangle, defaultScore: 90 },
+    { key: "community", name: "Community Intel & Reviews", baseWeight: 0.05, icon: Layers, defaultScore: 75 },
+    { key: "consistency", name: "Cross-Source Consistency", baseWeight: 0.10, icon: ShieldCheck, defaultScore: 80 },
   ];
 
   // Map each dimension with its active status and weight
@@ -3069,12 +3067,12 @@ function AdminReportView({
           <div className="flex items-center gap-3">
             <button
               onClick={onBack}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0F131A] text-slate-300 hover:text-[#00F0FF] border border-[#1E2838] text-xs font-mono font-bold transition-all cursor-pointer"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0F131A] text-slate-300 hover:text-sky-400 border border-[#1E2838] text-xs font-mono font-bold transition-all cursor-pointer"
             >
               <ChevronLeft className="w-4 h-4" /> Back to Mission Ops
             </button>
-            <span className="text-xs font-mono font-bold px-3 py-1 rounded-full bg-[#00F0FF]/15 text-[#00F0FF] border border-[#00F0FF]/30 uppercase tracking-wider">
-              🛡️ SOC Technical Audit Mode
+            <span className="inline-flex items-center gap-1.5 text-xs font-mono font-bold px-3 py-1 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20 uppercase tracking-wider">
+              <Shield className="w-3.5 h-3.5" /> SOC Technical Audit Mode
             </span>
           </div>
           <h1 className="text-3xl font-black text-slate-100 flex items-center gap-3 pt-1">
@@ -3088,7 +3086,7 @@ function AdminReportView({
         <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={() => setShowOverrideModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[#00F0FF]/20 hover:bg-[#00F0FF]/30 text-[#00F0FF] border border-[#00F0FF]/40 text-xs font-mono font-black transition-all cursor-pointer shadow-md"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-sky-600 hover:bg-sky-500 text-white border border-sky-500 text-xs font-mono font-bold transition-all cursor-pointer shadow-md"
           >
             <Edit3 className="w-4 h-4" />
             <span>Recalibrate / Override</span>
@@ -3104,16 +3102,16 @@ function AdminReportView({
             onClick={handleCopyJSON}
             className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[#131822] hover:bg-[#1A2232] text-slate-200 border border-[#1E2838] text-xs font-mono font-bold transition-all cursor-pointer"
           >
-            {copiedJson ? <Check className="w-4 h-4 text-[#00FF87]" /> : <Copy className="w-4 h-4" />}
+            {copiedJson ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
             <span>{copiedJson ? "JSON Copied" : "Raw JSON"}</span>
           </button>
           {onOpenCopilot && (
             <button
               onClick={() => onOpenCopilot()}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[#00FF87]/20 hover:bg-[#00FF87]/30 text-[#00FF87] border border-[#00FF87]/40 text-xs font-mono font-black transition-all cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[#131822] hover:bg-[#1A2232] text-slate-200 border border-[#1E2838] text-xs font-mono font-bold transition-all cursor-pointer"
             >
-              <Brain className="w-4 h-4" />
-              <span>AI Copilot</span>
+              <Brain className="w-4 h-4 text-sky-400" />
+              <span>Forensic Assistant</span>
             </button>
           )}
         </div>
@@ -3139,9 +3137,9 @@ function AdminReportView({
         <div className="p-6 rounded-3xl bg-[#0D1117] border-2 border-[#1E2838] space-y-2 shadow-xl">
           <div className="flex items-center justify-between">
             <span className="text-xs font-mono text-slate-400 uppercase">Confidence</span>
-            <span className="text-[10px] font-mono text-[#00FF87] bg-emerald-500/20 px-2 py-0.5 rounded">STATISTICAL</span>
+            <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">STATISTICAL</span>
           </div>
-          <p className="text-4xl font-black text-[#00FF87]">
+          <p className="text-4xl font-black text-emerald-400">
             {formatConfidence(report.confidence || report.confidence_score || 85)}%
           </p>
           <p className="text-xs text-slate-400 font-mono">Based on corroboration density</p>
@@ -3150,11 +3148,11 @@ function AdminReportView({
         <div className="p-6 rounded-3xl bg-[#0D1117] border-2 border-[#1E2838] space-y-2 shadow-xl">
           <div className="flex items-center justify-between">
             <span className="text-xs font-mono text-slate-400 uppercase">Evidence Completeness</span>
-            <span className="text-[10px] font-mono text-[#00F0FF] bg-cyan-500/20 px-2 py-0.5 rounded">
+            <span className="text-[10px] font-mono text-sky-400 bg-sky-500/10 border border-sky-500/20 px-2 py-0.5 rounded">
               {report.evidence_completeness?.category || "MODERATE"}
             </span>
           </div>
-          <p className="text-4xl font-black text-[#00F0FF]">
+          <p className="text-4xl font-black text-sky-400">
             {report.evidence_completeness?.percentage || 75}%
           </p>
           <p className="text-xs text-slate-400 font-mono">
@@ -3179,18 +3177,18 @@ function AdminReportView({
       {/* Tab Navigation for Deep SOC Inspection */}
       <div className="flex items-center gap-2 border-b border-[#1E2838] pb-3 overflow-x-auto">
         {[
-          { id: "math", label: "📐 10-Dimension Formula & Weights" },
-          { id: "claims", label: "🔍 Dynamic Claims Ledger (RAG)" },
-          { id: "telemetry", label: "⚡ Pipeline & HF Models" },
-          { id: "gemini", label: "🤖 Gemini Cross-Examination" },
-          { id: "raw", label: "💻 Raw Technical JSON" },
+          { id: "math", label: "10-Dimension Formula & Weights" },
+          { id: "claims", label: "Dynamic Claims Ledger (RAG)" },
+          { id: "telemetry", label: "Pipeline & Model Telemetry" },
+          { id: "gemini", label: "Gemini Cross-Examination" },
+          { id: "raw", label: "Raw Technical JSON" },
         ].map((t) => (
           <button
             key={t.id}
             onClick={() => setActiveTab(t.id as any)}
             className={`px-4 py-2 rounded-2xl text-xs font-mono font-bold whitespace-nowrap transition-all cursor-pointer ${
               activeTab === t.id
-                ? "bg-[#00F0FF]/20 text-[#00F0FF] border border-[#00F0FF]/50 shadow-md font-black"
+                ? "bg-sky-500/10 text-sky-400 border border-sky-500/30 font-black"
                 : "text-slate-400 hover:text-slate-200 hover:bg-[#131822]"
             }`}
           >
@@ -3203,12 +3201,12 @@ function AdminReportView({
       {activeTab === "math" && (
         <div className="space-y-6">
           {/* Mathematical Formula Callout */}
-          <div className="p-6 rounded-3xl bg-[#0D1117] border-2 border-[#00F0FF]/30 space-y-4 shadow-2xl">
+          <div className="p-6 rounded-3xl bg-[#0D1117] border border-slate-800 space-y-4 shadow-xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <span className="text-2xl">📐</span>
+                <Cpu className="w-5 h-5 text-sky-400" />
                 <div>
-                  <h3 className="text-lg font-black text-slate-100 text-glow-cyan">
+                  <h3 className="text-lg font-bold text-slate-100">
                     Deterministic Scoring Equation (LEGITIFY-SCORE-v2.0)
                   </h3>
                   <p className="text-xs text-slate-400 mt-0.5">
@@ -3216,13 +3214,13 @@ function AdminReportView({
                   </p>
                 </div>
               </div>
-              <span className="text-xs font-mono font-bold px-3 py-1 rounded-full bg-[#00F0FF]/20 text-[#00F0FF] border border-[#00F0FF]/40">
+              <span className="text-xs font-mono font-bold px-3 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
                 AUDITED ENGINE
               </span>
             </div>
 
             <div className="p-4 rounded-2xl bg-[#060709] border border-[#1E2838] font-mono text-sm space-y-2">
-              <p className="text-[#00FF87] font-bold text-sm md:text-base">
+              <p className="text-emerald-400 font-bold text-sm md:text-base">
                 Final Trust Score = Σ [ (w_i / Σ w_active) × Score_i ] + Δ_rules - Hard_Cap_Penalties
               </p>
               <div className="text-xs text-slate-300 space-y-1 pt-1">
@@ -3235,8 +3233,8 @@ function AdminReportView({
 
           {/* 10-Dimension Mathematical Table */}
           <div className="space-y-4">
-            <h4 className="text-base font-black text-slate-100 flex items-center gap-2">
-              <span>📊</span> Active Weights & Component Contributions
+            <h4 className="text-base font-bold text-slate-100 flex items-center gap-2">
+              <Activity className="w-4 h-4 text-slate-400" /> Active Weights & Component Contributions
             </h4>
             <div className="rounded-3xl border-2 border-[#1E2838] bg-[#0D1117] overflow-hidden shadow-2xl">
               <div className="overflow-x-auto">
@@ -3261,34 +3259,34 @@ function AdminReportView({
                         <tr key={idx} className="hover:bg-[#131822]/60 transition-colors">
                           <td className="px-6 py-4 font-bold text-slate-100">
                             <div className="flex items-center gap-2.5">
-                              <span className="text-lg">{dim.icon}</span>
+                              {React.createElement(dim.icon, { className: "w-4 h-4 text-slate-400 flex-shrink-0" })}
                               <span>{dim.name}</span>
                             </div>
                           </td>
                           <td className="px-6 py-4 font-mono text-slate-400">
                             {(dim.baseWeight * 100).toFixed(0)}%
                           </td>
-                          <td className="px-6 py-4 font-mono font-bold text-[#00F0FF]">
+                          <td className="px-6 py-4 font-mono font-bold text-sky-400">
                             {dim.isActive ? `${(normWeight * 100).toFixed(1)}%` : <span className="text-slate-500">0.0% (Excluded)</span>}
                           </td>
                           <td className="px-6 py-4 font-mono font-bold">
                             {dim.isActive ? (
-                              <span style={{ color: dim.rawScore >= 70 ? '#00FF87' : dim.rawScore >= 45 ? '#F59E0B' : '#FF3B5C' }}>
+                              <span className={dim.rawScore >= 70 ? 'text-emerald-400' : dim.rawScore >= 45 ? 'text-amber-400' : 'text-rose-400'}>
                                 {dim.rawScore}/100
                               </span>
                             ) : (
                               <span className="text-slate-500 font-normal">UNAVAILABLE</span>
                             )}
                           </td>
-                          <td className="px-6 py-4 font-mono font-extrabold text-[#00FF87]">
+                          <td className="px-6 py-4 font-mono font-extrabold text-emerald-400">
                             +{weightedContrib}
                           </td>
                           <td className="px-6 py-4">
                             <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold ${
                               dim.status === "VERIFIED"
-                                ? "bg-emerald-500/20 text-[#00FF87] border border-emerald-500/40"
+                                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
                                 : dim.status === "CONTRADICTED"
-                                ? "bg-red-500/20 text-[#FF3B5C] border border-red-500/40"
+                                ? "bg-rose-500/20 text-rose-400 border border-rose-500/40"
                                 : dim.status === "FLAGGED" || dim.status === "SUSPICIOUS"
                                 ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
                                 : "bg-slate-800 text-slate-400 border border-slate-700"
@@ -3299,7 +3297,7 @@ function AdminReportView({
                           <td className="px-6 py-4 text-xs text-slate-300 max-w-sm">
                             <p>{dim.reason}</p>
                             {dim.evidenceIds.length > 0 && (
-                              <span className="text-[10px] font-mono text-[#00F0FF] mt-0.5 block">
+                              <span className="text-[10px] font-mono text-sky-400 mt-0.5 block">
                                 Trace: {dim.evidenceIds.slice(0, 3).join(", ")}
                               </span>
                             )}
@@ -3315,8 +3313,8 @@ function AdminReportView({
 
           {/* Hard Safety Constraints & Caps Audit Table */}
           <div className="space-y-4">
-            <h4 className="text-base font-black text-slate-100 flex items-center gap-2">
-              <span>🛑</span> Hard Safety Constraints Audit (Override Engine)
+            <h4 className="text-base font-bold text-slate-100 flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-rose-400" /> Hard Safety Constraints Audit (Override Engine)
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {[
@@ -3349,19 +3347,19 @@ function AdminReportView({
                   key={cIdx}
                   className={`p-5 rounded-2xl border-2 space-y-2.5 shadow-lg ${
                     c.triggered
-                      ? "bg-red-500/10 border-red-500/50"
+                      ? "bg-rose-500/10 border-rose-500/50"
                       : "bg-[#0D1117] border-[#1E2838]"
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-mono font-bold text-slate-300">{c.rule}</span>
                     <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-black ${
-                      c.triggered ? "bg-red-500 text-white" : "bg-emerald-500/20 text-[#00FF87]"
+                      c.triggered ? "bg-rose-500 text-white" : "bg-emerald-500/20 text-emerald-400"
                     }`}>
                       {c.triggered ? "TRIGGERED" : "PASSED"}
                     </span>
                   </div>
-                  <p className="text-xs font-mono font-bold text-[#00F0FF]">{c.ceiling}</p>
+                  <p className="text-xs font-mono font-bold text-sky-400">{c.ceiling}</p>
                   <p className="text-xs text-slate-400 leading-relaxed">{c.description}</p>
                 </div>
               ))}
@@ -3375,10 +3373,10 @@ function AdminReportView({
         <div className="space-y-6">
           <div className="rounded-3xl border-2 border-[#1E2838] bg-[#0D1117] overflow-hidden shadow-2xl">
             <div className="p-6 border-b border-[#1E2838] flex items-center justify-between">
-              <h4 className="text-lg font-black text-slate-100 flex items-center gap-2">
-                <span>🔍</span> Extracted Document Claims vs. Ground Truth (RAG Layer 1 & 2)
+              <h4 className="text-lg font-bold text-slate-100 flex items-center gap-2.5">
+                <Search className="w-5 h-5 text-sky-400" /> Extracted Document Claims vs. Ground Truth (RAG Layer 1 & 2)
               </h4>
-              <span className="text-xs font-mono px-3 py-1 rounded-full bg-[#131822] text-[#00F0FF] border border-[#00F0FF]/30 font-bold">
+              <span className="text-xs font-mono px-3 py-1 rounded-full bg-slate-800 text-sky-400 border border-slate-700 font-bold">
                 {report.extracted_claims?.length || 0} Claims Ledger Records
               </span>
             </div>
@@ -3396,15 +3394,15 @@ function AdminReportView({
                 <tbody className="divide-y divide-[#1E2838]">
                   {(report.extracted_claims || []).map((clm, idx) => (
                     <tr key={idx} className="hover:bg-[#131822]/60 transition-colors">
-                      <td className="px-6 py-4 font-mono text-xs font-bold text-[#00F0FF]">{clm.id}</td>
+                      <td className="px-6 py-4 font-mono text-xs font-bold text-sky-400">{clm.id}</td>
                       <td className="px-6 py-4 font-mono text-xs text-slate-400">{clm.claim_type}</td>
                       <td className="px-6 py-4 font-bold text-slate-100 max-w-sm">{clm.raw_claim_text}</td>
                       <td className="px-6 py-4">
                         <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold ${
                           clm.verification_status === "VERIFIED"
-                            ? "bg-emerald-500/20 text-[#00FF87] border border-emerald-500/40"
+                            ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
                             : clm.verification_status === "CONTRADICTED"
-                            ? "bg-red-500/20 text-[#FF3B5C] border border-red-500/40"
+                            ? "bg-rose-500/20 text-rose-400 border border-rose-500/40"
                             : "bg-amber-500/20 text-amber-300 border border-amber-500/40"
                         }`}>
                           {clm.verification_status}
@@ -3422,8 +3420,8 @@ function AdminReportView({
 
           {/* Visual Signatory Forensics Card */}
           <div className="p-6 rounded-3xl bg-[#0D1117] border-2 border-[#1E2838] space-y-4 shadow-xl">
-            <h4 className="text-base font-black text-slate-100 flex items-center gap-2">
-              <span>✍️</span> Signatory & Letterhead Forensics
+            <h4 className="text-base font-bold text-slate-100 flex items-center gap-2">
+              <FileCheck className="w-4 h-4 text-slate-400" /> Signatory & Letterhead Forensics
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="p-4 rounded-2xl bg-[#131822] border border-[#1E2838]">
@@ -3453,17 +3451,17 @@ function AdminReportView({
         </div>
       )}
 
-      {/* TAB 3: PIPELINE & HUGGING FACE TELEMETRY */}
+      {/* TAB 3: PIPELINE & TELEMETRY */}
       {activeTab === "telemetry" && (
         <div className="space-y-6">
-          {/* Hugging Face Deep Learning Telemetry */}
+          {/* Hugging Face Telemetry */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="p-6 rounded-3xl bg-[#0D1117] border-2 border-[#1E2838] space-y-3 shadow-xl">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-mono font-bold text-[#00F0FF] uppercase">Hugging Face Model 1</span>
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-[#00FF87]">ONLINE</span>
+                <span className="text-xs font-mono font-bold text-sky-400 uppercase">Hugging Face Model 1</span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-400">ONLINE</span>
               </div>
-              <h4 className="text-base font-black text-slate-100">pszemraj/pdf-ocr (Mindee docTR)</h4>
+              <h4 className="text-base font-bold text-slate-100">pszemraj/pdf-ocr (Mindee docTR)</h4>
               <p className="text-xs text-slate-300">
                 Deep-learning optical character recognition with convolutional feature extraction for multi-column offer letters.
               </p>
@@ -3474,10 +3472,10 @@ function AdminReportView({
 
             <div className="p-6 rounded-3xl bg-[#0D1117] border-2 border-[#1E2838] space-y-3 shadow-xl">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-mono font-bold text-[#00F0FF] uppercase">Hugging Face Model 2</span>
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-[#00FF87]">ONLINE</span>
+                <span className="text-xs font-mono font-bold text-sky-400 uppercase">Hugging Face Model 2</span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-400">ONLINE</span>
               </div>
-              <h4 className="text-base font-black text-slate-100">davanstrien/ColPali-Query-Generator</h4>
+              <h4 className="text-base font-bold text-slate-100">davanstrien/ColPali-Query-Generator</h4>
               <p className="text-xs text-slate-300">
                 Qwen2.5-VL-7B multimodal vision-language query generation producing topical, detail, and visual search vectors.
               </p>
@@ -3491,10 +3489,10 @@ function AdminReportView({
           {report.pipeline_trace?.stages && report.pipeline_trace.stages.length > 0 && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h4 className="text-base font-black text-slate-100 flex items-center gap-2">
-                  <span>⚡</span> Stage-by-Stage Latency & Diagnostic Execution Trace
+                <h4 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-sky-400" /> Stage-by-Stage Latency & Diagnostic Execution Trace
                 </h4>
-                <span className="text-xs font-mono px-3 py-1 rounded-full bg-[#131822] text-[#00F0FF] border border-[#00F0FF]/30 font-bold">
+                <span className="text-xs font-mono px-3 py-1 rounded-full bg-[#131822] text-sky-400 border border-slate-700 font-bold">
                   {report.pipeline_trace.stages.length} Stages · {report.pipeline_trace.totalDurationMs || 0}ms
                 </span>
               </div>
@@ -3503,7 +3501,7 @@ function AdminReportView({
                   <div key={sIdx} className="py-2.5 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
                       <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${
-                        stg.status === 'PASS' ? 'bg-emerald-500/20 text-[#00FF87]' :
+                        stg.status === 'PASS' ? 'bg-emerald-500/20 text-emerald-400' :
                         stg.status === 'SKIP' ? 'bg-slate-700/40 text-slate-400' :
                         'bg-amber-500/20 text-amber-300'
                       }`}>
@@ -3529,28 +3527,30 @@ function AdminReportView({
           <div className="p-6 rounded-3xl bg-[#0D1117] border-2 border-[#1E2838] space-y-4 shadow-xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <span className="text-2xl">🤖</span>
+                <Brain className="w-6 h-6 text-sky-400" />
                 <div>
-                  <h4 className="text-lg font-black text-slate-100">Gemini Independent Investigation Dossier</h4>
+                  <h4 className="text-lg font-bold text-slate-100">Gemini Independent Investigation Dossier</h4>
                   <p className="text-xs text-slate-400">Independent LLM cross-examination grounded with Google Search.</p>
                 </div>
               </div>
-              <span className={`px-3 py-1 rounded-full text-xs font-mono font-black ${
+              <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold ${
                 (report.gemini_cross_examination?.verdict || "").includes("FAKE") || (report.gemini_cross_examination?.verdict || "").includes("SCAM")
-                  ? "bg-red-500/20 text-[#FF3B5C] border border-red-500/50"
-                  : "bg-emerald-500/20 text-[#00FF87] border border-emerald-500/50"
+                  ? "bg-rose-500/20 text-rose-400 border border-rose-500/50"
+                  : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/50"
               }`}>
                 {report.gemini_cross_examination?.verdict || "INDEPENDENT_EVAL_COMPLETE"}
               </span>
             </div>
 
-            <p className="text-sm text-slate-200 font-semibold leading-relaxed">
+            <p className="text-sm text-slate-200 font-medium leading-relaxed">
               {report.gemini_cross_examination?.summary || report.executive_summary || "Gemini cross-examination corroborated deterministic evidence findings."}
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
               <div className="p-4 rounded-2xl bg-[#131822] border border-[#1E2838] space-y-2">
-                <span className="text-xs font-mono text-[#00FF87] font-bold">✅ Agreements with Deterministic Engine</span>
+                <span className="inline-flex items-center gap-1.5 text-xs font-mono text-emerald-400 font-bold">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Agreements with Engine
+                </span>
                 <ul className="text-xs text-slate-300 space-y-1 list-disc list-inside">
                   {(report.gemini_reconciliation?.agreements || ["Zero-fee policy validation", "Entity name alignment"]).map((a, i) => (
                     <li key={i}>{a}</li>
@@ -3559,7 +3559,9 @@ function AdminReportView({
               </div>
 
               <div className="p-4 rounded-2xl bg-[#131822] border border-[#1E2838] space-y-2">
-                <span className="text-xs font-mono text-[#FF3B5C] font-bold">⚠️ Detected Contradictions</span>
+                <span className="inline-flex items-center gap-1.5 text-xs font-mono text-rose-400 font-bold">
+                  <AlertTriangle className="w-3.5 h-3.5" /> Detected Contradictions
+                </span>
                 <ul className="text-xs text-slate-300 space-y-1 list-disc list-inside">
                   {(report.gemini_reconciliation?.contradictions?.length ? report.gemini_reconciliation.contradictions : ["No direct factual contradictions discovered."]).map((c, i) => (
                     <li key={i}>{c}</li>
@@ -3568,7 +3570,9 @@ function AdminReportView({
               </div>
 
               <div className="p-4 rounded-2xl bg-[#131822] border border-[#1E2838] space-y-2">
-                <span className="text-xs font-mono text-amber-300 font-bold">❓ Epistemic Unknowns</span>
+                <span className="inline-flex items-center gap-1.5 text-xs font-mono text-amber-300 font-bold">
+                  <Info className="w-3.5 h-3.5" /> Epistemic Unknowns
+                </span>
                 <ul className="text-xs text-slate-300 space-y-1 list-disc list-inside">
                   {(report.gemini_reconciliation?.unknowns || ["Signatory employment record not in public registries."]).map((u, i) => (
                     <li key={i}>{u}</li>
@@ -3584,14 +3588,14 @@ function AdminReportView({
       {activeTab === "raw" && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h4 className="text-base font-black text-slate-100 flex items-center gap-2">
-              <span>💻</span> Complete Unredacted Report JSON
+            <h4 className="text-base font-bold text-slate-100 flex items-center gap-2">
+              <FileText className="w-4 h-4 text-slate-400" /> Complete Unredacted Report JSON
             </h4>
             <button
               onClick={handleCopyJSON}
-              className="flex items-center gap-2 px-3 py-1 rounded-xl bg-[#131822] text-slate-300 hover:text-[#00F0FF] border border-[#1E2838] text-xs font-mono font-bold cursor-pointer"
+              className="flex items-center gap-2 px-3 py-1 rounded-xl bg-[#131822] text-slate-300 hover:text-sky-400 border border-[#1E2838] text-xs font-mono font-bold cursor-pointer"
             >
-              {copiedJson ? <Check className="w-3.5 h-3.5 text-[#00FF87]" /> : <Copy className="w-3.5 h-3.5" />}
+              {copiedJson ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
               <span>{copiedJson ? "Copied" : "Copy Raw JSON"}</span>
             </button>
           </div>
@@ -3604,11 +3608,11 @@ function AdminReportView({
       {/* SOC Override Modal */}
       {showOverrideModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="w-full max-w-xl p-8 rounded-3xl bg-[#0D1117] border-2 border-[#00F0FF]/50 shadow-2xl space-y-6">
+          <div className="w-full max-w-xl p-8 rounded-3xl bg-slate-900 border border-slate-700 shadow-2xl space-y-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <span className="text-2xl">🛡️</span>
-                <h3 className="text-2xl font-black text-slate-100">SOC Decision Override</h3>
+                <Shield className="w-6 h-6 text-sky-400" />
+                <h3 className="text-2xl font-bold text-slate-100">SOC Decision Override</h3>
               </div>
               <button
                 onClick={() => setShowOverrideModal(false)}
@@ -3659,7 +3663,7 @@ function AdminReportView({
 
             <div className="flex items-center justify-between pt-2">
               {saveSuccess && (
-                <span className="text-xs font-mono text-[#00FF87] flex items-center gap-1.5 font-bold">
+                <span className="text-xs font-mono text-emerald-400 flex items-center gap-1.5 font-bold">
                   <CheckCircle2 className="w-4 h-4" /> Updated in Supabase!
                 </span>
               )}
@@ -3672,7 +3676,7 @@ function AdminReportView({
                 </button>
                 <button
                   onClick={handleSaveOverride}
-                  className="px-6 py-2.5 rounded-2xl bg-[#00F0FF] hover:bg-[#38BDF8] text-black font-black text-sm transition-all shadow-[0_0_20px_rgba(0,240,255,0.4)] flex items-center gap-2 cursor-pointer"
+                  className="px-6 py-2.5 rounded-2xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-sm transition-all border border-sky-500 flex items-center gap-2 cursor-pointer shadow-md"
                 >
                   <Save className="w-4 h-4" />
                   <span>Save Decision</span>
@@ -3691,39 +3695,40 @@ function AdminReportView({
 // ================================================================
 
 function AdminSidebar({ active, onNav }: { active: AdminView; onNav: (v: AdminView) => void }) {
-  const ITEMS: { id: AdminView; label: string; emoji: string; badge?: string }[] = [
-    { id: "admin_mission",       label: "Mission Operations",     emoji: "⚡" },
-    { id: "admin_report",        label: "Forensic Dossier & Math",emoji: "📐", badge: "SOC" },
-    { id: "admin_scan",          label: "Live Pipeline Scan",      emoji: "🔍", badge: "RUN" },
-    { id: "admin_copilot",       label: "Trust AI Copilot",       emoji: "🤖", badge: "AI" },
-    { id: "admin_threats",       label: "Threat Intelligence IOC",emoji: "🚨" },
-    { id: "admin_analytics",     label: "Platform Telemetry",     emoji: "📈" },
-    { id: "admin_cases",         label: "Case Registry & Review", emoji: "📁", badge: "EDIT" },
-    { id: "admin_settings",      label: "System Settings",        emoji: "⚙️" },
+  const ITEMS: { id: AdminView; label: string; icon: React.ComponentType<{ className?: string }>; badge?: string }[] = [
+    { id: "admin_mission",   label: "Mission Operations",     icon: Activity },
+    { id: "admin_report",    label: "Forensic Dossier & Math",icon: Shield, badge: "SOC" },
+    { id: "admin_scan",      label: "Live Pipeline Scan",      icon: Search, badge: "RUN" },
+    { id: "admin_copilot",   label: "Forensic Assistant",     icon: Brain, badge: "AI" },
+    { id: "admin_threats",   label: "Threat Intelligence IOC",icon: AlertTriangle },
+    { id: "admin_analytics", label: "Platform Telemetry",     icon: BarChart2 },
+    { id: "admin_cases",     label: "Case Registry & Review", icon: FileText, badge: "EDIT" },
+    { id: "admin_settings",  label: "System Settings",        icon: Settings },
   ];
 
   return (
     <aside className="w-72 border-r border-[#1E2838] bg-[#07090E] flex flex-col p-5 space-y-3 flex-shrink-0">
-      <div className="px-4 py-2 text-xs font-mono font-black tracking-widest text-[#00F0FF] uppercase text-glow-cyan">
+      <div className="px-4 py-2 text-xs font-mono font-bold tracking-widest text-slate-400 uppercase">
         Security Operations Center
       </div>
       {ITEMS.map((item) => {
         const isActive = active === item.id;
+        const IconComp = item.icon;
         return (
           <button
             key={item.id}
             onClick={() => onNav(item.id)}
-            className={`w-full flex items-center gap-4 px-5 py-3.5 rounded-2xl text-base font-bold transition-all cursor-pointer ${
+            className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-2xl text-sm font-semibold transition-all cursor-pointer ${
               isActive
-                ? "bg-[#00F0FF]/20 text-[#00F0FF] border-2 border-[#00F0FF]/50 shadow-[0_0_20px_rgba(0,240,255,0.25)] text-glow-cyan font-black"
+                ? "bg-slate-800 text-sky-400 border border-slate-700 shadow-sm"
                 : "text-slate-300 hover:text-slate-100 hover:bg-[#0F131A]"
             }`}
           >
-            <span className="text-xl">{item.emoji}</span>
+            <IconComp className={`w-4 h-4 flex-shrink-0 ${isActive ? "text-sky-400" : "text-slate-400"}`} />
             <span className="flex-1 text-left truncate">{item.label}</span>
             {item.badge && (
-              <span className={`text-xs font-mono px-2.5 py-0.5 rounded-full font-black ${
-                isActive ? "bg-[#00F0FF] text-black" : "bg-slate-800 text-slate-400"
+              <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
+                isActive ? "bg-sky-500/20 text-sky-400 border border-sky-500/30" : "bg-slate-800 text-slate-400"
               }`}>
                 {item.badge}
               </span>
@@ -3745,10 +3750,13 @@ function AdminThreatsView() {
 
   return (
     <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-8 bg-[#060709]">
-      <h2 className="text-3xl font-black text-slate-100">🚨 Threat Intelligence IOCs</h2>
-      <div className="rounded-3xl border-2 border-[#1E2838] bg-[#0D1117] overflow-hidden shadow-2xl">
-        <table className="w-full text-left text-base">
-          <thead className="bg-[#0F131A] text-slate-400 font-mono text-sm">
+      <h2 className="text-2xl font-bold text-slate-100 flex items-center gap-2.5">
+        <AlertTriangle className="w-6 h-6 text-rose-400" />
+        Threat Intelligence Indicators of Compromise (IOCs)
+      </h2>
+      <div className="rounded-3xl border border-slate-800 bg-[#0D1117] overflow-hidden shadow-2xl">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-[#0F131A] text-slate-400 font-mono text-xs">
             <tr>
               <th className="px-6 py-4">Indicator Value</th>
               <th className="px-6 py-4">Type</th>
@@ -3759,11 +3767,11 @@ function AdminThreatsView() {
           </thead>
           <tbody className="divide-y divide-[#1E2838]">
             {IOC_LIST.map((item, idx) => (
-              <tr key={idx} className="hover:bg-[#131822]/60">
+              <tr key={idx} className="hover:bg-[#131822]/60 transition-colors">
                 <td className="px-6 py-4 font-mono font-bold text-slate-100">{item.value}</td>
                 <td className="px-6 py-4 text-slate-300">{item.type}</td>
-                <td className="px-6 py-4 text-slate-100 font-extrabold">{item.threat}</td>
-                <td className="px-6 py-4"><span className="px-3 py-1 rounded-full text-xs font-black bg-red-500/20 text-[#FF3B5C]">{item.severity}</span></td>
+                <td className="px-6 py-4 text-slate-100 font-bold">{item.threat}</td>
+                <td className="px-6 py-4"><span className="px-3 py-1 rounded-full text-xs font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">{item.severity}</span></td>
                 <td className="px-6 py-4 text-slate-400 font-mono text-xs">{item.source}</td>
               </tr>
             ))}
@@ -3777,19 +3785,22 @@ function AdminThreatsView() {
 function AdminAnalyticsView() {
   return (
     <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-8 bg-[#060709]">
-      <h2 className="text-3xl font-black text-slate-100">📈 Telemetry & Machine Learning Metrics</h2>
+      <h2 className="text-2xl font-bold text-slate-100 flex items-center gap-2.5">
+        <BarChart2 className="w-6 h-6 text-sky-400" />
+        Platform Telemetry & Machine Learning Metrics
+      </h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="p-8 rounded-3xl bg-[#0D1117] border-2 border-[#1E2838] space-y-2">
+        <div className="p-8 rounded-3xl bg-[#0D1117] border border-slate-800 space-y-2">
           <p className="text-sm text-slate-400 font-mono">Model Accuracy</p>
-          <p className="text-4xl font-black text-[#00FF87]">98.4%</p>
+          <p className="text-4xl font-black text-emerald-400">98.4%</p>
           <p className="text-xs text-slate-500">Linear SVM (Kaggle dataset)</p>
         </div>
-        <div className="p-8 rounded-3xl bg-[#0D1117] border-2 border-[#1E2838] space-y-2">
+        <div className="p-8 rounded-3xl bg-[#0D1117] border border-slate-800 space-y-2">
           <p className="text-sm text-slate-400 font-mono">Precision / Recall</p>
-          <p className="text-4xl font-black text-[#00F0FF]">0.96 / 0.94</p>
+          <p className="text-4xl font-black text-sky-400">0.96 / 0.94</p>
           <p className="text-xs text-slate-500">Zero false negative target</p>
         </div>
-        <div className="p-8 rounded-3xl bg-[#0D1117] border-2 border-[#1E2838] space-y-2">
+        <div className="p-8 rounded-3xl bg-[#0D1117] border border-slate-800 space-y-2">
           <p className="text-sm text-slate-400 font-mono">Avg Pipeline Latency</p>
           <p className="text-4xl font-black text-amber-400">1.2s</p>
           <p className="text-xs text-slate-500">10-dimension forensic fusion engine</p>
@@ -3812,42 +3823,42 @@ function AdminMissionControl({
 }) {
   return (
     <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-8 bg-[#060709]">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 p-8 md:p-10 rounded-3xl bg-gradient-to-r from-[#131822] to-[#0D1117] border-2 border-[#1E2838] shadow-2xl">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 p-8 md:p-10 rounded-3xl bg-[#0D1117] border border-slate-800 shadow-xl">
         <div>
-          <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full text-xs font-black bg-[#00F0FF]/20 text-[#00F0FF] border border-[#00F0FF]/40 mb-3 text-glow-cyan uppercase">
-            <Activity className="w-4 h-4 animate-pulse" /> Live Telemetry Matrix
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono font-bold bg-slate-800 text-slate-300 border border-slate-700 mb-3 uppercase">
+            <Activity className="w-3.5 h-3.5 text-sky-400" /> Live Telemetry Matrix
           </div>
-          <h2 className="text-3xl md:text-4xl font-black text-slate-100 text-shadow-subtle">
+          <h2 className="text-3xl md:text-4xl font-black text-slate-100">
             Forensic Intelligence & SOC Terminal
           </h2>
         </div>
         <button
           onClick={() => onNav("admin_scan")}
-          className="px-8 py-4 rounded-3xl font-black text-base bg-[#00F0FF] hover:bg-[#38BDF8] text-black transition-all shadow-[0_0_20px_rgba(0,240,255,0.4)] flex items-center gap-3 cursor-pointer"
+          className="px-6 py-3 rounded-2xl font-semibold text-sm bg-sky-600 hover:bg-sky-500 text-white transition-all border border-sky-500 flex items-center gap-2.5 cursor-pointer shadow-md"
         >
-          <Zap className="w-5 h-5" /> Start Pipeline Scan
+          <Zap className="w-4 h-4" /> Start Pipeline Scan
         </button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="p-6 rounded-3xl bg-[#0D1117] border-2 border-[#1E2838] space-y-2">
-          <span className="text-sm font-bold text-slate-400">Total Scans in DB</span>
+        <div className="p-6 rounded-3xl bg-[#0D1117] border border-slate-800 space-y-2">
+          <span className="text-sm font-semibold text-slate-400">Total Scans in DB</span>
           <p className="text-4xl font-black text-slate-100"><AnimatedCounter value={stats?.total_scans ?? stats?.totalScans ?? scans.length ?? 0} /></p>
-          <span className="text-xs text-[#00FF87] font-mono">Live database records</span>
+          <span className="text-xs text-emerald-400 font-mono">Live database records</span>
         </div>
-        <div className="p-6 rounded-3xl bg-[#0D1117] border-2 border-[#1E2838] space-y-2">
-          <span className="text-sm font-bold text-slate-400">Threats Neutralized</span>
-          <p className="text-4xl font-black text-[#FF3B5C]"><AnimatedCounter value={stats?.high_risk_scans ?? stats?.threatsDetected ?? scans.filter(s => (s.trust_score || 0) <= 35).length} /></p>
-          <span className="text-xs text-[#FF3B5C] font-mono">Upfront fee & lookalikes</span>
+        <div className="p-6 rounded-3xl bg-[#0D1117] border border-slate-800 space-y-2">
+          <span className="text-sm font-semibold text-slate-400">Threats Neutralized</span>
+          <p className="text-4xl font-black text-rose-400"><AnimatedCounter value={stats?.high_risk_scans ?? stats?.threatsDetected ?? scans.filter(s => (s.trust_score || 0) <= 35).length} /></p>
+          <span className="text-xs text-rose-400 font-mono">Upfront fee & lookalikes</span>
         </div>
-        <div className="p-6 rounded-3xl bg-[#0D1117] border-2 border-[#1E2838] space-y-2">
-          <span className="text-sm font-bold text-slate-400">Average Trust Index</span>
-          <p className="text-4xl font-black text-[#00F0FF] text-glow-cyan">{stats?.avg_trust_score ?? stats?.avgTrustScore ?? (scans.length > 0 ? Math.round(scans.reduce((a, s) => a + (s.trust_score || 0), 0) / scans.length) : 0)}<span className="text-base font-normal text-slate-500">/100</span></p>
-          <span className="text-xs text-[#00F0FF] font-mono">10-dimension fusion avg</span>
+        <div className="p-6 rounded-3xl bg-[#0D1117] border border-slate-800 space-y-2">
+          <span className="text-sm font-semibold text-slate-400">Average Trust Index</span>
+          <p className="text-4xl font-black text-sky-400">{stats?.avg_trust_score ?? stats?.avgTrustScore ?? (scans.length > 0 ? Math.round(scans.reduce((a, s) => a + (s.trust_score || 0), 0) / scans.length) : 0)}<span className="text-base font-normal text-slate-500">/100</span></p>
+          <span className="text-xs text-sky-400 font-mono">10-dimension fusion avg</span>
         </div>
-        <div className="p-6 rounded-3xl bg-[#0D1117] border-2 border-[#1E2838] space-y-2">
-          <span className="text-sm font-bold text-slate-400">Active Forensics</span>
-          <p className="text-4xl font-black text-[#00FF87] text-glow-emerald">10 Dimensions</p>
+        <div className="p-6 rounded-3xl bg-[#0D1117] border border-slate-800 space-y-2">
+          <span className="text-sm font-semibold text-slate-400">Active Forensics</span>
+          <p className="text-4xl font-black text-emerald-400">10 Dimensions</p>
           <span className="text-xs text-slate-400 font-mono">Evidence-first deterministic engine</span>
         </div>
       </div>
@@ -3887,7 +3898,7 @@ const DEFAULT_REPORT: LegitifyReport = {
     { rule: "email_domain", severity: "medium", message: "Recruiter domain does not align with official corporate domain", score: 0.7 },
   ],
   next_steps: [
-    "🚨 Do NOT pay any 'registration fee', 'medical test deposit', or 'laptop caution charge'.",
+    "Do NOT pay any 'registration fee', 'medical test deposit', or 'laptop caution charge'.",
     "Do NOT share sensitive ID documents (Aadhaar, PAN, Bank Details).",
     "Report this offer to the National Cyber Crime Portal (1930 / cybercrime.gov.in).",
     "Verify the job posting directly on IndiGo's official careers portal (goindigo.in/careers).",
@@ -4133,14 +4144,16 @@ export function App() {
               {userView === "user_safety" && <UserSafetyHubView />}
               {userView === "user_settings" && (
                 <div className="flex-1 p-10 max-w-xl mx-auto space-y-6">
-                  <h2 className="text-3xl font-black">⚙️ Candidate Account Settings</h2>
-                  <div className="p-8 rounded-3xl bg-[#0D1117] border-2 border-[#1E2838] space-y-5">
+                  <h2 className="text-2xl font-bold text-slate-100 flex items-center gap-2.5">
+                    <Settings className="w-6 h-6 text-slate-400" /> Candidate Account Settings
+                  </h2>
+                  <div className="p-8 rounded-3xl bg-[#0D1117] border border-slate-800 space-y-5">
                     <p className="text-base text-slate-300">Name: <strong className="text-slate-100 text-lg">{user?.user_metadata?.full_name || "Sanjay Kumar. V"}</strong></p>
                     <p className="text-base text-slate-300">Email: <strong className="text-slate-100 text-lg">{user?.email || "sanjaykumar.v2023@vitstudent.ac.in"}</strong></p>
-                    <p className="text-base text-[#00FF87] font-black">Role: 🎓 Verified Candidate</p>
+                    <p className="text-base text-emerald-400 font-bold">Role: Verified Candidate</p>
                     <button
                       onClick={handleSignOut}
-                      className="px-8 py-4 rounded-2xl bg-red-500/20 text-[#FF3B5C] font-black text-base hover:bg-red-500/30 transition-all cursor-pointer"
+                      className="px-6 py-3 rounded-2xl bg-rose-500/10 text-rose-400 border border-rose-500/20 font-semibold text-sm hover:bg-rose-500/20 transition-all cursor-pointer"
                     >
                       Sign Out & Return to Portal Gate
                     </button>
@@ -4172,14 +4185,14 @@ export function App() {
                   />
                 ) : (
                   <div className="flex-1 flex flex-col items-center justify-center p-12 text-center space-y-4 bg-[#060709]">
-                    <span className="text-5xl">📐</span>
-                    <h3 className="text-xl font-black text-slate-200">No Forensic Dossier Loaded</h3>
+                    <FileText className="w-12 h-12 text-slate-500 mx-auto" />
+                    <h3 className="text-xl font-bold text-slate-200">No Forensic Dossier Loaded</h3>
                     <p className="text-sm text-slate-400 max-w-md">
                       Please select an investigation from Case Registry or run a new scan to view the complete mathematical score decomposition, active weights, and SOC telemetry.
                     </p>
                     <button
                       onClick={() => setAdminView("admin_scan")}
-                      className="px-6 py-2.5 rounded-2xl bg-[#00F0FF] text-black font-black text-sm cursor-pointer shadow-lg shadow-[#00F0FF]/20"
+                      className="px-6 py-2.5 rounded-2xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-sm cursor-pointer shadow-md border border-sky-500"
                     >
                       Run Pipeline Scan
                     </button>
@@ -4215,12 +4228,14 @@ export function App() {
               )}
               {adminView === "admin_settings" && (
                 <div className="flex-1 p-10 max-w-xl mx-auto space-y-6">
-                  <h2 className="text-3xl font-black">⚙️ Security Operations Settings</h2>
-                  <div className="p-8 rounded-3xl bg-[#0D1117] border-2 border-[#1E2838] space-y-5">
-                    <p className="text-base text-slate-300">Clearance: <strong className="text-[#00F0FF] text-lg">Active (Level 3 Clearance)</strong></p>
+                  <h2 className="text-2xl font-bold text-slate-100 flex items-center gap-2.5">
+                    <Settings className="w-6 h-6 text-slate-400" /> Security Operations Settings
+                  </h2>
+                  <div className="p-8 rounded-3xl bg-[#0D1117] border border-slate-800 space-y-5">
+                    <p className="text-base text-slate-300">Clearance: <strong className="text-sky-400 text-lg">Active (Level 3 Clearance)</strong></p>
                     <button
                       onClick={handleSignOut}
-                      className="px-8 py-4 rounded-2xl bg-red-500/20 text-[#FF3B5C] font-black text-base hover:bg-red-500/30 transition-all cursor-pointer"
+                      className="px-6 py-3 rounded-2xl bg-rose-500/10 text-rose-400 border border-rose-500/20 font-semibold text-sm hover:bg-rose-500/20 transition-all cursor-pointer"
                     >
                       Exit SOC & Return to Gate
                     </button>
@@ -4257,17 +4272,17 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
     if (this.state.hasError) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-[#060709] p-6 text-slate-100 font-sans">
-          <div className="max-w-md p-8 rounded-3xl bg-[#0F131A] border-2 border-red-500/40 text-center space-y-5 shadow-2xl">
-            <div className="w-16 h-16 rounded-2xl bg-red-500/20 border border-red-500/40 text-[#FF3B5C] flex items-center justify-center mx-auto text-3xl">
-              ⚠️
+          <div className="max-w-md p-8 rounded-3xl bg-[#0F131A] border border-rose-500/40 text-center space-y-5 shadow-2xl">
+            <div className="w-16 h-16 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-8 h-8 text-rose-400" />
             </div>
-            <h2 className="text-xl font-black text-slate-100">Display Recovery Mode</h2>
+            <h2 className="text-xl font-bold text-slate-100">Display Recovery Mode</h2>
             <p className="text-sm text-slate-300 leading-relaxed">
               Session state preserved. Click below to return to the active portal.
             </p>
             <button
               onClick={() => { this.setState({ hasError: false }); window.location.reload(); }}
-              className="px-8 py-3 rounded-full font-black text-sm bg-[#00FF87] hover:bg-[#D4FF00] text-black transition-all shadow-lg cursor-pointer"
+              className="px-6 py-3 rounded-2xl font-semibold text-sm bg-sky-600 hover:bg-sky-500 text-white transition-all shadow-md cursor-pointer border border-sky-500"
             >
               Reload Workspace
             </button>

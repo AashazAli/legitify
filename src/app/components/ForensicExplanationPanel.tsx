@@ -126,7 +126,7 @@ export const ForensicExplanationPanel: React.FC<ForensicExplanationPanelProps> =
               <ul className="space-y-1.5 text-xs text-slate-300">
                 {explanationSummary.whatIsVerified.map((item, i) => (
                   <li key={i} className="flex items-start gap-2">
-                    <span className="text-emerald-400 font-mono mt-0.5">✓</span>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
                     <span>{item}</span>
                   </li>
                 ))}

@@ -361,7 +361,7 @@ export function runEvidenceFusion(input: FusionInput): EvidenceFusionResult {
     whatWeFound.push('Document contains an explicit candidate payment demand or registration fee requirement.');
     whyItMatters.push('Legitimate employers never demand payment, registration charges, or equipment deposits from candidates.');
     whatIsSuspicious.push('Mandatory upfront fee condition detected.');
-    whatShouldBeDone.push('🚨 DO NOT PAY. Cease all financial transactions immediately.');
+    whatShouldBeDone.push('DO NOT PAY. Cease all financial transactions immediately.');
   }
 
   if (input.hasLookalikeDomain) {

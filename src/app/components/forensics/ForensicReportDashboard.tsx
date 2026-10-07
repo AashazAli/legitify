@@ -449,7 +449,7 @@ export const ForensicReportDashboard: React.FC<ForensicReportDashboardProps> = (
             <ul className="space-y-1.5 text-xs text-slate-300 font-sans">
               {scoring.reasons.verifiedSignals.map((item, i) => (
                 <li key={i} className="flex items-start gap-2">
-                  <span className="text-emerald-400 font-mono">✓</span>
+                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
                   <span>{item}</span>
                 </li>
               ))}

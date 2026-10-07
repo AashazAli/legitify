@@ -8,7 +8,7 @@ dotenv.config();
 dotenv.config({ path: '.env.local' });
 
 async function seedDemoData() {
-  console.log("🌱 [LEGITIFY] Seeding synthetic demo records into Supabase...");
+  console.log("[LEGITIFY] Seeding synthetic demo records into Supabase...");
 
   const demoThreats = [
     {
@@ -59,9 +59,9 @@ async function seedDemoData() {
         .from('threat_indicators')
         .upsert(threat, { onConflict: 'normalized_value' });
     }
-    console.log("✅ [LEGITIFY] Successfully seeded 4 synthetic threat indicators [DEMO DATA].");
+    console.log("[LEGITIFY] Successfully seeded 4 synthetic threat indicators [DEMO DATA].");
   } catch (err: any) {
-    console.error("❌ [LEGITIFY] Seed error:", err?.message || err);
+    console.error("[LEGITIFY] Seed error:", err?.message || err);
   }
 }
 

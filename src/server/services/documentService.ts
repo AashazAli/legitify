@@ -561,20 +561,20 @@ export function extractDocumentSignals(
   else finalVerdict = "LIKELY GENUINE";
 
   const nextSteps = finalVerdict === "LIKELY FAKE" ? [
-    "🚨 Do NOT share any personal documents (Aadhaar, PAN, bank details) with this organization.",
+    "Do NOT share any personal documents (Aadhaar, PAN, bank details) with this organization.",
     "Report this offer letter to your college placement cell immediately.",
     "If you found this on Internshala or LinkedIn, report the listing on the platform.",
     "File a complaint on the National Cyber Crime Portal (cybercrime.gov.in) if you've already shared any information.",
     "Do NOT pay any 'registration fee', 'security deposit', or 'training charges'. Legitimate companies never ask candidates for money.",
     `Search for '${detectedCompanyName || "this company"}' on MCA21 (mca.gov.in) to check if it's a registered company.`,
   ] : finalVerdict === "SUSPICIOUS" ? [
-    "⚠️ Verify this offer independently before sharing any personal information.",
+    "Verify this offer independently before sharing any personal information.",
     "Search for the company on LinkedIn and check if it has a legitimate presence (employee count, verified page).",
     "Call the company's official number (found independently, NOT from this letter) and ask to speak with HR.",
     "Check the company's reviews on Glassdoor and AmbitionBox.",
     `Verify '${detectedCompanyName || "company"}' CIN on MCA21 portal (mca.gov.in/mcafoportal).`,
   ] : [
-    "✅ This letter appears to be from a legitimate organization.",
+    "This letter appears to be from a legitimate organization.",
     "Standard next steps: review the compensation and terms carefully before accepting.",
     "Respond within the deadline mentioned in the letter.",
     "Keep a copy of this offer letter for your records.",

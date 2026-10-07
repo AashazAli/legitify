@@ -69,13 +69,13 @@ function getBaseStyles(): string {
 function renderNav(activePath: string): string {
   return `
     <div class="header">
-      <a href="/" class="logo-badge">🛡️ LEGITIFY INTELLIGENCE ENGINE</a>
+      <a href="/" class="logo-badge">LEGITIFY INTELLIGENCE ENGINE</a>
       <div class="nav-links">
-        <a href="http://localhost:3002" class="nav-link" target="_blank">🌐 Web UI (3002)</a>
-        <a href="/api/health" class="nav-link ${activePath === 'health' ? 'active' : ''}">🩺 System Health</a>
-        <a href="/api/providers/status" class="nav-link ${activePath === 'providers' ? 'active' : ''}">🔌 Providers</a>
-        <a href="/api/ml/metrics" class="nav-link ${activePath === 'ml' ? 'active' : ''}">🧠 ML Metrics</a>
-        <a href="/api/docs" class="nav-link ${activePath === 'docs' ? 'active' : ''}">📖 API Docs</a>
+        <a href="http://localhost:3002" class="nav-link" target="_blank">Web UI (3002)</a>
+        <a href="/api/health" class="nav-link ${activePath === 'health' ? 'active' : ''}">System Health</a>
+        <a href="/api/providers/status" class="nav-link ${activePath === 'providers' ? 'active' : ''}">Providers</a>
+        <a href="/api/ml/metrics" class="nav-link ${activePath === 'ml' ? 'active' : ''}">ML Metrics</a>
+        <a href="/api/docs" class="nav-link ${activePath === 'docs' ? 'active' : ''}">API Docs</a>
       </div>
     </div>
   `;
@@ -106,12 +106,12 @@ function renderHtmlDashboard(uptime: number, dbStatus: string): string {
     <div class="card">
       <h3 style="margin: 0 0 10px 0; font-size: 14px;">Active Verification Providers</h3>
       <div class="grid">
-        <div class="grid-item"><div class="grid-label">Database</div><div class="grid-val">${dbStatus === 'CONNECTED' ? '🟢 PostgreSQL Connected' : '⚪ Standalone / Local'}</div></div>
-        <div class="grid-item"><div class="grid-label">Supervised ML</div><div class="grid-val">🟢 Kaggle Linear SVM (v1.2.0)</div></div>
-        <div class="grid-item"><div class="grid-label">Document OCR</div><div class="grid-val">🟢 WASM Tesseract + EasyOCR</div></div>
-        <div class="grid-item"><div class="grid-label">Domain Intel</div><div class="grid-val">🟢 DNS / RDAP / Lookalike</div></div>
-        <div class="grid-item"><div class="grid-label">Company Registry</div><div class="grid-val">🟢 Statutory MCA Verifier</div></div>
-        <div class="grid-item"><div class="grid-label">Threat Feeds</div><div class="grid-val">🟢 VirusTotal + Safe Browsing</div></div>
+        <div class="grid-item"><div class="grid-label">Database</div><div class="grid-val">${dbStatus === 'CONNECTED' ? 'PostgreSQL Connected' : 'Standalone / Local'}</div></div>
+        <div class="grid-item"><div class="grid-label">Supervised ML</div><div class="grid-val">Kaggle Linear SVM (v1.2.0)</div></div>
+        <div class="grid-item"><div class="grid-label">Document OCR</div><div class="grid-val">WASM Tesseract + EasyOCR</div></div>
+        <div class="grid-item"><div class="grid-label">Domain Intel</div><div class="grid-val">DNS / RDAP / Lookalike</div></div>
+        <div class="grid-item"><div class="grid-label">Company Registry</div><div class="grid-val">Statutory MCA Verifier</div></div>
+        <div class="grid-item"><div class="grid-label">Threat Feeds</div><div class="grid-val">VirusTotal + Safe Browsing</div></div>
       </div>
     </div>
 
@@ -226,29 +226,29 @@ app.get(['/api/health', '/health'], async (req, res) => {
     <div class="card">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
         <h2 style="margin: 0; font-size: 17px;">System Health & Service Diagnostics</h2>
-        <span class="badge badge-green">🟢 OPERATIONAL (Uptime: ${healthData.uptime}s)</span>
+        <span class="badge badge-green">OPERATIONAL (Uptime: ${healthData.uptime}s)</span>
       </div>
       <div class="grid">
-        <div class="grid-item"><div class="grid-label">Database</div><div class="grid-val">${healthData.services.database === 'CONNECTED' ? '🟢 Connected' : '⚪ Standalone'}</div></div>
-        <div class="grid-item"><div class="grid-label">ML Model</div><div class="grid-val">🟢 Ready (${healthData.ml_model_version})</div></div>
-        <div class="grid-item"><div class="grid-label">Document OCR</div><div class="grid-val">🟢 Ready (Tesseract WASM)</div></div>
-        <div class="grid-item"><div class="grid-label">Threat Intel</div><div class="grid-val">🟢 Ready (VT + Safe Browsing + AbuseIPDB)</div></div>
-        <div class="grid-item"><div class="grid-label">AI Synthesis</div><div class="grid-val">🟢 Ready (${process.env.OPENAI_API_KEY ? 'OpenAI GPT-4o' : 'Gemini 1.5'})</div></div>
-        <div class="grid-item"><div class="grid-label">Domain Intel</div><div class="grid-val">🟢 Ready (DNS / RDAP)</div></div>
+        <div class="grid-item"><div class="grid-label">Database</div><div class="grid-val">${healthData.services.database === 'CONNECTED' ? 'Connected' : 'Standalone'}</div></div>
+        <div class="grid-item"><div class="grid-label">ML Model</div><div class="grid-val">Ready (${healthData.ml_model_version})</div></div>
+        <div class="grid-item"><div class="grid-label">Document OCR</div><div class="grid-val">Ready (Tesseract WASM)</div></div>
+        <div class="grid-item"><div class="grid-label">Threat Intel</div><div class="grid-val">Ready (VT + Safe Browsing + AbuseIPDB)</div></div>
+        <div class="grid-item"><div class="grid-label">AI Synthesis</div><div class="grid-val">Ready (${process.env.OPENAI_API_KEY ? 'OpenAI GPT-4o' : 'Gemini 1.5'})</div></div>
+        <div class="grid-item"><div class="grid-label">Domain Intel</div><div class="grid-val">Ready (DNS / RDAP)</div></div>
       </div>
     </div>
 
     <div class="card">
       <h3 style="margin: 0 0 10px 0; font-size: 14px;">Environment Integrations Status</h3>
       <div class="grid">
-        <div class="grid-item"><div class="grid-label">Supabase Auth & DB</div><div class="grid-val">${healthData.environment.supabase_configured ? '🟢 Configured' : '🔴 Missing'}</div></div>
-        <div class="grid-item"><div class="grid-label">OpenAI Engine</div><div class="grid-val">${healthData.environment.openai_configured ? '🟢 Active' : '⚪ Optional'}</div></div>
-        <div class="grid-item"><div class="grid-label">Google Gemini / AI</div><div class="grid-val">${healthData.environment.gemini_configured ? '🟢 Active' : '⚪ Optional'}</div></div>
-        <div class="grid-item"><div class="grid-label">Google Safe Browsing</div><div class="grid-val">${healthData.environment.safe_browsing_configured ? '🟢 Active' : '⚪ Optional'}</div></div>
-        <div class="grid-item"><div class="grid-label">VirusTotal Feed</div><div class="grid-val">${healthData.environment.virustotal_configured ? '🟢 Active' : '⚪ Optional'}</div></div>
-        <div class="grid-item"><div class="grid-label">AbuseIPDB Feed</div><div class="grid-val">${healthData.environment.abuseipdb_configured ? '🟢 Active' : '⚪ Optional'}</div></div>
-        <div class="grid-item"><div class="grid-label">Resend Dispatcher</div><div class="grid-val">${healthData.environment.resend_configured ? '🟢 Active' : '⚪ Optional'}</div></div>
-        <div class="grid-item"><div class="grid-label">Upstash Redis</div><div class="grid-val">${healthData.environment.redis_configured ? '🟢 Connected' : '⚪ In-Memory'}</div></div>
+        <div class="grid-item"><div class="grid-label">Supabase Auth & DB</div><div class="grid-val">${healthData.environment.supabase_configured ? 'Configured' : 'Missing'}</div></div>
+        <div class="grid-item"><div class="grid-label">OpenAI Engine</div><div class="grid-val">${healthData.environment.openai_configured ? 'Active' : 'Optional'}</div></div>
+        <div class="grid-item"><div class="grid-label">Google Gemini / AI</div><div class="grid-val">${healthData.environment.gemini_configured ? 'Active' : 'Optional'}</div></div>
+        <div class="grid-item"><div class="grid-label">Google Safe Browsing</div><div class="grid-val">${healthData.environment.safe_browsing_configured ? 'Active' : 'Optional'}</div></div>
+        <div class="grid-item"><div class="grid-label">VirusTotal Feed</div><div class="grid-val">${healthData.environment.virustotal_configured ? 'Active' : 'Optional'}</div></div>
+        <div class="grid-item"><div class="grid-label">AbuseIPDB Feed</div><div class="grid-val">${healthData.environment.abuseipdb_configured ? 'Active' : 'Optional'}</div></div>
+        <div class="grid-item"><div class="grid-label">Resend Dispatcher</div><div class="grid-val">${healthData.environment.resend_configured ? 'Active' : 'Optional'}</div></div>
+        <div class="grid-item"><div class="grid-label">Upstash Redis</div><div class="grid-val">${healthData.environment.redis_configured ? 'Connected' : 'In-Memory'}</div></div>
       </div>
     </div>
 
@@ -340,7 +340,7 @@ app.get(['/api/system/status', '/api/providers/status'], async (req, res) => {
     <div class="card">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
         <h2 style="margin: 0; font-size: 17px;">Verification Providers & Services Inventory</h2>
-        <span class="badge badge-green">🟢 ${providerData.providers.filter(p => p.status === 'CONNECTED').length} / ${providerData.providers.length} CONNECTED</span>
+        <span class="badge badge-green">${providerData.providers.filter(p => p.status === 'CONNECTED').length} / ${providerData.providers.length} CONNECTED</span>
       </div>
       <table>
         <thead><tr><th>Provider / Service</th><th>Category</th><th>Operational Mode</th><th>Status</th></tr></thead>
@@ -526,7 +526,7 @@ app.get(['/api/ml/metrics', '/ml/metrics'], (req, res) => {
 
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.25rem;">
       <div class="card">
-        <h3 style="margin: 0 0 10px 0; font-size: 14px; color: #EF4444;">🚨 Top Predictive Scam Keywords</h3>
+        <h3 style="margin: 0 0 10px 0; font-size: 14px; color: #EF4444;">Top Predictive Scam Keywords</h3>
         <table>
           <thead><tr><th>Feature Pattern</th><th>Coefficient Weight</th></tr></thead>
           <tbody>
@@ -544,7 +544,7 @@ app.get(['/api/ml/metrics', '/ml/metrics'], (req, res) => {
       </div>
 
       <div class="card">
-        <h3 style="margin: 0 0 10px 0; font-size: 14px; color: #00C880;">✅ Top Legitimacy Indicators</h3>
+        <h3 style="margin: 0 0 10px 0; font-size: 14px; color: #00C880;">Top Legitimacy Indicators</h3>
         <table>
           <thead><tr><th>Feature Pattern</th><th>Coefficient Weight</th></tr></thead>
           <tbody>
@@ -1050,7 +1050,7 @@ app.post(['/api/notifications/email', '/notifications/email'], async (req, res) 
 const isServerless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT || process.env.NOW_REGION);
 if (!isServerless && process.argv[1] && (process.argv[1].includes('server') || process.argv[1].includes('index.ts'))) {
   app.listen(PORT, () => {
-    console.log(`🛡️  [LEGITIFY API] Server online on http://localhost:${PORT}`);
+    console.log(`[LEGITIFY API] Server online on http://localhost:${PORT}`);
   });
 }
 

@@ -129,9 +129,9 @@ export function buildEvidenceLocker(context: Record<string, any>): EvidenceRecor
 export function generateEvidenceGroundedAnswer(question: string, context: Record<string, any>): string {
   const q = question.toLowerCase().trim();
   const userName = context.user_name || context.candidate_name || (context.user_email ? context.user_email.split('@')[0] : 'Candidate');
-  const greeting = `Hello ${userName}! 👋\n\n`;
-
   const companyName = sanitizeCompanyName(context);
+  const greeting = `### Forensic Intelligence Briefing\n**Candidate:** ${userName} · **Subject Entity:** ${companyName}\n\n`;
+
   const score = typeof context.trust_score === 'number'
     ? context.trust_score
     : (typeof context.confidence_score === 'number' ? context.confidence_score : 0);
@@ -196,7 +196,7 @@ export function generateEvidenceGroundedAnswer(question: string, context: Record
     const hourMatches = findMatchingDocSentences(['hour', 'timing', 'schedule', 'shift', 'am', 'pm', 'monday', 'friday', 'weekend', 'working day']);
 
     if (hourMatches.length > 0) {
-      return greeting + `### ⏰ Working Hours & Schedule Analysis for ${companyName}
+      return greeting + `### Operational Working Hours & Schedule Analysis: ${companyName}
 
 **1. Extracted Clauses from Uploaded Document:**
 ${hourMatches.map(m => `* *"${m.trim()}"*`).join('\n')}
@@ -206,17 +206,17 @@ ${hourMatches.map(m => `* *"${m.trim()}"*`).join('\n')}
 * **Standard Enterprise Benchmark:** Authentic enterprise contracts typically mandate 40–45 hours per week (e.g., 9:30 AM to 6:30 PM, Monday through Friday) with formal public holiday provisions.
 * If flexible/remote hours are promised without tracking or oversight, cross-verify attendance expectations with HR before onboarding.`;
     } else {
-      return greeting + `### ⏰ Working Hours & Schedule Analysis for ${companyName}
+      return greeting + `### Operational Working Hours & Schedule Analysis: ${companyName}
 
 **1. Document Inspection Finding:**
-* 🔍 **No explicit working hours, shift timings, or schedule clauses were identified in the analyzed document text.**
+* **Observation:** No explicit working hours, shift timings, or schedule clauses were identified in the analyzed document text.
 
 **2. Forensic Implications:**
 * **Standard Legitimate Practice:** Authentic enterprise appointment and internship contracts explicitly define:
   1. Weekly working commitment (e.g., *40 hours per week*).
   2. Daily operational window (e.g., *9:00 AM – 6:00 PM IST*).
   3. Work model specification (*On-site campus / Hybrid / Remote*).
-* **Why This Matters:** The complete omission of working hours, department reporting times, or attendance policies is a frequent characteristic of **unregulated or fabricated offer templates** assembled without corporate HR oversight.
+* **Significance:** The complete omission of working hours, department reporting times, or attendance policies is a frequent characteristic of **unregulated or fabricated offer templates** assembled without corporate HR oversight.
 
 **3. Action Item:**
 Request a formal Addendum or Appointment Annexure specifying work hours and reporting manager details from official company HR.`;
@@ -229,7 +229,7 @@ Request a formal Addendum or Appointment Annexure specifying work hours and repo
   if (q.includes('signatory') || q.includes('signed') || q.includes('signature') || q.includes('who signed') || q.includes('stamp') || q.includes('seal')) {
     const sigMatches = findMatchingDocSentences(['sincerely', 'regards', 'signatory', 'authorized', 'manager', 'director', 'talent acquisition', 'human resources']);
 
-    return greeting + `### ✍️ Authorized Signatory & Execution Analysis
+    return greeting + `### Authorized Signatory & Executive Execution Audit
 
 **1. Extracted Signatory Parameters:**
 * **Detected Signatory / Department:** **${primarySignatory || 'Signatory block unstated / unverified'}**
@@ -238,13 +238,13 @@ ${sigMatches.length > 0 ? `* **Sign-off Text Observed:** *"${sigMatches[0].trim(
 
 **2. Forensic Verification Principles:**
 * **Absence of Listed Executive $\\neq$ Automatic Proof of Fraud:** Junior HR talent coordinators often sign internship contracts without appearing on public MCA Director registers.
-* **Red Flag Indicators:**
+* **Risk Indicators:**
   * Typed name without signature stroke or digital cryptographic certificate.
-  * Generic signatures copied from internet stock photos.
+  * Generic signatures copied from internet templates.
   * Mismatch between the signatory's claimed title and company size.
 
 **3. Verification Step:**
-Call ${companyName}'s official reception switchboard and ask to be connected with **${primarySignatory || 'the Talent Acquisition department'}** to confirm their authorization.`;
+Contact ${companyName}'s official corporate switchboard and request verification with **${primarySignatory || 'the Talent Acquisition department'}** to confirm authorization.`;
   }
 
   // ==========================================================================
@@ -253,7 +253,7 @@ Call ${companyName}'s official reception switchboard and ask to be connected wit
   if (q.includes('stipend') || q.includes('salary') || q.includes('package') || q.includes('compensation') || q.includes('ctc') || q.includes('pay') || q.includes('money') && (q.includes('receive') || q.includes('get'))) {
     const compMatches = findMatchingDocSentences(['stipend', 'salary', 'compensation', 'inr', 'rs.', '₹', 'per month', 'ctc', 'lpa']);
 
-    return greeting + `### 💰 Compensation & Economic Plausibility Analysis for ${companyName}
+    return greeting + `### Compensation & Economic Plausibility Analysis: ${companyName}
 
 **1. Extracted Compensation Terms:**
 * **Documented Compensation / Stipend:** **${primaryStipend || 'Unstated / Not explicitly defined in letter'}**
@@ -262,8 +262,8 @@ ${compMatches.length > 0 ? `* **Direct Text Excerpt:** *"${compMatches[0].trim()
 
 **2. Economic Plausibility Assessment:**
 * **Standard Market Median:** Authentic Indian corporate internships for ${detectedRole} typically benchmark between **₹12,000 to ₹35,000 per month** (higher for top-tier product tech firms).
-* **Contradiction Check:** ${hasFee ? '🚨 **CRITICAL CONTRADICTION:** The document promises compensation while simultaneously soliciting candidate deposits or registration charges. This is a definitive employment fraud pattern.' : '✅ **Zero-Fee Adherence:** No candidate-side deduction or caution deposit was detected.'}
-* **Inflation Risk:** Be wary of offers promising exorbitant salaries (e.g., ₹50,000+/month) for entry-level tasks without prior technical interview evaluation.`;
+* **Contradiction Check:** ${hasFee ? '[CRITICAL ANOMALY] The document promises compensation while simultaneously soliciting candidate deposits or registration charges. Corporate employers prohibit candidate charges.' : '[VERIFIED] No candidate-side deduction or caution deposit was detected.'}
+* **Inflation Risk:** Exercise caution regarding offers promising inflated compensation (e.g., ₹50,000+/month) for entry-level positions without technical interview stages.`;
   }
 
   // ==========================================================================
@@ -271,35 +271,35 @@ ${compMatches.length > 0 ? `* **Direct Text Excerpt:** *"${compMatches[0].trim()
   // ==========================================================================
   if (q.includes('why') || q.includes('score') || q.includes('fake') || q.includes('decision') || q.includes('reason') || q.includes('red flag') || q.includes('warning')) {
     const keyDrivers: string[] = [];
-    if (hasFee) keyDrivers.push(`🚨 **Mandatory Candidate Fee Demanded:** Upfront monetary charges detected [${feeDemandKeywords.join(', ') || 'Deposit requested'}]. Corporate employment prohibits candidate charges.`);
-    if (isFreeWebmail) keyDrivers.push(`🚨 **Public Webmail Recruiter:** Recruiter uses personal webmail (${recruiterEmail}) rather than an authenticated corporate domain.`);
-    if (hasInformal) keyDrivers.push(`🚨 **Informal Channel Migration:** Recruitment directed to ${informalChannels.join(', ')} to bypass formal corporate audit trails.`);
-    if (hasNoInterview) keyDrivers.push(`🚨 **Direct Selection Without Interview:** Unscreened direct appointment is a known recruitment scam mechanism.`);
-    if (structure && !structure.hasOfficialReferenceNumber) keyDrivers.push(`⚠️ **Missing Document Reference Number:** Lacks standard corporate tracking ID (Ref No.).`);
-    if (structure && !structure.hasRegisteredAddress) keyDrivers.push(`⚠️ **Missing Registered Office Address:** No physical corporate campus or registered location stated.`);
+    if (hasFee) keyDrivers.push(`[CRITICAL RISK] **Mandatory Candidate Fee Demanded:** Monetary charges detected [${feeDemandKeywords.join(', ') || 'Deposit requested'}]. Corporate employment prohibits candidate charges.`);
+    if (isFreeWebmail) keyDrivers.push(`[HIGH RISK] **Public Webmail Recruiter:** Recruiter uses personal webmail (${recruiterEmail}) rather than an authenticated corporate domain.`);
+    if (hasInformal) keyDrivers.push(`[HIGH RISK] **Informal Channel Migration:** Recruitment directed to ${informalChannels.join(', ')} to bypass formal corporate audit trails.`);
+    if (hasNoInterview) keyDrivers.push(`[HIGH RISK] **Direct Selection Without Interview:** Unscreened direct appointment is an established recruitment risk indicator.`);
+    if (structure && !structure.hasOfficialReferenceNumber) keyDrivers.push(`[DEFECT] **Missing Document Reference Number:** Lacks standard corporate tracking ID (Ref No.).`);
+    if (structure && !structure.hasRegisteredAddress) keyDrivers.push(`[DEFECT] **Missing Registered Office Address:** No physical corporate campus or registered location stated.`);
 
     if (keyDrivers.length === 0) {
-      keyDrivers.push(`✅ **Zero-Fee Compliant:** No candidate monetary charges identified.`);
-      keyDrivers.push(`✅ **Corporate Domain:** Recruiter correspondence originates from official domain.`);
-      keyDrivers.push(`✅ **Standard Formatting:** Corporate letterhead and reference tracking present.`);
+      keyDrivers.push(`[COMPLIANT] **Zero-Fee Compliant:** No candidate monetary charges identified.`);
+      keyDrivers.push(`[COMPLIANT] **Corporate Domain:** Recruiter correspondence originates from official domain.`);
+      keyDrivers.push(`[COMPLIANT] **Standard Formatting:** Corporate letterhead and reference tracking present.`);
     }
 
-    return greeting + `### 📊 Forensic Assessment Breakdown for ${companyName}
+    return greeting + `### Forensic Assessment Breakdown: ${companyName}
 
-* **Trust Score:** **${score}/100** (${isHighRisk ? '🔴 High Risk · Scam Indicators Detected' : '🟢 Verified Low Risk Profile'})
+* **Trust Score:** **${score}/100** (${isHighRisk ? 'HIGH RISK · Anomalies Detected' : 'LOW RISK · Verified Profile'})
 * **Overall Verdict:** **${context.verdict || (isHighRisk ? 'LIKELY SCAM / HIGH RISK' : 'LOW RISK')}**
 * **Confidence Level:** **${confidence}%** based on multi-dimensional forensic cross-examination.
 
 ---
 
-### 🔍 Primary Evidentiary Drivers in This Document:
+### Primary Evidentiary Drivers in This Document:
 ${keyDrivers.map((d, i) => `${i + 1}. ${d}`).join('\n\n')}
 
 ---
 
-### 🛡️ Core Cybersecurity Principle:
+### Core Security Principle:
 > **Company Existence $\\neq$ Offer Authenticity.**
-> Even if **${companyName}** is a legally registered company in MCA21, fraudsters routinely create lookalike documents and unauthorized Gmail accounts impersonating genuine brands.`;
+> Even if **${companyName}** is a legally registered company in corporate registers, bad actors routinely produce lookalike documents and unauthorized free email accounts impersonating genuine organizations.`;
   }
 
   // ==========================================================================
@@ -309,7 +309,7 @@ ${keyDrivers.map((d, i) => `${i + 1}. ${d}`).join('\n\n')}
     const checks = structure?.structureChecks || [];
     const missing = structure?.missingElements || [];
 
-    return greeting + `### 📋 Standard Organizational Format & Structure Audit
+    return greeting + `### Standard Organizational Format & Structure Audit
 
 Every legitimate corporate offer letter adheres to standardized enterprise documentation conventions. Here is how this document complies:
 
@@ -317,13 +317,13 @@ Every legitimate corporate offer letter adheres to standardized enterprise docum
 * **Conventions Passed:** **${structure?.passedChecksCount ?? 5} / ${structure?.totalChecksCount ?? 10} Standards**
 
 **2. Document Control Parameters:**
-* **Official Reference Number:** ${referenceNumber ? '✅ Identified: ' + referenceNumber : '❌ Absent (Non-standard template)'}
-* **Corporate Letterhead & Entity:** ${structure?.hasCorporateHeader ? '✅ Verified corporate entity indicator' : '❌ Generic header lacking entity suffix'}
-* **Registered Office Address:** ${structure?.hasRegisteredAddress ? '✅ Physical corporate campus present' : '❌ Omitted physical registered address & PIN code'}
-* **Personalized Addressee:** ${structure?.hasPersonalizedAddressee ? `✅ Addressed to: ${structure.candidateName}` : '❌ Generic salutation (e.g., "Dear Candidate")'}
-* **Authorized Signatory Block:** ${structure?.hasAuthorizedSignatoryBlock ? '✅ HR executive closing block present' : '❌ Lacks executive designation & signature'}
+* **Official Reference Number:** ${referenceNumber ? '[PRESENT] Identified: ' + referenceNumber : '[ABSENT] Omitted (Non-standard template)'}
+* **Corporate Letterhead & Entity:** ${structure?.hasCorporateHeader ? '[PRESENT] Verified corporate entity indicator' : '[ABSENT] Generic header lacking entity suffix'}
+* **Registered Office Address:** ${structure?.hasRegisteredAddress ? '[PRESENT] Physical corporate campus present' : '[ABSENT] Omitted physical registered address & PIN code'}
+* **Personalized Addressee:** ${structure?.hasPersonalizedAddressee ? `[PRESENT] Addressed to: ${structure.candidateName}` : '[ABSENT] Generic salutation (e.g., "Dear Candidate")'}
+* **Authorized Signatory Block:** ${structure?.hasAuthorizedSignatoryBlock ? '[PRESENT] HR executive closing block present' : '[ABSENT] Lacks executive designation & signature'}
 
-${missing.length > 0 ? `\n**3. Critical Missing Conventions:**\n${missing.map(m => `* ⚠️ ${m}`).join('\n')}` : ''}
+${missing.length > 0 ? `\n**3. Critical Missing Conventions:**\n${missing.map(m => `* [DEFECT] ${m}`).join('\n')}` : ''}
 
 **Conclusion:** Legitimate corporate HR departments enforce strict document governance. Omission of multiple administrative conventions indicates an unverified or informal letter.`;
   }
@@ -332,65 +332,65 @@ ${missing.length > 0 ? `\n**3. Critical Missing Conventions:**\n${missing.map(m 
   // INTENT 6: Emergency - What if I already paid money?
   // ==========================================================================
   if (q.includes('already paid') || q.includes('transferred') || q.includes('sent money') || q.includes('i paid') || q.includes('scammed') || q.includes('lost money') || q.includes('police') || q.includes('1930')) {
-    return greeting + `### 🚨 EMERGENCY ACTION PLAN: Immediate Steps If You Sent Money
+    return greeting + `### Incident Response Protocol: Actions Following Unauthorized Transfers
 
-If you have transferred funds to this recruiter, act IMMEDIATELY:
+If funds have been transferred to an unverified counterparty, execute the following protocol immediately:
 
-1. **📞 Call National Cybercrime Helpline (1930) RIGHT NOW:**
-   * Dial **1930** (24x7 across India).
-   * **Golden Hour Rule:** Reporting within **2 hours** allows cybercrime cells to freeze the recipient bank account or UPI wallet before money is withdrawn.
+1. **National Cybercrime Reporting Portal (Dial 1930):**
+   * Contact **1930** (Active 24x7 nationwide across India).
+   * **Golden Hour Response:** Reporting within **2 hours** maximizes the ability of financial intelligence cells to freeze recipient escrow wallets and accounts.
 
-2. **🏦 Contact Your Bank's Fraud Desk:**
-   * Report an **unauthorized employment fraud transaction**.
-   * Provide the UTR / UPI Transaction Reference Number and request an immediate chargeback / recall.
+2. **Bank Fraud Unit Escalation:**
+   * Contact the issuing bank fraud response team and log an **unauthorized employment fraud transaction**.
+   * Furnish UTR / UPI transaction identifiers and demand an immediate clawback / chargeback request.
 
-3. **👮 File an Official e-FIR:**
-   * Visit **[cybercrime.gov.in](https://cybercrime.gov.in)**.
-   * Attach screenshots of payment, the offer letter, and WhatsApp/Telegram chat logs.
+3. **Official e-FIR Documentation:**
+   * File an incident report on **[cybercrime.gov.in](https://cybercrime.gov.in)**.
+   * Attach evidentiary artifacts: payment transaction receipts, the offer letter document, and complete chat transcripts.
 
-4. **🔒 Protect Your Identity:**
-   * If you shared Aadhaar or PAN card copies, lock your biometrics immediately on the **[UIDAI portal](https://resident.uidai.gov.in/aadhaar-lockunlock)**.`;
+4. **Identity & Biometric Protection:**
+   * If Aadhaar or PAN card credentials were provided, lock biometric authentication immediately via the **[UIDAI portal](https://resident.uidai.gov.in/aadhaar-lockunlock)**.`;
   }
 
   // ==========================================================================
   // INTENT 7: Questions to Ask the Recruiter
   // ==========================================================================
   if (q.includes('question') || q.includes('ask recruiter') || q.includes('what should i ask') || q.includes('hr question')) {
-    return greeting + `### ❓ Recruiter Verification Checklist for ${companyName}
+    return greeting + `### Recruiter Verification Inquiries: ${companyName}
 
-Copy and send these 5 formal verification questions to the recruiter:
+Formal verification inquiries to dispatch to the recruiting entity:
 
 1. **Official Careers Portal Requisition:**
    *"Please provide the direct requisition link for this position hosted on your official corporate careers portal ('${companyName.toLowerCase().replace(/[^a-z0-9]/g, '')}.com/careers')."*
 
 2. **Corporate Domain Email Requirement:**
-   *"Why is this offer correspondence originating from ${isFreeWebmail ? ('a personal Gmail address (' + recruiterEmail + ')') : 'an unaligned channel'} rather than your official enterprise domain server?"*
+   *"Why is this correspondence originating from ${isFreeWebmail ? ('a personal webmail address (' + recruiterEmail + ')') : 'an external channel'} rather than your registered corporate domain?"*
 
-3. **Official Reference & Requisition ID:**
-   *"Please confirm the internal Corporate Offer Requisition ID registered with your Central HR talent management system."*
+3. **Corporate Requisition Reference ID:**
+   *"Please confirm the internal Corporate Offer Requisition ID registered within your Central HR talent system."*
 
 4. **Zero-Fee Statutory Written Confirmation:**
-   *"Please confirm in writing that there are zero mandatory registration fees, laptop security deposits, training charges, or onboarding fees at any stage."*
+   *"Please confirm in writing that there are zero mandatory onboarding charges, training fees, caution deposits, or laptop charges at any stage."*
 
-5. **Direct Boardline Telephone Verification:**
-   *"May I have the direct telephone extension and official contact details of your Central HR Department to verify this offer independently?"*
+5. **Direct Switchboard Telephone Verification:**
+   *"Please provide the registered corporate boardline number and extension of the Central Human Resources department to verify this offer independently."*
 
-💡 *When the recruiter replies, paste their response back into LEGITIFY for instant analysis!*`;
+*Submit recruiter responses to LEGITIFY for updated evidence correlation.*`;
   }
 
   // ==========================================================================
   // INTENT 8: 30-Second Summary for Parents & Family
   // ==========================================================================
   if (q.includes('parent') || q.includes('family') || q.includes('30-second') || q.includes('simple') || q.includes('explain simply')) {
-    return greeting + `### ⏱️ 30-Second Summary for Parents & Family
+    return greeting + `### Executive Summary for Advisors & Family
 
 > *"This offer letter uses the name of **${companyName}**, but our verification indicates ${isHighRisk ? 'critical risk factors in the recruiter contact or fee clauses' : 'standard corporate recruitment patterns'}.*
 > *Real companies never charge students to give them a job. The National Cybercrime Helpline (1930) classifies asking money for job offers as employment fraud. We should ${isHighRisk ? 'not pay any fee or send sensitive ID documents' : 'proceed with standard corporate verification'}.*
 
 **Key Takeaways:**
 * **Company Status:** ${companyName} (${isHighRisk ? 'Unverified recruiter' : 'Corporate profile evaluated'})
-* **Money Involved:** ${hasFee ? '🚨 Demands candidate payment/deposit' : '✅ No candidate fee detected'}
-* **Next Action:** ${isHighRisk ? 'Do NOT pay money or share Aadhaar/bank documents.' : 'Verify directly via official company careers portal.'}`;
+* **Financial Demands:** ${hasFee ? '[FLAGGED] Mandatory candidate deposit demanded' : '[VERIFIED] No candidate fee detected'}
+* **Next Action:** ${isHighRisk ? 'Do NOT transfer funds or provide sensitive identification documents.' : 'Verify directly via official company careers portal.'}`;
   }
 
   // ==========================================================================
@@ -401,7 +401,7 @@ Copy and send these 5 formal verification questions to the recruiter:
   const matchedSentences = findMatchingDocSentences(queryTerms);
 
   if (matchedSentences.length > 0) {
-    return greeting + `### 🔍 Investigation Findings: "${question}"
+    return greeting + `### Investigation Findings: "${question}"
 
 **1. Relevant Excerpts from Uploaded Document:**
 ${matchedSentences.map(s => `* *"${s.trim()}"*`).join('\n\n')}
@@ -409,7 +409,7 @@ ${matchedSentences.map(s => `* *"${s.trim()}"*`).join('\n\n')}
 **2. Contextual Forensic Analysis:**
 * **Target Entity:** **${companyName}** · Trust Score: **${score}/100**
 * The clause(s) extracted above directly relate to your question.
-* ${hasFee ? '⚠️ Note: Regardless of specific clauses, this letter contains candidate fee requirements which violate standard employment ethics.' : 'Standard review advised.'}
+* ${hasFee ? '[RISK] Regardless of specific clauses, this letter contains candidate fee requirements which violate standard employment ethics.' : 'Standard review advised.'}
 
 **3. Next Step:**
 Compare these terms with the verified company guidelines on their official corporate website (\`/careers\`).`;
@@ -418,7 +418,7 @@ Compare these terms with the verified company guidelines on their official corpo
   // ==========================================================================
   // INTENT 10: INTELLIGENT OPEN-ENDED CONTEXTUAL SYNTHESIS
   // ==========================================================================
-  return greeting + `### 🛡️ LEGITIFY Forensic Intelligence: ${companyName}
+  return greeting + `### Forensic Intelligence Summary: ${companyName}
 
 **Regarding your inquiry:** *"**${question}**"*
 
@@ -428,9 +428,9 @@ Compare these terms with the verified company guidelines on their official corpo
 * **Target Organization:** **${companyName}**
 * **Designated Role:** **${detectedRole}**
 * **Stipend / Compensation:** **${primaryStipend || 'Unstated in document text'}**
-* **Recruiter Email:** **${recruiterEmail || 'Not stated'}** (${isFreeWebmail ? '🚨 Free Webmail' : 'Domain Aligned'})
+* **Recruiter Email:** **${recruiterEmail || 'Not stated'}** (${isFreeWebmail ? '[FLAGGED] Public Webmail' : 'Domain Aligned'})
 * **Document Reference ID:** **${referenceNumber || 'Omitted'}**
-* **Evaluated Trust Score:** **${score}/100** (${isHighRisk ? '🔴 High Risk · Scam Signals Detected' : '🟢 Low Risk Profile'})
+* **Evaluated Trust Score:** **${score}/100** (${isHighRisk ? 'HIGH RISK · Anomalies Detected' : 'LOW RISK'})
 
 ---
 
@@ -441,7 +441,7 @@ I inspected the uploaded document for *"**${question}**"*.
 
 ---
 
-💡 *You can ask me about working hours, stipend plausibility, signatory authenticity, standard formatting checks, or how to challenge this result!*`;
+*Submit inquiries on working hours, compensation, signatory credentials, or structural formatting.*`;
 }
 
 // ----------------------------------------------------------------------------
@@ -593,13 +593,13 @@ Return strictly a JSON object matching this schema:
 
     try {
       const sampleIds = locker.length > 0 ? locker.map(l => '[' + l.id + ']').slice(0, 4).join(', ') : '[Doc-P1-C0], [Ext-DNS-01]';
-      const systemPrompt = `You are the LEGITIFY Evidence-Grounded Investigation Copilot.
-Your job is to assist candidate '${userName}' by answering their exact question accurately, professionally, and empathetically.
+      const systemPrompt = `You are the LEGITIFY Forensic Investigation Assistant.
+Your objective is to provide candidate '${userName}' with authoritative, objective, and evidentiary document forensic intelligence.
 
-CRITICAL RULES:
-1. Greet the candidate naturally: "Hello ${userName}! 👋"
+OPERATIONAL DIRECTIVES:
+1. Tone: Maintain a rigorous, institutional, enterprise security posture. Absolutely NO emojis anywhere in your response.
 2. The investigated target organization is "${compName}". NEVER refer to the company as "images", "screenshot", or raw filenames.
-3. The evaluated Trust Score is ${score}/100.
+3. Evaluated Authenticity & Trust Score: ${score}/100.
 4. You must answer the user's SPECIFIC question in detail based ONLY on verified evidence.
 5. Ground your explanation in the following verified Evidence Locker records and Dual RAG citations:
 --- EVIDENCE RECORDS ---
@@ -608,13 +608,13 @@ ${evidenceCitations || 'No evidence records available.'}
 Document Chunks: ${JSON.stringify(docChunks.slice(0, 5))}
 External Evidence Chunks: ${JSON.stringify(extChunks.slice(0, 5))}
 6. Distinguish clearly:
-   - A Registered Company does NOT prove the specific recruiter or offer is genuine.
-   - An Authentic Certificate does NOT prove the internship opportunity is legitimate.
-   - Legitimate employers NEVER charge candidate registration fees, laptop caution deposits, or training charges.
+   - Corporate Entity Existence != Offer Letter Authenticity.
+   - An Authentic Corporate Registration does not prove that this specific recruiter or letter is legitimate.
+   - Legitimate corporate employers NEVER demand candidate registration fees, laptop caution deposits, or training charges.
 7. Cite actual Evidence IDs (e.g. ${sampleIds}) where applicable.
-8. If an assertion cannot be verified from the provided evidence, explicitly state: "I could not verify this from the available investigation evidence."
-9. Include practical advice such as verifying on official company careers portal, calling official boardline numbers, and reporting scams to the 1930 National Cybercrime Helpline.
-10. Format response cleanly using Markdown headings (###) and bullet points.`;
+8. If an assertion cannot be verified from the provided evidence, explicitly state: "This claim could not be verified from the available forensic evidence."
+9. Include practical verification actions: checking the official company careers portal, calling the registered reception boardline, and reporting fraud to the 1930 National Cybercrime Helpline if money was transferred.
+10. Format response cleanly using Markdown headings (###), bold key terms, and concise bullet points.`;
 
       const response = await this.ai.models.generateContent({
         model: 'gemini-3.6-flash',

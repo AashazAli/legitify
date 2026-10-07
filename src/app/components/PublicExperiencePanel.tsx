@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, AlertTriangle, ExternalLink, RefreshCw, CheckCircle, Search, Filter, Layers } from 'lucide-react';
+import { Shield, AlertTriangle, ExternalLink, RefreshCw, CheckCircle, Search, Filter, Layers, Globe, ShieldCheck } from 'lucide-react';
 import { PublicExperienceResult, PublicExperience, ComplaintCluster, ProviderStatusRecord } from '../../types/forensicTypes';
 
 interface PublicExperiencePanelProps {
@@ -68,31 +68,31 @@ export const PublicExperiencePanel: React.FC<PublicExperiencePanelProps> = ({
   return (
     <div className="space-y-6">
       {/* Header with Title, Status Badges, and Re-Investigate Action */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 rounded-3xl bg-[#0D1117] border-2 border-[#1E2838] shadow-2xl">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl">
         <div className="space-y-1">
           <div className="flex items-center gap-3">
-            <span className="text-2xl">🌐</span>
-            <h3 className="text-xl font-black text-slate-100 text-glow-cyan">
+            <Globe className="w-5 h-5 text-sky-400" />
+            <h3 className="text-lg font-bold text-slate-100">
               Real-Time Public Experience & Complaint Intelligence
             </h3>
           </div>
           <p className="text-xs text-slate-400 font-mono">
-            Query-driven investigation of candidate reports across Reddit, consumer forums & corporate caution notices
+            Query-driven investigation of candidate reports across community forums & corporate caution notices
           </p>
           <div className="flex flex-wrap items-center gap-2 pt-2">
-            <span className={`px-3 py-1 rounded-full text-[11px] font-mono font-bold uppercase tracking-wider ${
+            <span className={`px-2.5 py-1 rounded-md text-[11px] font-mono font-semibold uppercase tracking-wider ${
               isLive
-                ? 'bg-emerald-500/20 text-[#00FF87] border border-emerald-500/40'
-                : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                : 'bg-amber-500/10 text-amber-300 border border-amber-500/30'
             }`}>
-              {isLive ? '🟢 LIVE INVESTIGATION' : '🟡 CACHED EVIDENCE'}
+              {isLive ? 'LIVE AUDIT' : 'ARCHIVED EVIDENCE'}
             </span>
             <span className="text-xs font-mono text-slate-400">
               Retrieved: {searchTimestamp ? new Date(searchTimestamp).toLocaleTimeString() : new Date().toLocaleTimeString()}
             </span>
             {data?.investigationId && (
               <span className="text-[11px] font-mono text-slate-400">
-                · ID: <strong className="text-[#00F0FF]">{data.investigationId}</strong>
+                · ID: <strong className="text-sky-400">{data.investigationId}</strong>
               </span>
             )}
           </div>
@@ -102,10 +102,10 @@ export const PublicExperiencePanel: React.FC<PublicExperiencePanelProps> = ({
           <button
             onClick={handleReinvestigateClick}
             disabled={isReinvestigating}
-            className={`px-5 py-3 rounded-2xl font-black text-xs font-mono tracking-wider uppercase transition-all flex items-center gap-2.5 cursor-pointer shadow-lg ${
+            className={`px-4 py-2.5 rounded-xl font-semibold text-xs font-mono tracking-wider uppercase transition-colors flex items-center gap-2.5 cursor-pointer ${
               isReinvestigating
                 ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
-                : 'bg-[#131822] hover:bg-[#1E2838] text-[#00FF87] border border-[#00FF87]/40 hover:border-[#00FF87] shadow-[0_0_15px_rgba(0,255,135,0.15)]'
+                : 'bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30 hover:border-emerald-500/60'
             }`}
           >
             <RefreshCw className={`w-4 h-4 ${isReinvestigating ? 'animate-spin' : ''}`} />
@@ -115,50 +115,50 @@ export const PublicExperiencePanel: React.FC<PublicExperiencePanelProps> = ({
       </div>
 
       {reinvestigateError && (
-        <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-xs font-mono text-red-300 flex items-center gap-3">
-          <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+        <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs font-mono text-rose-300 flex items-center gap-3">
+          <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
           <span>{reinvestigateError}</span>
         </div>
       )}
 
       {/* Summary Metrics Bar */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <div className="p-4 rounded-2xl bg-[#0D1117] border border-[#1E2838] text-center">
-          <span className="text-2xl font-black text-slate-100">{sources.length}</span>
+        <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 text-center">
+          <span className="text-2xl font-bold text-slate-100">{sources.length}</span>
           <span className="text-[10px] font-mono uppercase text-slate-400 block mt-1">Sources Evaluated</span>
         </div>
-        <div className="p-4 rounded-2xl bg-[#0D1117] border border-red-500/30 text-center">
-          <span className="text-2xl font-black text-red-400">{fraudCount}</span>
-          <span className="text-[10px] font-mono uppercase text-red-400/80 block mt-1">Fraud Reports</span>
+        <div className="p-4 rounded-xl bg-slate-900/80 border border-rose-500/30 text-center">
+          <span className="text-2xl font-bold text-rose-400">{fraudCount}</span>
+          <span className="text-[10px] font-mono uppercase text-rose-400/80 block mt-1">Fraud Reports</span>
         </div>
-        <div className="p-4 rounded-2xl bg-[#0D1117] border border-orange-500/30 text-center">
-          <span className="text-2xl font-black text-orange-400">{paymentCount}</span>
-          <span className="text-[10px] font-mono uppercase text-orange-400/80 block mt-1">Payment Demands</span>
+        <div className="p-4 rounded-xl bg-slate-900/80 border border-amber-500/30 text-center">
+          <span className="text-2xl font-bold text-amber-400">{paymentCount}</span>
+          <span className="text-[10px] font-mono uppercase text-amber-400/80 block mt-1">Payment Demands</span>
         </div>
-        <div className="p-4 rounded-2xl bg-[#0D1117] border border-amber-500/30 text-center">
-          <span className="text-2xl font-black text-amber-300">{warningCount}</span>
+        <div className="p-4 rounded-xl bg-slate-900/80 border border-amber-500/30 text-center">
+          <span className="text-2xl font-bold text-amber-300">{warningCount}</span>
           <span className="text-[10px] font-mono uppercase text-amber-300/80 block mt-1">Caution Notices</span>
         </div>
-        <div className="p-4 rounded-2xl bg-[#0D1117] border border-emerald-500/30 text-center col-span-2 sm:col-span-1">
-          <span className="text-2xl font-black text-[#00FF87]">{positiveCount}</span>
+        <div className="p-4 rounded-xl bg-slate-900/80 border border-emerald-500/30 text-center col-span-2 sm:col-span-1">
+          <span className="text-2xl font-bold text-emerald-400">{positiveCount}</span>
           <span className="text-[10px] font-mono uppercase text-emerald-400/80 block mt-1">Positive Signals</span>
         </div>
       </div>
 
       {/* Real-Source Integrity & Provider Audit Bar */}
       {providers.length > 0 && (
-        <div className="p-4 rounded-2xl bg-[#0A0D14] border border-[#1E2838] flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+        <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
           <div className="flex items-center gap-2 text-slate-400">
-            <Shield className="w-4 h-4 text-[#00FF87]" />
-            <span className="font-bold">Real-Source Integrity Audit:</span>
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <span className="font-bold text-slate-200">Source Integrity Audit:</span>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {providers.map((p, i) => (
               <span
                 key={i}
-                className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold flex items-center gap-1.5 ${
+                className={`px-2.5 py-1 rounded-md text-[10px] font-mono font-medium flex items-center gap-1.5 ${
                   p.status === 'LIVE'
-                    ? 'bg-emerald-500/10 text-[#00FF87] border border-emerald-500/30'
+                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                     : p.status === 'NOT_FOUND'
                     ? 'bg-slate-800 text-slate-400 border border-slate-700'
                     : 'bg-amber-500/10 text-amber-300 border border-amber-500/30'
@@ -172,39 +172,40 @@ export const PublicExperiencePanel: React.FC<PublicExperiencePanelProps> = ({
         </div>
       )}
 
-      {/* Complaint Clusters (Toxic Multi-Signal Correlation) */}
+      {/* Complaint Clusters (Corroborated Multi-Signal Correlation) */}
       {clusters.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center gap-2">
-            <Layers className="w-4 h-4 text-red-400" />
-            <h4 className="text-sm font-black text-slate-200 uppercase font-mono tracking-wider">
-              Corroborated Fraud Clusters Detected ({clusters.length})
+            <Layers className="w-4 h-4 text-rose-400" />
+            <h4 className="text-xs font-bold text-slate-200 uppercase font-mono tracking-wider">
+              Corroborated Incident Clusters ({clusters.length})
             </h4>
           </div>
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 gap-3">
             {clusters.map((cluster, i) => (
               <div
                 key={i}
-                className="p-5 rounded-2xl bg-red-500/10 border-2 border-red-500/40 space-y-3 shadow-xl"
+                className="p-5 rounded-xl bg-rose-500/5 border border-rose-500/30 space-y-3"
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="flex items-center gap-2.5">
-                    <span className="px-2.5 py-1 rounded-md bg-red-500/20 text-red-400 font-mono font-black text-xs">
+                    <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-mono font-bold text-xs">
                       {cluster.clusterId}
                     </span>
-                    <h5 className="text-base font-black text-slate-100">{cluster.name}</h5>
+                    <h5 className="text-sm font-bold text-slate-100">{cluster.name}</h5>
                   </div>
-                  <span className="text-xs font-mono font-bold text-red-300 px-3 py-1 rounded-full bg-red-500/20">
-                    {cluster.reportCount} Independent Candidate Reports
+                  <span className="text-xs font-mono font-semibold text-rose-300 px-2.5 py-0.5 rounded bg-rose-500/20">
+                    {cluster.reportCount} Independent Corroborated Reports
                   </span>
                 </div>
-                <p className="text-xs text-slate-300 leading-relaxed font-semibold">
+                <p className="text-xs text-slate-300 leading-relaxed">
                   {cluster.description}
                 </p>
                 <div className="flex flex-wrap items-center gap-2 pt-1">
                   {cluster.matchedIndicators.map((ind, idx) => (
-                    <span key={idx} className="px-2.5 py-0.5 rounded-full bg-[#131822] text-xs font-mono text-slate-300 border border-[#1E2838]">
-                      ⚠️ {ind}
+                    <span key={idx} className="px-2 py-0.5 rounded bg-slate-800 text-xs font-mono text-slate-300 border border-slate-700 flex items-center gap-1.5">
+                      <AlertTriangle className="w-3 h-3 text-amber-400" />
+                      <span>{ind}</span>
                     </span>
                   ))}
                 </div>
@@ -215,7 +216,7 @@ export const PublicExperiencePanel: React.FC<PublicExperiencePanelProps> = ({
       )}
 
       {/* Filter Tabs */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-[#1E2838] pb-3">
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-3">
         {[
           { id: 'ALL', label: 'All Experiences', count: sources.length },
           { id: 'FRAUD', label: 'Fraud Reports', count: fraudCount },
@@ -227,15 +228,15 @@ export const PublicExperiencePanel: React.FC<PublicExperiencePanelProps> = ({
           <button
             key={tab.id}
             onClick={() => setActiveFilter(tab.id)}
-            className={`px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-medium transition-colors flex items-center gap-2 cursor-pointer ${
               activeFilter === tab.id
-                ? 'bg-[#00FF87] text-black shadow-[0_0_15px_rgba(0,255,135,0.3)]'
-                : 'bg-[#0D1117] text-slate-400 hover:text-slate-200 border border-[#1E2838]'
+                ? 'bg-slate-100 text-slate-900 shadow-sm'
+                : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800 hover:border-slate-700'
             }`}
           >
             <span>{tab.label}</span>
-            <span className={`px-1.5 py-0.2 rounded-md text-[10px] ${
-              activeFilter === tab.id ? 'bg-black/20 text-black' : 'bg-[#1E2838] text-slate-400'
+            <span className={`px-1.5 py-0.2 rounded text-[10px] ${
+              activeFilter === tab.id ? 'bg-slate-200 text-slate-900 font-bold' : 'bg-slate-800 text-slate-400'
             }`}>
               {tab.count}
             </span>
@@ -245,9 +246,9 @@ export const PublicExperiencePanel: React.FC<PublicExperiencePanelProps> = ({
 
       {/* Sources List */}
       {filteredSources.length === 0 ? (
-        <div className="p-8 rounded-3xl bg-[#0D1117] border-2 border-[#1E2838] text-center space-y-3">
-          <span className="text-3xl">🛡️</span>
-          <h4 className="text-base font-black text-slate-100">No matching public reports in this category</h4>
+        <div className="p-8 rounded-2xl bg-slate-900/80 border border-slate-800 text-center space-y-3">
+          <Shield className="w-8 h-8 text-slate-500 mx-auto" />
+          <h4 className="text-sm font-semibold text-slate-100">No matching public reports in this category</h4>
           <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
             Public forum queries returned no records matching the selected filter for {companyName}.
           </p>
@@ -262,35 +263,35 @@ export const PublicExperiencePanel: React.FC<PublicExperiencePanelProps> = ({
             return (
               <div
                 key={idx}
-                className={`p-5 rounded-2xl bg-[#0D1117] border-2 transition-all space-y-3 shadow-xl ${
+                className={`p-5 rounded-xl bg-slate-900/80 border transition-all space-y-3 ${
                   isScam
-                    ? 'border-red-500/40 hover:border-red-500/70'
+                    ? 'border-rose-500/40 hover:border-rose-500/70'
                     : isAdvisory
                     ? 'border-amber-500/40 hover:border-amber-500/70'
                     : isPositive
                     ? 'border-emerald-500/40 hover:border-emerald-500/70'
-                    : 'border-[#1E2838] hover:border-slate-700'
+                    : 'border-slate-800 hover:border-slate-700'
                 }`}
               >
                 {/* Header with Badges */}
                 <div className="flex items-center justify-between gap-2">
-                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-black uppercase tracking-wider ${
+                  <span className={`px-2.5 py-1 rounded-md text-[10px] font-mono font-semibold uppercase tracking-wider ${
                     source.sourceTier === 'TIER_1'
-                      ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                      ? 'bg-purple-500/10 text-purple-300 border border-purple-500/30'
                       : source.sourceTier === 'TIER_2'
-                      ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                      ? 'bg-sky-500/10 text-sky-300 border border-sky-500/30'
                       : 'bg-slate-800 text-slate-300 border border-slate-700'
                   }`}>
-                    {source.sourceTier === 'TIER_1' ? '🏛️ TIER 1: OFFICIAL' : source.sourceTier === 'TIER_2' ? '📰 TIER 2: MEDIA' : '💬 TIER 3: FORUM'}
+                    {source.sourceTier === 'TIER_1' ? 'TIER 1 · REGULATORY' : source.sourceTier === 'TIER_2' ? 'TIER 2 · PRESS' : 'TIER 3 · COMMUNITY'}
                   </span>
 
-                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold ${
+                  <span className={`px-2.5 py-1 rounded-md text-[10px] font-mono font-medium ${
                     isScam
-                      ? 'bg-red-500/20 text-red-400 border border-red-500/40'
+                      ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
                       : isAdvisory
-                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                      ? 'bg-amber-500/10 text-amber-300 border border-amber-500/30'
                       : isPositive
-                      ? 'bg-emerald-500/20 text-[#00FF87] border border-emerald-500/40'
+                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                       : 'bg-slate-800 text-slate-400 border border-slate-700'
                   }`}>
                     {source.experienceType.replace(/_/g, ' ')}
@@ -303,32 +304,32 @@ export const PublicExperiencePanel: React.FC<PublicExperiencePanelProps> = ({
                     href={source.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm font-black text-slate-100 hover:text-[#00FF87] transition-colors flex items-start justify-between gap-2 group"
+                    className="text-sm font-semibold text-slate-100 hover:text-emerald-400 transition-colors flex items-start justify-between gap-2 group"
                   >
                     <span>{source.title}</span>
-                    <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-[#00FF87] shrink-0 mt-0.5" />
+                    <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-400 shrink-0 mt-0.5" />
                   </a>
                   <p className="text-[11px] font-mono text-slate-400">
-                    Publisher: <strong className="text-slate-300">{source.publisher || 'Public Web Source'}</strong> · Matched: <span className="text-[#00F0FF]">{source.matchedEntities?.join(', ') || (source as any).matchedEntity || 'Entity'}</span>
+                    Publisher: <strong className="text-slate-300">{source.publisher || 'Public Web Source'}</strong> · Matched: <span className="text-sky-400">{source.matchedEntities?.join(', ') || (source as any).matchedEntity || 'Entity'}</span>
                   </p>
                 </div>
 
                 {/* Excerpt */}
-                <p className="text-xs text-slate-300 leading-relaxed bg-[#131822] p-3 rounded-xl border border-[#1E2838] font-mono">
+                <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/60 p-3 rounded-lg border border-slate-800/80 font-mono">
                   "{source.evidenceText}"
                 </p>
 
                 {/* Matching rationale */}
                 {(source.matchRationale || (source as any).whyItMatches) && (
                   <p className="text-[11px] text-slate-400 font-mono">
-                    🎯 <strong>Correlation:</strong> {source.matchRationale || (source as any).whyItMatches}
+                    <strong className="text-slate-300">Correlation:</strong> {source.matchRationale || (source as any).whyItMatches}
                   </p>
                 )}
 
                 {/* Footer Metadata */}
-                <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 pt-1 border-t border-[#1E2838]">
+                <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-800">
                   <span>Status: <strong className="text-slate-300">{source.status || (source as any).sourceStatus || 'LIVE'}</strong></span>
-                  <span>Relevance: <strong className="text-[#00FF87]">{Math.round(source.relevance * 100)}%</strong></span>
+                  <span>Relevance: <strong className="text-emerald-400">{Math.round(source.relevance * 100)}%</strong></span>
                 </div>
               </div>
             );
