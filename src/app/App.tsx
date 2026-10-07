@@ -781,7 +781,7 @@ function UserScanView({
           confidence: fReport ? fReport.scoring.confidenceMetric : 75,
           confidence_score: fReport ? fReport.scoring.authenticityScore : 80,
           risk_level: fReport?.scoring.verdictSeverity === "critical" ? "CRITICAL" : fReport?.scoring.verdictSeverity === "moderate" ? "HIGH" : "LOW",
-          verdict: fReport?.scoring.verdict === "AUTHENTIC_VERIFIED" ? "LIKELY_LEGITIMATE" : "LIKELY_SCAM",
+          verdict: fReport?.scoring.verdict === "AUTHENTIC_VERIFIED" ? "LIKELY LEGITIMATE" : "LIKELY SCAM",
           summary: fReport?.scoring.executiveSummary || "Forensic client-side analysis completed.",
           findings: fReport?.scoring.reasons.whatWeFound || [],
           recommendations: fReport?.scoring.reasons.recommendedActions || [],
@@ -797,7 +797,7 @@ function UserScanView({
         finalReport.trust_score = fReport.scoring.authenticityScore;
         finalReport.confidence = fReport.scoring.confidenceMetric;
         finalReport.confidence_score = fReport.scoring.authenticityScore;
-        finalReport.verdict = fReport.scoring.verdict === "AUTHENTIC_VERIFIED" ? "LIKELY_LEGITIMATE" : "LIKELY_SCAM";
+        finalReport.verdict = fReport.scoring.verdict === "AUTHENTIC_VERIFIED" ? "LIKELY LEGITIMATE" : "LIKELY SCAM";
         finalReport.risk_level = fReport.scoring.verdictSeverity === "critical" ? "CRITICAL" : fReport.scoring.verdictSeverity === "moderate" ? "HIGH" : "LOW";
         finalReport.company_name = effectiveCompany;
         finalReport.entity_name = effectiveCompany;
@@ -1557,29 +1557,85 @@ function UserReportView({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Card 1: Document Authenticity & Visual Forensics */}
-          <div className="p-6 rounded-3xl bg-[#0D1117] border-2 border-[#1E2838] space-y-3 shadow-xl">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <span className="text-2xl">🔬</span>
-                <div>
-                  <span className="text-base font-black text-slate-100 block">Document Authenticity & Visual Forensics</span>
-                  <span className="text-[10px] font-mono text-slate-400">Canvas 8x8 DCT Compression & EXIF Provenance</span>
+          {(() => {
+            const card1Score = Math.round(
+              activeForensicReport?.scoring?.docAuthScore ??
+              (report?.components?.document_authenticity?.score ??
+              (activeForensicReport?.scoring?.structureAnalysis?.structureScore ?? 75))
+            );
+            const card1Struct = activeForensicReport?.scoring?.structureAnalysis || fSemantics?.structure;
+            const isVerified = card1Score >= 75 && !activeForensicReport?.metadata?.modifyingSoftwareFlagged;
+            const isAnomalous = card1Score >= 50 && card1Score < 75;
+
+            return (
+              <div className={`p-6 rounded-3xl border-2 space-y-3 shadow-xl ${
+                !isVerified && !isAnomalous
+                  ? "bg-red-500/10 border-red-500/40"
+                  : isAnomalous
+                  ? "bg-amber-500/10 border-amber-500/40"
+                  : "bg-[#0D1117] border-[#1E2838]"
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-2xl">🔬</span>
+                    <div>
+                      <span className="text-base font-black text-slate-100 block">Document Authenticity & Visual Forensics</span>
+                      <span className="text-[10px] font-mono text-slate-400">Enterprise Structure Compliance & Canvas ELA Tamper Grid</span>
+                    </div>
+                  </div>
+                  <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold ${
+                    isVerified
+                      ? "bg-emerald-500/20 text-[#00FF87] border border-emerald-500/40"
+                      : isAnomalous
+                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                      : "bg-red-500/20 text-[#FF3B5C] border border-red-500/50"
+                  }`}>
+                    {isVerified ? `VERIFIED FORMAT (${card1Score}%)` : isAnomalous ? `STRUCTURAL ANOMALIES (${card1Score}%)` : `DEFICIENT / FAKE FORMAT (${card1Score}%)`}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-300 font-medium leading-relaxed">
+                    {card1Struct ? (
+                      <>
+                        <strong className="text-slate-100">{card1Struct.passedChecksCount}/{card1Struct.totalChecksCount} Enterprise Standards Verified.</strong>{" "}
+                        {card1Struct.missingElements && card1Struct.missingElements.length > 0 ? (
+                          <span className="text-red-400">
+                            Missing mandatory organizational requirements: {card1Struct.missingElements.slice(0, 3).join(", ")}.
+                          </span>
+                        ) : (
+                          <span className="text-[#00FF87]">
+                            Document conforms to legitimate organizational formatting: reference number, corporate address, specific job role, and executive signatory block.
+                          </span>
+                        )}
+                      </>
+                    ) : activeForensicReport?.metadata?.modifyingSoftwareFlagged ? (
+                      `Graphic editing software signatures detected in header (${activeForensicReport.metadata.modifyingSoftwareList.join(', ')}). Possible digital compositing.`
+                    ) : (
+                      "Pixel luminance noise and 8x8 DCT compression grid exhibit uniform spatial distribution across canvas rendering."
+                    )}
+                  </p>
+                  {card1Struct?.structureChecks && (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {card1Struct.structureChecks.slice(0, 6).map((chk: any) => (
+                        <span
+                          key={chk.id}
+                          className={`text-[10px] font-mono px-2 py-0.5 rounded-md border flex items-center gap-1 ${
+                            chk.passed
+                              ? "bg-emerald-500/10 text-[#00FF87] border-emerald-500/30"
+                              : "bg-red-500/10 text-red-400 border-red-500/30"
+                          }`}
+                          title={chk.details}
+                        >
+                          <span>{chk.passed ? "✓" : "✗"}</span>
+                          <span>{chk.name}</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
-              <span className={`px-3 py-1 rounded-full text-xs font-mono font-bold ${
-                (activeForensicReport?.pixel?.pixelScore || 85) >= 75 && !activeForensicReport?.metadata?.modifyingSoftwareFlagged
-                  ? "bg-emerald-500/20 text-[#00FF87] border border-emerald-500/40"
-                  : "bg-red-500/20 text-[#FF3B5C] border border-red-500/50"
-              }`}>
-                {(activeForensicReport?.pixel?.pixelScore || 85) >= 75 && !activeForensicReport?.metadata?.modifyingSoftwareFlagged ? "VERIFIED (88%)" : "COMPROMISED (32%)"}
-              </span>
-            </div>
-            <p className="text-xs text-slate-300 font-medium leading-relaxed">
-              {activeForensicReport?.metadata?.modifyingSoftwareFlagged
-                ? `Graphic editing software signatures detected in header (${activeForensicReport.metadata.modifyingSoftwareList.join(', ')}). Possible digital compositing.`
-                : "Pixel luminance noise and 8x8 DCT compression grid exhibit uniform spatial distribution across canvas rendering."}
-            </p>
-          </div>
+            );
+          })()}
 
           {/* Card 2: Financial Safety & Non-Fee Verification */}
           <div className={`p-6 rounded-3xl border-2 space-y-3 shadow-xl ${
@@ -1998,22 +2054,31 @@ function ReportCopilotInline({
 
 function UserCopilotView({
   report: rawReport,
+  forensicReport,
   userToken,
   userName,
   initialQuestion,
 }: {
   report: LegitifyReport;
+  forensicReport?: CompleteForensicReport | null;
   userToken?: string;
   userName?: string;
   initialQuestion?: string;
 }) {
   const report: LegitifyReport = (rawReport as any)?.report || rawReport || {};
-  const rawName = report.company_name || report.entity_name || report.entity_value || "this investigated opportunity";
+  const activeFReport = forensicReport || (rawReport as any)?.forensicAnalysis;
+  const rawDocText = activeFReport?.ocr?.rawText || report.document_analysis?.extracted_text || (report as any).contextText || "";
+  const fSemantics = activeFReport?.semantics;
+  const fStructure = activeFReport?.scoring?.structureAnalysis || fSemantics?.structure;
+
+  const rawName = fSemantics?.detectedCompany || report.company_name || report.entity_name || report.entity_value || "this investigated opportunity";
   const cleanCompany = (rawName.match(/\.(png|jpg|jpeg|pdf)$/i) || rawName.includes("images ("))
     ? (report.document_analysis?.extracted_entities?.detected_company || "this investigated opportunity")
     : rawName;
 
-  const trustScore = typeof report.trust_score === "number"
+  const trustScore = typeof activeFReport?.scoring?.authenticityScore === "number"
+    ? Math.round(activeFReport.scoring.authenticityScore)
+    : typeof report.trust_score === "number"
     ? Math.round(report.trust_score)
     : (typeof (report as any).final_score === "number"
     ? Math.round((report as any).final_score)
@@ -2079,38 +2144,113 @@ function UserCopilotView({
     setLoading(true);
 
     try {
-      const enriched = { ...report, user_name: userName || "Sanjay Kumar" };
+      const enriched = {
+        ...report,
+        forensicAnalysis: activeFReport,
+        raw_text: rawDocText,
+        document_text: rawDocText,
+        structureAnalysis: fStructure,
+        detectedRisks: activeFReport?.scoring?.reasons?.riskIndicators || report.red_flags || [],
+        user_name: userName || "Sanjay Kumar",
+      };
       const res = await askCopilot(enriched, q, userToken);
       setMessages([
         ...newHistory,
         { role: "assistant", text: res, time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }
       ]);
     } catch {
-      const isHighRisk = (report.trust_score || 0) < 60;
+      const isHighRisk = trustScore < 60;
       const comp = cleanCompany || "Organization";
-      const score = report.trust_score ?? 84;
       const qLower = q.toLowerCase();
+      const docLower = rawDocText.toLowerCase();
+
+      // Helper: sentence matcher in extracted doc
+      const findDocSentences = (kws: string[]): string[] => {
+        if (!rawDocText) return [];
+        return rawDocText.split(/(?<=[.!?\n])\s+/).filter(s => {
+          const sl = s.toLowerCase();
+          return kws.some(k => sl.includes(k.toLowerCase()));
+        }).slice(0, 3);
+      };
 
       let dynamicAnswer = "";
-      if (qLower.includes("parent") || qLower.includes("family") || qLower.includes("30-second") || qLower.includes("simple")) {
+
+      // 1. Working Hours & Shift Timings
+      if (qLower.includes("hour") || qLower.includes("timing") || qLower.includes("schedule") || qLower.includes("shift") || qLower.includes("attendance")) {
+        const matches = findDocSentences(["hour", "timing", "schedule", "shift", "am", "pm", "monday", "friday", "working day"]);
+        if (matches.length > 0) {
+          dynamicAnswer = `### ⏰ Working Hours & Schedule Analysis for ${comp}\n\n` +
+            `**1. Clauses Extracted from Document:**\n` +
+            matches.map(m => `* *"${m.trim()}"*`).join("\n") + "\n\n" +
+            `**2. Forensic Benchmark:**\n` +
+            `* Authentic corporate contracts mandate a 40–45 hour work week (e.g., 9:30 AM to 6:30 PM, Monday–Friday).\n` +
+            `* Ensure attendance tracking occurs on the official company enterprise portal.`;
+        } else {
+          dynamicAnswer = `### ⏰ Working Hours & Schedule Analysis for ${comp}\n\n` +
+            `**1. Document Finding:**\n` +
+            `* 🔍 **No explicit working hours, shift timings, or schedule clauses were found in the uploaded document.**\n\n` +
+            `**2. Why This Matters:**\n` +
+            `* Authentic enterprise appointment letters explicitly specify weekly hours (e.g. 40 hrs/week) and reporting windows.\n` +
+            `* The total absence of working hours and attendance policies is a frequent characteristic of non-standard or fabricated templates.`;
+        }
+      }
+      // 2. Signatory & Authority Block
+      else if (qLower.includes("signatory") || qLower.includes("signed") || qLower.includes("signature") || qLower.includes("who signed")) {
+        const sigMatches = findDocSentences(["sincerely", "regards", "authorized", "signatory", "manager", "director", "human resources"]);
+        const sigTitle = fStructure?.signatoryTitle || (rawDocText.match(/(?:Human Resources|HR Manager|Director|Vice President|Authorized Signatory)[\s\S]{0,30}/i)?.[0]);
+        dynamicAnswer = `### ✍️ Authorized Signatory Analysis for ${comp}\n\n` +
+          `* **Detected Signatory Block:** **${sigTitle || "Signatory block unstated / unverified"}**\n` +
+          (sigMatches.length > 0 ? `* **Closing Text Found:** *"${sigMatches[0].trim()}"*\n` : "") +
+          `* **Verification Guidance:** Authentic corporate letters include the executive's full legal name, department designation, and company authorization seal. Junior HR personnel may sign internship letters, but their identity should be verifiable via the company's official corporate directory.`;
+      }
+      // 3. Stipend Plausibility
+      else if (qLower.includes("stipend") || qLower.includes("salary") || qLower.includes("compensation") || qLower.includes("ctc")) {
+        const stipendMatch = rawDocText.match(/(?:Stipend|Salary|Compensation|CTC|Remuneration)\s*[:\-]?\s*(?:INR|Rs\.?|₹|\$|USD)?\s*([0-9,]+(?:\s*(?:per month|\/month|LPA|K))?)/i)?.[0];
+        dynamicAnswer = `### 💰 Stipend & Compensation Plausibility for ${comp}\n\n` +
+          `* **Extracted Compensation Clause:** **${stipendMatch || fSemantics?.detectedStipend || "Not explicitly specified in document"}**\n` +
+          `* **Standard Industry Benchmark:** Indian student internships typically provide ₹10,000–₹35,000/month for software/engineering roles.\n` +
+          `* **Warning Signal:** Scams often offer unrealistically inflated figures (e.g. ₹60,000+/month for untrained beginners) or demand 'security deposits' to unlock stipends.`;
+      }
+      // 4. Deposit & Fees
+      else if (qLower.includes("deposit") || qLower.includes("fee") || qLower.includes("pay") || qLower.includes("money") || qLower.includes("training fee")) {
+        const hasFee = fSemantics?.hasFeeDemand || report.has_fee_demand || /registration\s+fee|security\s+deposit|training\s+fee/i.test(docLower);
+        dynamicAnswer = `### 💳 Deposit & Fee Demands Analysis\n\n` +
+          `* **Finding:** ${hasFee ? "🚨 **Candidate fee or deposit requested in this document!**" : "✅ No upfront candidate payment clauses detected."}\n` +
+          `* **Statutory Law:** Under ILO Fair Recruitment Initiatives and Indian labor practices, **legitimate employers NEVER charge candidates** for interviews, training kits, laptop caution deposits, or onboarding.\n` +
+          `* **Rule of Thumb:** Any demand for money before or upon joining is a definitive indicator of employment fraud.`;
+      }
+      // 5. Parent Summary
+      else if (qLower.includes("parent") || qLower.includes("family") || qLower.includes("30-second") || qLower.includes("simple")) {
         dynamicAnswer = `### ⏱️ 30-Second Summary for Parents & Family\n\n` +
-          `> *"This offer letter uses the name of **${comp}**, but our verification indicates critical risk factors in the recruiter contact or fee clauses.*\n` +
-          `> *Real companies never charge students to give them a job. The National Cybercrime Helpline (1930) classifies asking money for job offers as employment fraud. We should not pay any fee or send sensitive ID documents."*\n\n` +
-          `**Key Evidence:**\n` +
-          `* Company Status: ${report.company_record?.status || "Evaluated"} [E-001]\n` +
-          `* Recruiter Authentication: Unofficial handle detected [E-003]\n` +
-          `* Payment Clause: ${report.has_fee_demand ? "Fee demanded" : "No fee detected"} [E-004]`;
-      } else {
+          `> *"This offer letter uses the name of **${comp}**, but LEGITIFY evaluated a Trust Score of **${trustScore}/100**.*\n` +
+          `> *${isHighRisk ? "Real companies never ask students for money or recruit exclusively via personal Gmail/WhatsApp. The Cybercrime Helpline (1930) classifies candidate fees as employment fraud. We should not pay any fee or share sensitive IDs." : "The document follows standard organizational formatting with no candidate fees detected. Standard corporate onboarding steps apply."}*"`;
+      }
+      // 6. Emergency Steps
+      else if (qLower.includes("already paid") || qLower.includes("sent money") || qLower.includes("lost money") || qLower.includes("1930")) {
+        dynamicAnswer = `### 🚨 EMERGENCY ACTION PLAN: If You Paid Money\n\n` +
+          `1. **📞 Dial 1930 Immediately:** Call the National Cybercrime Helpline within 2 hours to freeze recipient bank accounts or UPI wallets.\n` +
+          `2. **🏦 Contact Bank Fraud Desk:** Request a payment recall / chargeback quoting the UPI UTR or bank transaction reference.\n` +
+          `3. **👮 File Formal e-FIR:** Register complaint on **[cybercrime.gov.in](https://cybercrime.gov.in)** with screenshots and chat logs.\n` +
+          `4. **🔒 Lock Biometrics:** Lock Aadhaar biometrics on UIDAI portal if copies were shared.`;
+      }
+      // 7. Questions to Ask Recruiter
+      else if (qLower.includes("question") || qLower.includes("ask recruiter") || qLower.includes("what to ask")) {
+        dynamicAnswer = `### ❓ Formal Verification Questions for ${comp} Recruiter\n\n` +
+          `1. *"Please provide the direct requisition link for this job opening hosted on your official career portal."*\n` +
+          `2. *"Why is this correspondence sent from ${fSemantics?.isFreeWebmail ? 'a personal Gmail address' : 'an unaligned domain'} rather than the official enterprise server?"*\n` +
+          `3. *"Please provide the official corporate Requisition ID registered with your central HR system."*\n` +
+          `4. *"Please confirm in writing that zero mandatory registration fees or laptop deposits will ever be charged."*`;
+      }
+      // 8. Explain Decision / Why Score
+      else {
         dynamicAnswer = `### 📊 Forensic Assessment Breakdown for ${comp}\n\n` +
-          `**Overall Assessment:** ${isHighRisk ? '🔴 **HIGH RISK (Scam Indicators Detected)**' : '🟢 **LOW RISK (Verified Structure)**'}\n` +
-          `* **Evaluated Trust Score:** **${score}/100**\n` +
-          `* **Verdict:** **${report.verdict || "ANALYSIS COMPLETE"}**\n\n` +
-          `---\n\n` +
-          `### 🔍 Key Evidence Highlights:\n` +
-          `1. **${isHighRisk ? '🔴' : '🟢'} Corporate Registry [E-001]:** ${comp} registered status evaluated in MCA21 database.\n` +
-          `2. **${isHighRisk ? '🔴' : '🟢'} Recruiter & Email [E-003]:** Recruiter communications evaluated against enterprise domain records.\n` +
-          `3. **${report.has_fee_demand ? '🔴' : '🟢'} Payment & Fee Requirement [E-004]:** ${report.has_fee_demand ? 'Upfront fee or security deposit requested — major scam signal.' : 'No upfront candidate monetary charge detected.'}\n\n` +
-          `> **Critical Reminder:** A registered company does not automatically guarantee that a specific recruiter email or offer letter is authorized. Always verify via the company's official corporate boardline.`;
+          `* **Evaluated Trust Score:** **${trustScore}/100** (${isHighRisk ? '🔴 High Risk · Scam Indicators' : '🟢 Verified Authentic'})\n` +
+          `* **Primary Verdict:** **${report.verdict || (isHighRisk ? 'LIKELY SCAM' : 'LIKELY LEGITIMATE')}**\n\n` +
+          `**Diagnostic Pillars:**\n` +
+          `1. **Document Structure & Authenticity:** ${fStructure ? `${fStructure.passedChecksCount}/${fStructure.totalChecksCount} Standards Verified` : 'Evaluated'}\n` +
+          `2. **Recruiter Domain Security:** ${fSemantics?.isFreeWebmail ? '🚨 Free personal webmail detected (@gmail.com)' : fSemantics?.recruiterEmail ? `Corporate email (${fSemantics.recruiterEmail})` : 'Unverified'}\n` +
+          `3. **Financial Safety:** ${report.has_fee_demand || fSemantics?.hasFeeDemand ? '🚨 Upfront candidate fee/deposit demanded' : '✅ Zero candidate fee'}\n\n` +
+          `> **Key Rule:** A registered company name does not guarantee that this specific letter or recruiter is authorized. Always verify via official corporate channels.`;
       }
 
       setMessages([
@@ -3984,6 +4124,7 @@ export function App() {
               {userView === "user_copilot" && (
                 <UserCopilotView
                   report={currentReport}
+                  forensicReport={forensicReport}
                   userToken={session?.access_token}
                   userName={user?.user_metadata?.full_name || "Sanjay Kumar. V"}
                   initialQuestion={copilotInitialPrompt}
@@ -4056,6 +4197,7 @@ export function App() {
               {adminView === "admin_copilot" && (
                 <UserCopilotView
                   report={currentReport}
+                  forensicReport={forensicReport}
                   userToken={session?.access_token}
                   userName="Security Admin"
                   initialQuestion={copilotInitialPrompt}

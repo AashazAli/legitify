@@ -776,6 +776,7 @@ export function extractDocumentSignals(
     extracted_claims,
     sanitized_evidence_block: text.slice(0, 1000),
     has_fee_demand: isFeeDemand,
+    is_suspicious_offer_letter: finalVerdict !== "LIKELY GENUINE" || finalPercent < 70 || isFeeDemand || flags.length >= 2,
     detected_company_name: detectedCompanyName,
     detected_domain: emails[0]?.split('@')[1]?.toLowerCase(),
     detected_email: emails[0],

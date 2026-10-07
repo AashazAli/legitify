@@ -253,26 +253,30 @@ export function calculateDeterministicScore(inputs: ScoringInputs): Deterministi
   if (isDocAuthActive && inputs.documentData) {
     docAuthConfidence = 85;
     const flagCount = inputs.documentData.triggered_flags?.length || 0;
+    const docScore = typeof inputs.documentData.final_score === 'number'
+      ? inputs.documentData.final_score
+      : 50;
+
     if (inputs.documentData.is_confirmed_impersonation) {
       docAuthScore = 5;
       docAuthStatus = 'CONTRADICTED';
       docAuthReason = "Document identified as confirmed corporate impersonation attempt.";
       criticalSignals.push("Document identified as confirmed corporate impersonation attempt.");
-    } else if (inputs.documentData.is_suspicious_offer_letter) {
-      docAuthScore = 15;
+    } else if (inputs.documentData.is_suspicious_offer_letter || inputs.documentData.verdict === 'LIKELY FAKE' || docScore < 40) {
+      docAuthScore = Math.min(22, Math.max(8, docScore));
       docAuthStatus = 'SUSPICIOUS';
-      docAuthReason = "Document exhibits structural anomalies consistent with fabricated offer letters.";
-      warningSignals.push("Document structure exhibits anomalies typical of fraudulent offers.");
-    } else if (flagCount >= 3) {
-      docAuthScore = Math.max(20, 60 - flagCount * 10);
+      docAuthReason = "Document exhibits structural anomalies and fails standard corporate formatting conventions.";
+      warningSignals.push("Document structure exhibits critical anomalies typical of fraudulent offers.");
+    } else if (inputs.documentData.verdict === 'SUSPICIOUS' || flagCount >= 2 || docScore < 70) {
+      docAuthScore = Math.max(20, Math.min(55, docScore));
       docAuthStatus = 'FLAGGED';
-      docAuthReason = `Document triggered ${flagCount} structural anomaly flags.`;
+      docAuthReason = `Document triggered ${flagCount} structural anomaly flags and incomplete enterprise standards.`;
       warningSignals.push(`Multiple document anomaly flags triggered (${flagCount}).`);
     } else {
-      docAuthScore = 85;
-      docAuthStatus = 'VERIFIED';
-      docAuthReason = "Document structure and layout align with genuine formal correspondence.";
-      positiveSignals.push("Document structure consistent with legitimate offer.");
+      docAuthScore = Math.min(90, Math.max(70, docScore));
+      docAuthStatus = docAuthScore >= 75 ? 'VERIFIED' : 'FLAGGED';
+      docAuthReason = "Document structure and layout align with genuine formal organizational correspondence.";
+      positiveSignals.push("Document structure consistent with legitimate enterprise offer.");
     }
   }
 
@@ -497,7 +501,7 @@ export function calculateDeterministicScore(inputs: ScoringInputs): Deterministi
   const isThreatActive = Boolean(
     inputs.threatData &&
     !(inputs.threatData as any).source_unavailable &&
-    (inputs.threatData.queries_run || 0) > 0
+    ((inputs.threatData as any).queries_run || 0) > 0
   );
 
   let threatScore = 0;
@@ -806,6 +810,71 @@ export function calculateDeterministicScore(inputs: ScoringInputs): Deterministi
       applied,
     });
     hardCaps.push(`MALICIOUS_IOC_CAP: Trust capped to max 15 — confirmed threat intelligence match`);
+  }
+
+  // Constraint 4: Recruiter uses free webmail for enterprise offer (max 24)
+  const isFreeWebmail = Boolean(
+    inputs.recruiterData?.free_provider ||
+    (inputs.documentData?.detected_email && /@(gmail\.com|yahoo\.com|outlook\.com|hotmail\.com)$/i.test(inputs.documentData.detected_email))
+  );
+  if (isFreeWebmail) {
+    const applied = rawTrust > 24;
+    if (applied) rawTrust = 24;
+    constraintsTriggered.push({
+      constraint: "FREE_WEBMAIL_CAP",
+      ceiling: 24,
+      reason: "Personal free webmail utilized for corporate employment offer",
+      applied,
+    });
+    hardCaps.push("FREE_WEBMAIL_CAP: Trust capped to max 24 — personal webmail provider detected");
+  }
+
+  // Constraint 5: Structural / Document Format Failure (max 32)
+  const isDocCompromised = Boolean(
+    docAuthScore < 45 ||
+    inputs.documentData?.is_suspicious_offer_letter ||
+    inputs.documentData?.verdict === "LIKELY FAKE"
+  );
+  if (isDocCompromised) {
+    const applied = rawTrust > 32;
+    if (applied) rawTrust = 32;
+    constraintsTriggered.push({
+      constraint: "DOCUMENT_STRUCTURE_CAP",
+      ceiling: 32,
+      reason: "Document structure fails organizational formatting or contains multiple anomaly flags",
+      applied,
+    });
+    hardCaps.push("DOCUMENT_STRUCTURE_CAP: Trust capped to max 32 — document failed enterprise layout & structure standards");
+  }
+
+  // Constraint 6: Informal Communication Channel (WhatsApp / Telegram) (max 28)
+  const hasInformalChannel = Boolean(
+    inputs.documentData?.has_informal_channel ||
+    (inputs.documentData?.suspicious_patterns || []).some(p => p.includes("WhatsApp") || p.includes("Telegram"))
+  );
+  if (hasInformalChannel) {
+    const applied = rawTrust > 28;
+    if (applied) rawTrust = 28;
+    constraintsTriggered.push({
+      constraint: "INFORMAL_CHANNEL_CAP",
+      ceiling: 28,
+      reason: "Recruitment process directs communication to unofficial personal messaging channels (WhatsApp/Telegram)",
+      applied,
+    });
+    hardCaps.push("INFORMAL_CHANNEL_CAP: Trust capped to max 28 — informal messaging channel detected");
+  }
+
+  // Constraint 7: Compound Risk Cap (max 22)
+  if (criticalSignals.length >= 2 || (criticalSignals.length >= 1 && warningSignals.length >= 2)) {
+    const applied = rawTrust > 22;
+    if (applied) rawTrust = 22;
+    constraintsTriggered.push({
+      constraint: "COMPOUND_RISK_CAP",
+      ceiling: 22,
+      reason: "Compound risk threshold exceeded across independent forensic vectors",
+      applied,
+    });
+    hardCaps.push("COMPOUND_RISK_CAP: Trust capped to max 22 — multiple concurrent fraud signals detected");
   }
 
   const finalTrust = activeWeightSum === 0 ? 0 : Math.round(Math.max(1, Math.min(99, rawTrust)));

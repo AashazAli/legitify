@@ -120,6 +120,41 @@ export interface EvidenceLockerEntry {
   tier: string;
 }
 
+export interface DocumentStructureItem {
+  id: string;
+  name: string;
+  passed: boolean;
+  details: string;
+  weight: number;
+}
+
+export interface DocumentStructureResult {
+  structureScore: number; // 0 - 100
+  status: 'STANDARD_COMPLIANT' | 'STRUCTURAL_ANOMALIES' | 'NON_STANDARD_FORMAT';
+  hasCorporateHeader: boolean;
+  hasRegisteredAddress: boolean;
+  hasOfficialReferenceNumber: boolean;
+  referenceNumber?: string;
+  hasFormalDate: boolean;
+  documentDate?: string;
+  hasPersonalizedAddressee: boolean;
+  candidateName?: string;
+  hasSpecificRole: boolean;
+  jobRole?: string;
+  hasClearDurationOrStartDate: boolean;
+  durationOrDate?: string;
+  hasStipendOrCompensationTerms: boolean;
+  hasConfidentialityOrIP: boolean;
+  hasAuthorizedSignatoryBlock: boolean;
+  signatoryTitle?: string;
+  signatoryName?: string;
+  hasAcceptanceProcedure: boolean;
+  passedChecksCount: number;
+  totalChecksCount: number;
+  structureChecks: DocumentStructureItem[];
+  missingElements: string[];
+}
+
 export interface DimensionBreakdownItem {
   id: string;
   name: string;
@@ -148,6 +183,7 @@ export interface DocumentSemanticsResult {
   detectedCin?: string;
   hasLegalTerms: boolean;
   contentIntegrityScore: number; // 0 - 100
+  structure?: DocumentStructureResult;
   findings: string[];
   riskFlags: DetectedRiskEntry[];
   evidenceItems: EvidenceLockerEntry[];
@@ -158,6 +194,7 @@ export interface ForensicScoreResult {
   pixelScore: number;          // Weight
   ocrScore: number;            // Weight
   contentScore?: number;       // Weight (Document Semantics, Email & Offer Legality)
+  structureScore?: number;     // Weight (Standard Corporate Structure & Format Compliance)
   authenticityScore: number;   // 0 - 100 (Higher = more authentic)
   manipulationProbability: number; // 100 - authenticityScore
   verdict: 'AUTHENTIC_VERIFIED' | 'ANOMALOUS_SUSPICIOUS' | 'FORGED_CRITICAL';
@@ -175,6 +212,9 @@ export interface ForensicScoreResult {
   dimensionBreakdown?: DimensionBreakdownItem[];
   detectedRisks?: DetectedRiskEntry[];
   evidenceLocker?: EvidenceLockerEntry[];
+  structureAnalysis?: DocumentStructureResult;
+  docAuthScore?: number;
+  hardCapsApplied?: Array<{ limit: number; reason: string }>;
 }
 
 export interface CompleteForensicReport {
@@ -188,3 +228,4 @@ export interface CompleteForensicReport {
   sanitizedPreviewUrl: string;
   analysisDurationMs: number;
 }
+

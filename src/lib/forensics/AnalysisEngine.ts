@@ -1193,6 +1193,9 @@ export function analyzeDocumentSemantics(
     });
   }
 
+  // 12. Standard Organizational Structure & Format Analysis
+  const structure = analyzeDocumentStructureAndFormat(text, detectedCompany);
+
   return {
     detectedCompany,
     detectedEmails: emailsFound,
@@ -1212,6 +1215,7 @@ export function analyzeDocumentSemantics(
     detectedCin,
     hasLegalTerms,
     contentIntegrityScore: Math.max(5, Math.min(100, contentScore)),
+    structure,
     findings,
     riskFlags,
     evidenceItems,
@@ -1219,9 +1223,261 @@ export function analyzeDocumentSemantics(
 }
 
 /**
+ * Analyzes whether the contents and layout of the document conform to
+ * standard legitimate organizational formats used by authentic enterprises.
+ */
+export function analyzeDocumentStructureAndFormat(
+  rawText: string,
+  detectedCompany: string
+): import('./types').DocumentStructureResult {
+  const text = rawText || '';
+  const lower = text.toLowerCase();
+
+  const structureChecks: import('./types').DocumentStructureItem[] = [];
+  const missingElements: string[] = [];
+
+  // 1. Corporate Header & Registered Entity Presence
+  const corporateEntityIndicators = [
+    'private limited', 'pvt ltd', 'pvt. ltd.', 'limited', 'ltd.', 'corporation', 'corp.',
+    'technologies', 'solutions', 'enterprises', 'holdings', 'services', 'inc.', 'llp', 'gmbh'
+  ];
+  const hasCorporateHeader = corporateEntityIndicators.some(ind => lower.includes(ind)) ||
+    (detectedCompany && detectedCompany !== 'Corporate Entity' && detectedCompany !== 'Investigated Organization' && detectedCompany.length > 3);
+
+  structureChecks.push({
+    id: 'STRUCT-01',
+    name: 'Corporate Header & Entity Identity',
+    passed: Boolean(hasCorporateHeader),
+    details: hasCorporateHeader
+      ? `Corporate entity nomenclature or brand header detected: "${detectedCompany}".`
+      : 'Missing formal corporate entity designation (e.g. Pvt Ltd, Ltd, Inc). Fails enterprise letterhead convention.',
+    weight: 12,
+  });
+  if (!hasCorporateHeader) missingElements.push('Corporate Letterhead & Entity Suffix (Pvt Ltd / Inc)');
+
+  // 2. Physical Registered Office Address & Postal Code
+  const addressKeywords = [
+    'registered office', 'corporate office', 'head office', 'campus', 'tower',
+    'tech park', 'cyber city', 'building', 'floor', 'plot no', 'sector', 'road', 'street',
+    'mumbai', 'delhi', 'bengaluru', 'bangalore', 'hyderabad', 'pune', 'chennai', 'gurugram', 'gurgaon', 'noida', 'kolkata'
+  ];
+  const pinCodeRegex = /\b(?:pin|pincode|postal code|zip)?[ -]*[1-9][0-9]{5}\b/i;
+  const hasAddressKeywords = addressKeywords.some(ak => lower.includes(ak));
+  const hasPinCode = pinCodeRegex.test(text);
+  const hasRegisteredAddress = hasAddressKeywords || hasPinCode;
+
+  structureChecks.push({
+    id: 'STRUCT-02',
+    name: 'Registered Corporate Office Address',
+    passed: hasRegisteredAddress,
+    details: hasRegisteredAddress
+      ? 'Physical registered corporate address or campus location observed in document layout.'
+      : 'Document omits physical registered office address and PIN/postal code. Non-standard corporate format.',
+    weight: 12,
+  });
+  if (!hasRegisteredAddress) missingElements.push('Registered Corporate Office Address');
+
+  // 3. Document Administration & Reference Number (Ref No. / Offer ID)
+  const refRegex = /(?:ref(?:erence)?(?:\s*(?:no|num|\.))?|offer\s*(?:id|ref|letter\s*id|code)|requisition\s*(?:id|no)|job\s*(?:id|code)|doc(?:ument)?\s*(?:id|no)|case\s*(?:id|no))\s*[:#-]?\s*([A-Za-z0-9\/-]{3,})/i;
+  const refMatch = text.match(refRegex);
+  const hasOfficialReferenceNumber = Boolean(refMatch);
+  const referenceNumber = refMatch ? refMatch[1].trim() : undefined;
+
+  structureChecks.push({
+    id: 'STRUCT-03',
+    name: 'Official Reference / Requisition ID',
+    passed: hasOfficialReferenceNumber,
+    details: hasOfficialReferenceNumber
+      ? `Formal document tracking reference found: "${referenceNumber}".`
+      : 'Absence of formal corporate document reference number (e.g. Ref: HR/2026/...). Typical of ad-hoc scam templates.',
+    weight: 12,
+  });
+  if (!hasOfficialReferenceNumber) missingElements.push('Official Reference Tracking Number (Ref No.)');
+
+  // 4. Formal Date of Issuance
+  const dateRegex = /(?:date|dated)\s*[:\-]?\s*([0-9]{1,2}[-\/.][0-9]{1,2}[-\/.][0-9]{2,4}|[0-9]{1,2}(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+[0-9]{2,4})/i;
+  const dateMatch = text.match(dateRegex);
+  const hasFormalDate = Boolean(dateMatch);
+  const documentDate = dateMatch ? dateMatch[1].trim() : undefined;
+
+  structureChecks.push({
+    id: 'STRUCT-04',
+    name: 'Formal Issuance Date',
+    passed: hasFormalDate,
+    details: hasFormalDate
+      ? `Formal issuance date documented: "${documentDate}".`
+      : 'Document lacks a structured date stamp in the document header.',
+    weight: 8,
+  });
+  if (!hasFormalDate) missingElements.push('Formal Document Issuance Date');
+
+  // 5. Candidate Addressee Specificity
+  const genericGreetings = ['dear candidate', 'dear applicant', 'dear student', 'dear intern', 'to whom it may concern', 'dear sir/madam'];
+  const hasGenericGreeting = genericGreetings.some(g => lower.includes(g));
+  const candidateMatch = text.match(/(?:dear|to)\s+(?:mr\.?|ms\.?|mrs\.?|dr\.?)?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})/);
+  const hasPersonalizedAddressee = !hasGenericGreeting && Boolean(candidateMatch);
+  const candidateName = candidateMatch ? candidateMatch[1].trim() : undefined;
+
+  structureChecks.push({
+    id: 'STRUCT-05',
+    name: 'Personalized Candidate Addressee',
+    passed: hasPersonalizedAddressee,
+    details: hasPersonalizedAddressee
+      ? `Addressed to candidate specifically: "${candidateName}".`
+      : hasGenericGreeting
+      ? 'Addressed with generic greeting ("Dear Candidate"). Mass-harvested scam format.'
+      : 'Candidate formal addressee block unstated or unstructured.',
+    weight: 10,
+  });
+  if (!hasPersonalizedAddressee) missingElements.push('Personalized Candidate Legal Addressee');
+
+  // 6. Explicit Position, Designation & Department
+  const roleMatch = text.match(/(?:role|position|designation|job title|post of)\s*[:\-]?\s*([A-Za-z0-9\s/&()\-]{3,40})/i);
+  const hasSpecificRole = Boolean(roleMatch) || lower.includes('engineer') || lower.includes('developer') || lower.includes('analyst') || lower.includes('intern');
+  const jobRole = roleMatch ? roleMatch[1].trim() : undefined;
+
+  structureChecks.push({
+    id: 'STRUCT-06',
+    name: 'Clear Role & Departmental Specification',
+    passed: hasSpecificRole,
+    details: hasSpecificRole
+      ? `Specific role designated: "${jobRole || 'Professional Role'}".`
+      : 'Vague or unspecified job designation. Corporate offers clearly define operational scope.',
+    weight: 10,
+  });
+  if (!hasSpecificRole) missingElements.push('Specific Job Designation & Department');
+
+  // 7. Employment Term, Duration, or Commencement Date
+  const termMatches = [
+    'duration of', 'period of', 'joining date', 'commencing on', 'commencement date',
+    'effective date', 'start date', 'reporting date', 'tenure of'
+  ];
+  const hasClearDurationOrStartDate = termMatches.some(tm => lower.includes(tm));
+
+  structureChecks.push({
+    id: 'STRUCT-07',
+    name: 'Term, Duration & Commencement Schedule',
+    passed: hasClearDurationOrStartDate,
+    details: hasClearDurationOrStartDate
+      ? 'Explicit start date, reporting schedule, or internship duration clauses verified.'
+      : 'Missing clear duration, joining date, or onboarding schedule.',
+    weight: 10,
+  });
+  if (!hasClearDurationOrStartDate) missingElements.push('Clear Commencement Date & Duration Term');
+
+  // 8. Structured Compensation & Stipend Terms
+  const compMatches = ['stipend', 'salary', 'compensation', 'ctc', 'remuneration', 'allowance', 'per month', 'inr'];
+  const hasStipendOrCompensationTerms = compMatches.some(cm => lower.includes(cm));
+
+  structureChecks.push({
+    id: 'STRUCT-08',
+    name: 'Structured Compensation / Stipend Clauses',
+    passed: hasStipendOrCompensationTerms,
+    details: hasStipendOrCompensationTerms
+      ? 'Document includes structured stipend or compensation disclosure clause.'
+      : 'Absence of clear compensation or stipend breakdown terms.',
+    weight: 8,
+  });
+  if (!hasStipendOrCompensationTerms) missingElements.push('Structured Compensation & Payment Terms');
+
+  // 9. Confidentiality, NDA, or Code of Conduct Governance
+  const governanceMatches = [
+    'confidential', 'non-disclosure', 'nda', 'proprietary', 'code of conduct',
+    'intellectual property', 'background check', 'terms and conditions', 'governing law', 'jurisdiction'
+  ];
+  const hasConfidentialityOrIP = governanceMatches.filter(gm => lower.includes(gm)).length >= 1;
+
+  structureChecks.push({
+    id: 'STRUCT-09',
+    name: 'Corporate Governance & Confidentiality Clauses',
+    passed: hasConfidentialityOrIP,
+    details: hasConfidentialityOrIP
+      ? 'Standard corporate legal boilerplate (confidentiality, IP rights, or code of conduct) present.'
+      : 'Complete omission of standard legal protection, confidentiality, or IP clauses standard in genuine offers.',
+    weight: 10,
+  });
+  if (!hasConfidentialityOrIP) missingElements.push('Confidentiality / Code of Conduct / Legal Terms');
+
+  // 10. Authorized Executive Signatory Block & Title
+  const signoffMatches = ['sincerely', 'regards', 'yours faithfully', 'authorized signatory', 'hr manager', 'talent acquisition', 'head of hr', 'director'];
+  const hasSignatoryIndicator = signoffMatches.some(sm => lower.includes(sm));
+  const sigTitleMatch = text.match(/(?:Human Resources|HR Manager|Talent Acquisition|Director|Vice President|Lead Recruiter|Authorized Signatory|Managing Director)/i);
+  const hasAuthorizedSignatoryBlock = hasSignatoryIndicator || Boolean(sigTitleMatch);
+  const signatoryTitle = sigTitleMatch ? sigTitleMatch[0] : undefined;
+
+  structureChecks.push({
+    id: 'STRUCT-10',
+    name: 'Authorized Executive Signatory Block',
+    passed: hasAuthorizedSignatoryBlock,
+    details: hasAuthorizedSignatoryBlock
+      ? `Formal executive closing and authorized signatory designation observed: "${signatoryTitle || 'HR Executive'}".`
+      : 'Document lacks a verified corporate signatory block, executive designation, or authorization seal.',
+    weight: 8,
+  });
+  if (!hasAuthorizedSignatoryBlock) missingElements.push('Authorized Executive Signatory Block (Name & Title)');
+
+  // Calculate Structure Score
+  let structureScore = 0;
+  for (const check of structureChecks) {
+    if (check.passed) {
+      structureScore += check.weight;
+    }
+  }
+
+  // Penalize heavily for fraud indicators in structure
+  if (lower.includes('registration fee') || lower.includes('security deposit') || lower.includes('training fee')) {
+    structureScore = Math.max(5, structureScore - 45);
+  }
+  if (lower.includes('telegram') || lower.includes('whatsapp')) {
+    structureScore = Math.max(10, structureScore - 25);
+  }
+  if (lower.includes('without interview') || lower.includes('direct selection')) {
+    structureScore = Math.max(10, structureScore - 20);
+  }
+
+  structureScore = Math.max(8, Math.min(98, structureScore));
+
+  const passedChecksCount = structureChecks.filter(c => c.passed).length;
+  const totalChecksCount = structureChecks.length;
+
+  const status: import('./types').DocumentStructureResult['status'] =
+    structureScore >= 75
+      ? 'STANDARD_COMPLIANT'
+      : structureScore >= 50
+      ? 'STRUCTURAL_ANOMALIES'
+      : 'NON_STANDARD_FORMAT';
+
+  return {
+    structureScore,
+    status,
+    hasCorporateHeader: Boolean(hasCorporateHeader),
+    hasRegisteredAddress,
+    hasOfficialReferenceNumber,
+    referenceNumber,
+    hasFormalDate,
+    documentDate,
+    hasPersonalizedAddressee,
+    candidateName,
+    hasSpecificRole,
+    jobRole,
+    hasClearDurationOrStartDate,
+    hasStipendOrCompensationTerms,
+    hasConfidentialityOrIP,
+    hasAuthorizedSignatoryBlock,
+    signatoryTitle,
+    hasAcceptanceProcedure: lower.includes('accept') || lower.includes('signature') || lower.includes('portal'),
+    passedChecksCount,
+    totalChecksCount,
+    structureChecks,
+    missingElements,
+  };
+}
+
+/**
  * Dynamic Scoring Function:
- * Synthesizes Pixel Noise, EXIF Metadata, OCR Integrity, AND Document Content Semantics.
- * Enforces strict safety hard caps to guarantee scam letters are NEVER awarded high scores.
+ * Synthesizes Standard Organizational Formatting & Structure, Pixel Noise, EXIF Metadata,
+ * Recruiter Communication Security, and Financial Anti-Fee Compliance.
+ * Evaluates all risks, claims, cautions, and statutory validity strictly.
  */
 export function computeDynamicScore(
   metadata: ExtractedMetadata,
@@ -1232,34 +1488,103 @@ export function computeDynamicScore(
   const mScore = metadata.metadataScore;
   const pScore = pixel.pixelScore;
   const oScore = ocr.ocrScore;
-  const cScore = semantics ? semantics.contentIntegrityScore : oScore;
 
-  // 1. Raw Weighted Synthesis
-  // 25% Metadata/EXIF + 25% Pixel Variance + 25% OCR Confidence + 25% Content/Offer Integrity
-  let rawScore = Math.round(mScore * 0.25 + pScore * 0.25 + oScore * 0.25 + cScore * 0.25);
+  // 1. Evaluate Standard Organizational Structure & Format Compliance
+  const structure = semantics?.structure;
+  const structureScore = structure ? structure.structureScore : 45;
 
-  // 2. Strict Deterministic Safety Hard Caps
+  // 2. Document Authenticity & Visual Forensics Score
+  // Blends physical pixel ELA + EXIF tampering with standard organizational formatting rules!
+  const physicalTamperingScore = Math.round((pScore + mScore) / 2);
+  const docAuthScore = Math.round(structureScore * 0.65 + Math.min(structureScore + 10, physicalTamperingScore) * 0.35);
+
+  const docAuthStatus: 'VERIFIED' | 'WARNING' | 'CRITICAL' =
+    docAuthScore >= 75 && !metadata.modifyingSoftwareFlagged
+      ? 'VERIFIED'
+      : docAuthScore >= 50
+      ? 'WARNING'
+      : 'CRITICAL';
+
+  const docAuthSummary = structure?.missingElements && structure.missingElements.length > 0
+    ? `Standard format evaluation: ${structure.passedChecksCount}/${structure.totalChecksCount} conventions verified. Missing: ${structure.missingElements.slice(0, 3).join(', ')}.`
+    : pixel.pixelFindings[0] || 'Canvas pixel noise and standard organizational format conventions verified.';
+
+  // 3. Evaluate Sender Communication & Recruiter Domain
+  const senderScore = semantics?.isFreeWebmail ? 18 : semantics?.recruiterEmail ? 85 : 45;
+  const senderStatus: 'VERIFIED' | 'WARNING' | 'CRITICAL' =
+    semantics?.isFreeWebmail ? 'CRITICAL' : semantics?.recruiterEmail ? 'VERIFIED' : 'WARNING';
+
+  // 4. Evaluate Financial & Fee Safety
+  const feeScore = semantics?.hasFeeDemand ? 5 : 95;
+  const feeStatus: 'VERIFIED' | 'WARNING' | 'CRITICAL' = semantics?.hasFeeDemand ? 'CRITICAL' : 'VERIFIED';
+
+  // 5. Evaluate Offer Terms & Linguistic Integrity
+  let linguisticScore = 85;
+  if (semantics?.hasDirectSelectionNoInterview) linguisticScore -= 35;
+  if (semantics?.hasInformalChannels) linguisticScore -= 25;
+  if (semantics?.hasGenericGreeting) linguisticScore -= 15;
+  if (semantics?.hasUrgency) linguisticScore -= 12;
+  linguisticScore = Math.max(10, Math.min(95, linguisticScore));
+
+  const linguisticStatus: 'VERIFIED' | 'WARNING' | 'CRITICAL' =
+    linguisticScore >= 70 ? 'VERIFIED' : linguisticScore >= 45 ? 'WARNING' : 'CRITICAL';
+
+  // 6. Corporate Entity & Regulatory Compliance
+  const entityScore = semantics?.hasCinNumber ? 90 : semantics?.detectedCompany && semantics.detectedCompany !== 'Corporate Entity' ? 65 : 40;
+  const entityStatus: 'VERIFIED' | 'WARNING' | 'CRITICAL' = entityScore >= 75 ? 'VERIFIED' : entityScore >= 55 ? 'WARNING' : 'CRITICAL';
+
+  // 7. Deductive Raw Score Synthesis
+  // Weights: Document Authenticity & Format (30%), Sender Security (25%), Financial Safety (25%), Entity Legal (20%)
+  let rawScore = Math.round(
+    docAuthScore * 0.30 +
+    senderScore * 0.25 +
+    feeScore * 0.25 +
+    entityScore * 0.20
+  );
+
+  // Additional Deductions for verified risk flags
+  if (semantics?.hasDirectSelectionNoInterview) rawScore -= 15;
+  if (semantics?.hasInformalChannels) rawScore -= 15;
+  if (semantics?.hasGenericGreeting) rawScore -= 8;
+  if (semantics?.hasUrgency) rawScore -= 8;
+  if (metadata.modifyingSoftwareFlagged) rawScore -= 15;
+
+  // 8. Strict Deterministic Safety Hard Caps
   // If critical scam patterns exist, the score MUST NOT exceed these safety ceilings
   const hardCaps: { limit: number; reason: string }[] = [];
 
   if (semantics?.hasFeeDemand || ocr.suspiciousKeywordsFound.length > 0) {
-    hardCaps.push({ limit: 18, reason: 'Mandatory Fee / Payment Demand Detected' });
+    hardCaps.push({ limit: 16, reason: 'Mandatory Upfront Fee / Deposit Demanded' });
   }
 
   if (semantics?.isFreeWebmail) {
-    hardCaps.push({ limit: 28, reason: 'Recruiter Uses Free Personal Webmail (@gmail.com / public webmail)' });
+    hardCaps.push({ limit: 24, reason: 'Recruiter Uses Free Personal Webmail (@gmail.com)' });
   }
 
   if (semantics?.hasInformalChannels) {
-    hardCaps.push({ limit: 38, reason: 'Informal Messaging Channels (Telegram / WhatsApp) Solicited' });
+    hardCaps.push({ limit: 28, reason: 'Informal Messaging Channels (Telegram / WhatsApp) Solicited' });
   }
 
   if (semantics?.hasDirectSelectionNoInterview) {
-    hardCaps.push({ limit: 45, reason: 'Selection Claimed Without Formal Interview Evaluation' });
+    hardCaps.push({ limit: 32, reason: 'Selection Claimed Without Formal Interview Evaluation' });
+  }
+
+  if (structure && structure.structureScore < 45) {
+    hardCaps.push({ limit: 35, reason: 'Fails Standard Legitimate Corporate Document Format & Control Conventions' });
   }
 
   if (metadata.modifyingSoftwareFlagged) {
-    hardCaps.push({ limit: 42, reason: 'Document Header Modified by Graphic Editing Software' });
+    hardCaps.push({ limit: 38, reason: 'Document Header Modified by Graphic Editing Software' });
+  }
+
+  const criticalRiskCount = (semantics?.hasFeeDemand ? 1 : 0) +
+    (semantics?.isFreeWebmail ? 1 : 0) +
+    (semantics?.hasInformalChannels ? 1 : 0) +
+    (semantics?.hasDirectSelectionNoInterview ? 1 : 0) +
+    (structure && structure.structureScore < 45 ? 1 : 0);
+
+  if (criticalRiskCount >= 2) {
+    hardCaps.push({ limit: 22, reason: 'Multiple Concurrent Critical Fraud & Formatting Anomalies Detected' });
   }
 
   let authenticityScore = rawScore;
@@ -1290,22 +1615,22 @@ export function computeDynamicScore(
     verdictSeverity = 'moderate';
   }
 
-  // 3. Multi-Dimensional Forensic Breakdown
+  // 9. Multi-Dimensional Forensic Breakdown (5 Comprehensive Diagnostic Vectors)
   const dimensionBreakdown: DimensionBreakdownItem[] = [
     {
       id: 'visual_pixels',
       name: 'Document Authenticity & Visual Forensics',
-      score: Math.round((pScore + mScore) / 2),
+      score: docAuthScore,
       weight: 25,
-      status: pScore >= 80 && !metadata.modifyingSoftwareFlagged ? 'VERIFIED' : 'CRITICAL',
-      summary: pixel.pixelFindings[0] || 'Canvas pixel noise and DCT compression variance analyzed.',
+      status: docAuthStatus,
+      summary: docAuthSummary,
     },
     {
       id: 'sender_channel',
       name: 'Sender Communication & Email Security',
-      score: semantics?.isFreeWebmail ? 20 : semantics?.recruiterEmail ? 85 : 60,
+      score: senderScore,
       weight: 25,
-      status: semantics?.isFreeWebmail ? 'CRITICAL' : semantics?.recruiterEmail ? 'VERIFIED' : 'WARNING',
+      status: senderStatus,
       summary: semantics?.isFreeWebmail
         ? `Recruiter utilizes public personal webmail (${semantics.recruiterEmail}). Corporate offers never use Gmail.`
         : semantics?.recruiterEmail
@@ -1315,31 +1640,46 @@ export function computeDynamicScore(
     {
       id: 'offer_legitimacy',
       name: 'Offer Letter Terms & Linguistic Integrity',
-      score: semantics?.hasDirectSelectionNoInterview ? 35 : semantics?.hasLegalTerms ? 90 : 70,
-      weight: 25,
-      status: semantics?.hasDirectSelectionNoInterview ? 'CRITICAL' : 'VERIFIED',
+      score: linguisticScore,
+      weight: 20,
+      status: linguisticStatus,
       summary: semantics?.hasDirectSelectionNoInterview
         ? 'Direct appointment declared without technical interview evaluation.'
-        : 'Formal employment clauses and appointment structure verified.',
+        : semantics?.hasLegalTerms
+        ? 'Formal employment clauses and appointment structure verified.'
+        : 'Informal or truncated offer language lacking standard employment terms.',
     },
     {
       id: 'financial_safety',
       name: 'Financial Safety & Non-Fee Verification',
-      score: semantics?.hasFeeDemand ? 5 : 95,
-      weight: 25,
-      status: semantics?.hasFeeDemand ? 'CRITICAL' : 'VERIFIED',
+      score: feeScore,
+      weight: 20,
+      status: feeStatus,
       summary: semantics?.hasFeeDemand
         ? `Monetary caution deposit demanded: [${semantics.feeDemandKeywords.join(', ')}].`
         : 'Zero upfront fees, deposits, or monetary solicitations detected.',
     },
+    {
+      id: 'company_governance',
+      name: 'Corporate Entity & Regulatory Compliance',
+      score: entityScore,
+      weight: 10,
+      status: entityStatus,
+      summary: semantics?.hasCinNumber
+        ? `Statutory corporate identifier (CIN) verified: ${semantics.detectedCin}.`
+        : semantics?.detectedCompany && semantics.detectedCompany !== 'Corporate Entity'
+        ? `Claimed organization name identified: ${semantics.detectedCompany}.`
+        : 'Corporate entity unverified against statutory master data.',
+    },
   ];
 
-  // 4. Synthesize Structured Findings and Actions
+  // 10. Synthesize Structured Findings and Actions
   const whatWeFound: string[] = [
     ...(semantics ? semantics.findings : []),
-    ...metadata.metadataFindings,
-    ...pixel.pixelFindings,
-    ...ocr.ocrFindings,
+    ...(structure ? structure.structureChecks.map(sc => `${sc.passed ? 'Passed' : 'Failed'}: ${sc.name} - ${sc.details}`) : []),
+    ...(metadata.metadataFindings || (metadata as any).findings || []),
+    ...(pixel.pixelFindings || (pixel as any).findings || []),
+    ...(ocr.ocrFindings || (ocr as any).findings || []),
   ];
 
   const whyItMatters: string[] = [];
@@ -1369,6 +1709,13 @@ export function computeDynamicScore(
     );
     riskIndicators.push(`Informal chat channel solicited: ${semantics.informalChannels.join(', ')}`);
     recommendedActions.push('Refuse communication on Telegram or personal WhatsApp for job offers.');
+  }
+
+  if (structure && structure.missingElements.length > 0) {
+    whyItMatters.push(
+      `Document omits standard organizational conventions (${structure.missingElements.slice(0, 3).join(', ')}). Official corporate offers adhere strictly to corporate governance templates.`
+    );
+    riskIndicators.push(`Non-standard format: Missing ${structure.missingElements.slice(0, 3).join(', ')}`);
   }
 
   if (metadata.modifyingSoftwareFlagged) {
@@ -1405,6 +1752,10 @@ export function computeDynamicScore(
             ? `HR correspondence originates from personal webmail (${semantics.recruiterEmail}) instead of an official company domain. `
             : ''
         }${
+          structure?.missingElements && structure.missingElements.length > 0
+            ? `Fails standard organizational formatting (Missing ${structure.missingElements.slice(0, 2).join(', ')}). `
+            : ''
+        }${
           metadata.modifyingSoftwareFlagged
             ? `Metadata confirms modification with graphic editing software (${metadata.modifyingSoftwareList.join(', ')}). `
             : ''
@@ -1415,7 +1766,8 @@ export function computeDynamicScore(
     metadataScore: mScore,
     pixelScore: pScore,
     ocrScore: oScore,
-    contentScore: cScore,
+    contentScore: structureScore,
+    structureScore,
     authenticityScore,
     manipulationProbability,
     verdict,
@@ -1433,6 +1785,9 @@ export function computeDynamicScore(
     dimensionBreakdown,
     detectedRisks: semantics?.riskFlags || [],
     evidenceLocker: semantics?.evidenceItems || [],
+    structureAnalysis: structure,
+    docAuthScore,
+    hardCapsApplied: hardCaps,
   };
 }
 
