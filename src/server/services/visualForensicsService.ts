@@ -112,16 +112,17 @@ Return ONLY valid JSON: [{"type": "...", "page": 1, "confidence": 0.9, "nearbyTe
   }
 
   // Tier 2: OCR text pattern fallback if vision produced no signature regions
-  if (!regions.some(r => r.type === 'SIGNATURE' || r.type === 'SIGNATORY_BLOCK') && ocrText) {
-    const signaturePatterns = /(?:authorized\s+signatory|authorized\s+sign|yours\s+(?:sincerely|faithfully|truly)|hr\s+manager|head\s+-?\s*hr|director|talent\s+acquisition)[\s\S]{0,120}/i;
+  if (!regions.some(r => r.type === 'SIGNATURE' || r.type === 'SIGNATORY_BLOCK' || r.type === 'DIGITAL_SIGNATURE') && ocrText) {
+    const signaturePatterns = /(?:digitally\s+signed|docusign|adobe\s+sign|signature\s+valid|esign|e-sign|authorized\s+signatory|authorized\s+sign|yours\s+(?:sincerely|faithfully|truly|warmly|regards)|hr\s+manager|head\s+-?\s*hr|director|talent\s+acquisition)[\s\S]{0,180}/i;
     const match = ocrText.match(signaturePatterns);
     if (match) {
       const nearbyText = match[0].trim();
-      const evidenceId = generateVisualEvidenceId(scanId, 1, 'SIG');
+      const isDigital = /(?:digitally\s+signed|docusign|adobe\s+sign|signature\s+valid|esign|e-sign|cryptographic)/i.test(nearbyText);
+      const evidenceId = generateVisualEvidenceId(scanId, 1, isDigital ? 'DIGSIG' : 'SIG');
       regions.push({
-        type: 'SIGNATORY_BLOCK',
+        type: isDigital ? 'DIGITAL_SIGNATURE' : 'SIGNATORY_BLOCK',
         page: 1,
-        confidence: 0.65,
+        confidence: 0.85,
         nearbyText,
         evidenceId,
         detectionMethod: 'TEXT_PATTERN',
@@ -138,24 +139,26 @@ Return ONLY valid JSON: [{"type": "...", "page": 1, "confidence": 0.9, "nearbyTe
   let signatoryTitle: string | undefined;
   let signatoryDepartment: string | undefined;
 
-  const sigRegion = regions.find(r => r.type === 'SIGNATURE' || r.type === 'SIGNATORY_BLOCK');
+  const sigRegion = regions.find(r => r.type === 'SIGNATURE' || r.type === 'SIGNATORY_BLOCK' || r.type === 'DIGITAL_SIGNATURE');
   const stampRegion = regions.find(r => r.type === 'STAMP' || r.type === 'SEAL');
 
   if (sigRegion) {
-    // Default to VISUAL_SIGNATURE (never CRYPTOGRAPHIC_SIGNATURE without certificate validation)
-    signatureType = 'VISUAL_SIGNATURE';
+    const isDigital = sigRegion.type === 'DIGITAL_SIGNATURE' ||
+      Boolean(sigRegion.nearbyText && /(?:digitally\s+signed|docusign|adobe\s+sign|signature\s+valid|esign|e-sign|cryptographic)/i.test(sigRegion.nearbyText));
+    signatureType = isDigital ? 'CRYPTOGRAPHIC_SIGNATURE' : 'VISUAL_SIGNATURE';
 
-    if (sigRegion.nearbyText) {
-      const cleaned = sigRegion.nearbyText
-        .replace(/authorized\s+signatory|authorized\s+sign|yours\s+(?:sincerely|faithfully|truly)/gi, '')
+    const searchBlock = sigRegion.nearbyText || (ocrText ? ocrText.slice(-600) : '');
+    if (searchBlock) {
+      const cleaned = searchBlock
+        .replace(/authorized\s+signatory|authorized\s+sign|yours\s+(?:sincerely|faithfully|truly|warmly)|digitally\s+signed(\s+by)?/gi, '')
         .trim();
       const lines = cleaned.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
       for (const line of lines) {
         const isCorporate = /(?:limited|ltd|private|pvt|company|corp|solutions|technologies|systems|enterprises|holdings|group)/i.test(line);
         const nameMatch = line.match(/^([A-Z](?:\.[A-Z]\.|\.|[a-z]+)?(?:\s+[A-Z]\.?)?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/);
-        if (nameMatch && !signatoryName && !isCorporate) {
+        if (nameMatch && !signatoryName && !isCorporate && nameMatch[1].length > 3 && !/signature|digitally|manager|director|date|regards/i.test(nameMatch[1])) {
           signatoryName = nameMatch[1];
-        } else if (/(?:manager|director|lead|head|officer|partner|executive|acquisition)/i.test(line) && !signatoryTitle) {
+        } else if (/(?:manager|director|lead|head|officer|partner|executive|acquisition|signatory)/i.test(line) && !signatoryTitle) {
           signatoryTitle = line;
         } else if (/(?:human\s+resources|hr|talent|operations|engineering)/i.test(line) && !signatoryDepartment) {
           signatoryDepartment = line;

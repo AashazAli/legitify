@@ -1398,19 +1398,98 @@ export function analyzeDocumentStructureAndFormat(
   });
   if (!hasConfidentialityOrIP) missingElements.push('Confidentiality / Code of Conduct / Legal Terms');
 
-  // 10. Authorized Executive Signatory Block & Title
-  const signoffMatches = ['sincerely', 'regards', 'yours faithfully', 'authorized signatory', 'hr manager', 'talent acquisition', 'head of hr', 'director'];
-  const hasSignatoryIndicator = signoffMatches.some(sm => lower.includes(sm));
-  const sigTitleMatch = text.match(/(?:Human Resources|HR Manager|Talent Acquisition|Director|Vice President|Lead Recruiter|Authorized Signatory|Managing Director)/i);
-  const hasAuthorizedSignatoryBlock = hasSignatoryIndicator || Boolean(sigTitleMatch);
-  const signatoryTitle = sigTitleMatch ? sigTitleMatch[0] : undefined;
+  // 10. Authorized Executive Signatory Block, Digital Signature & Identity
+  const digitalSigKeywords = ['digitally signed', 'digital signature', 'docusign', 'adobe sign', 'esign', 'e-sign', 'signature valid', 'certified by', 'pki', 'cryptographically signed'];
+  const hasDigitalSignature = digitalSigKeywords.some(kw => lower.includes(kw));
+
+  const signoffMatches = ['sincerely', 'regards', 'yours faithfully', 'authorized signatory', 'hr manager', 'talent acquisition', 'head of hr', 'director', 'placement officer', 'sd/-', 'sd /-', 'sd/'];
+  const hasSignatoryIndicator = hasDigitalSignature || signoffMatches.some(sm => lower.includes(sm));
+
+  const sigTitleMatch = text.match(/(?:Chief\s+(?:Human\s+Resources|People|Executive|Operating)\s+Officer|Vice\s+President(?:\s*-\s*[A-Za-z\s]+)?|Head\s*[-–]?\s*(?:Human\s+Resources|HR|Talent\s+Acquisition)|HR\s+Manager|Senior\s+HR\s+Manager|Talent\s+Acquisition(?:\s+Lead)?|Managing\s+Director|Director(?:\s*-\s*[A-Za-z\s]+)?|Placement\s+Officer|Authorized\s+Signatory|Lead\s+Recruiter|Senior\s+Recruiter|Human\s+Resources)/i);
+  const signatoryTitle = sigTitleMatch ? sigTitleMatch[0].trim() : (hasDigitalSignature ? 'Digital Signatory Authority' : undefined);
+
+  // Extract Signatory Person's Name
+  let signatoryName: string | undefined;
+
+  // Pattern 1: Explicit digital signature or sign block pattern (e.g., "Digitally signed by Rajesh Sharma", "Signed by: John Doe", "Sd/- Amit Kumar")
+  const explicitNameMatch = text.match(/(?:digitally\s+signed\s+by|signed\s+by\s*[:\-]?|signatory\s*(?:name)?\s*[:\-]?|sd\/?-?\s*)\s*(?:(?:Mr\.?|Ms\.?|Mrs\.?|Dr\.?)\s*)?([A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+){1,3})/i);
+  if (explicitNameMatch) {
+    const candidate = explicitNameMatch[1].trim();
+    if (!/(?:Limited|Ltd|Private|Pvt|Company|Corp|Inc|Technologies|Solutions|Services|Holdings|LLP)/i.test(candidate)) {
+      signatoryName = candidate;
+    }
+  }
+
+  // Pattern 2: Name adjacent to "Name:" or "Signature:" label in closing section
+  if (!signatoryName) {
+    const labelMatch = text.match(/(?:(?:Authorized\s+Signatory|Signature|Sign)\s*[\n\r]+\s*(?:Name\s*[:\-]?\s*)?|(?:Name\s*[:\-]\s*))\s*(?:(?:Mr\.?|Ms\.?|Mrs\.?|Dr\.?)\s*)?([A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+){1,3})/i);
+    if (labelMatch) {
+      const candidate = labelMatch[1].trim();
+      if (!/(?:Limited|Ltd|Private|Pvt|Company|Corp|Inc|Technologies|Solutions|Services|Holdings|LLP)/i.test(candidate)) {
+        signatoryName = candidate;
+      }
+    }
+  }
+
+  // Pattern 3: Look at lines below formal signoff (Sincerely, Regards, etc.)
+  if (!signatoryName) {
+    const signoffSectionMatch = text.match(/(?:yours\s+(?:sincerely|faithfully|truly)|with\s+regards|warm\s+regards|authorized\s+signatory)[\s,:\-]*\n+([\s\S]{1,200})/i);
+    if (signoffSectionMatch) {
+      const lines = signoffSectionMatch[1].split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      for (const line of lines) {
+        if (/(?:for|from)\s+[A-Za-z]/i.test(line) || /(?:limited|ltd|private|pvt|company|corp|solutions|technologies|systems|enterprises)/i.test(line)) {
+          continue;
+        }
+        const nameCandidate = line.match(/^(?:(?:Mr\.?|Ms\.?|Mrs\.?|Dr\.?)\s*)?([A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+){1,3})$/);
+        if (nameCandidate) {
+          signatoryName = nameCandidate[1];
+          break;
+        }
+      }
+    }
+  }
+
+  // Pattern 4: Name immediately preceding signatory title
+  if (!signatoryName && sigTitleMatch) {
+    const titleIdx = text.indexOf(sigTitleMatch[0]);
+    if (titleIdx > 0) {
+      const precedingText = text.substring(Math.max(0, titleIdx - 120), titleIdx);
+      const lines = precedingText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      for (let i = lines.length - 1; i >= 0; i--) {
+        const line = lines[i];
+        if (/(?:for|from)\s+[A-Za-z]/i.test(line) || /(?:limited|ltd|private|pvt|company|corp|solutions|technologies|systems|enterprises)/i.test(line)) {
+          continue;
+        }
+        const nameCandidate = line.match(/^(?:(?:Mr\.?|Ms\.?|Mrs\.?|Dr\.?)\s*)?([A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+){1,3})$/);
+        if (nameCandidate) {
+          signatoryName = nameCandidate[1];
+          break;
+        }
+      }
+    }
+  }
+
+  const hasAuthorizedSignatoryBlock = hasSignatoryIndicator || Boolean(sigTitleMatch) || Boolean(signatoryName);
+
+  const signatureType = hasDigitalSignature
+    ? 'DIGITAL_SIGNATURE'
+    : (lower.includes('signature') || lower.includes('sd/-') || lower.includes('signed'))
+    ? 'VISUAL_SIGNATURE'
+    : hasAuthorizedSignatoryBlock
+    ? 'PRINTED_SIGNATORY'
+    : 'ABSENT';
+
+  const signatureDetected = signatureType !== 'ABSENT';
+  const identityState = signatureDetected
+    ? (signatoryName ? 'SIGNATORY_OBSERVED' : 'SIGNATURE_PRESENT_UNIDENTIFIED')
+    : 'NO_SIGNATURE_DETECTED';
 
   structureChecks.push({
     id: 'STRUCT-10',
     name: 'Authorized Executive Signatory Block',
     passed: hasAuthorizedSignatoryBlock,
     details: hasAuthorizedSignatoryBlock
-      ? `Formal executive closing and authorized signatory designation observed: "${signatoryTitle || 'HR Executive'}".`
+      ? `${hasDigitalSignature ? 'Digital cryptographic signature' : 'Formal authorized signatory block'} observed: "${signatoryName ? `${signatoryName} (${signatoryTitle || 'Authorized Executive'})` : (signatoryTitle || 'HR Authority')}".`
       : 'Document lacks a verified corporate signatory block, executive designation, or authorization seal.',
     weight: 8,
   });
@@ -1465,6 +1544,10 @@ export function analyzeDocumentStructureAndFormat(
     hasConfidentialityOrIP,
     hasAuthorizedSignatoryBlock,
     signatoryTitle,
+    signatoryName,
+    signatureType,
+    signatureDetected,
+    identityState,
     hasAcceptanceProcedure: lower.includes('accept') || lower.includes('signature') || lower.includes('portal'),
     passedChecksCount,
     totalChecksCount,

@@ -214,7 +214,7 @@ export function retrieveRAGKnowledge(query: {
       title: e.claim,
       content: e.evidence_text,
       source: e.source,
-      source_type: e.source_type,
+      source_type: (e.source_type as any) || 'SECURITY_DATABASE',
       authority_level: e.authority_tier === 1 ? 'TIER_1_AUTHORITATIVE' : 'TIER_2_HIGH_QUALITY',
     });
   });

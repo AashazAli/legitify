@@ -288,13 +288,13 @@ export function compileFullReport(params: CompileReportParams): LegitifyReport {
     pipeline_trace: params.pipelineTrace,
     has_fee_demand: Boolean(
       documentData?.has_fee_demand ||
-      params.fraudPatterns?.hasPaymentDemand ||
+      (params.fraudPatterns as any)?.hasPaymentDemand ||
       (params as any).hasPaymentDemand ||
       scoreResult.rules_triggered.some(r => r.rule_id === 'R001' || r.name?.toLowerCase().includes('fee') || r.description?.toLowerCase().includes('fee') || r.explanation?.toLowerCase().includes('fee')) ||
       scoreResult.hard_caps_applied.some(c => c.toLowerCase().includes('fee') || c.toLowerCase().includes('payment'))
     ),
     evidence: params.evidence || [],
-    extracted_claims: params.documentData?.extracted_claims || [],
+    extracted_claims: (params.documentData as any)?.extracted_claims || [],
   } as any;
 
   return report;

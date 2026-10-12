@@ -688,13 +688,14 @@ export function extractDocumentSignals(
   if (isFeeDemand) {
     evidence.push({
       id: `EXT-DOC-FEE-${Math.random().toString(36).substring(2, 7).toUpperCase()}`,
-      category: "FINANCIAL",
+      category: "DOCUMENT",
       evidence_type_category: "STRONG_INDICATOR",
       evidence_type: "UPFRONT_FEE_DEMAND",
+      evidence_strength: "VERY_STRONG",
       source_name: "Document Text Forensics",
       title: "Mandatory Candidate Fee / Caution Deposit Demanded",
       evidence_text: "Document contains explicit clauses demanding candidate payment, registration fee, training cost, or caution deposit. Standard recruitment laws strictly prohibit candidate fees.",
-      status: "CONTRADICTED",
+      status: "NEGATIVE",
       severity: "CRITICAL",
       verified: true,
       confidence: 98,
@@ -707,12 +708,13 @@ export function extractDocumentSignals(
       evidence.push({
         id: `EXT-DOC-MAIL-${Math.random().toString(36).substring(2, 7).toUpperCase()}`,
         category: "RECRUITER",
-        evidence_type_category: "MEDIUM_INDICATOR",
+        evidence_type_category: "STRONG_INDICATOR",
         evidence_type: "FREE_WEBMAIL_PROVIDER",
+        evidence_strength: "STRONG",
         source_name: "Recruiter Channel Analysis",
         title: `Public Webmail Channel (${personalFound[0].split('@')[1]})`,
         evidence_text: `Recruiter communicates from personal webmail service (${personalFound[0]}) rather than official enterprise domain infrastructure.`,
-        status: "SUSPICIOUS",
+        status: "WARNING",
         severity: "HIGH",
         verified: true,
         confidence: 88,
@@ -721,8 +723,9 @@ export function extractDocumentSignals(
       evidence.push({
         id: `EXT-DOC-MAIL-${Math.random().toString(36).substring(2, 7).toUpperCase()}`,
         category: "RECRUITER",
-        evidence_type_category: "MEDIUM_INDICATOR",
+        evidence_type_category: "STRONG_INDICATOR",
         evidence_type: "CORPORATE_DOMAIN_EMAIL",
+        evidence_strength: "STRONG",
         source_name: "Recruiter Channel Analysis",
         title: `Enterprise Sender Domain (${emails[0].split('@')[1]})`,
         evidence_text: `Recruiter email corresponds to custom corporate domain (${emails[0]}).`,
@@ -737,9 +740,10 @@ export function extractDocumentSignals(
   if (detectedCompanyName) {
     evidence.push({
       id: `EXT-DOC-ENT-${Math.random().toString(36).substring(2, 7).toUpperCase()}`,
-      category: "ORGANIZATION",
-      evidence_type_category: "MEDIUM_INDICATOR",
+      category: "COMPANY",
+      evidence_type_category: "STRONG_INDICATOR",
       evidence_type: "OFFER_ENTITY_IDENTIFIER",
+      evidence_strength: "MEDIUM",
       source_name: "Document Header Analysis",
       title: `Issuing Organization Named: ${detectedCompanyName}`,
       evidence_text: `Document text explicitly identifies hiring organization as '${detectedCompanyName}'.`,
@@ -753,9 +757,10 @@ export function extractDocumentSignals(
   if (matchedClauses.length > 0) {
     evidence.push({
       id: `EXT-DOC-CLAUSE-${Math.random().toString(36).substring(2, 7).toUpperCase()}`,
-      category: "DOCUMENT_STRUCTURE",
+      category: "DOCUMENT",
       evidence_type_category: "WEAK_INDICATOR",
       evidence_type: "STANDARD_TERMS_CLAUSES",
+      evidence_strength: "MEDIUM",
       source_name: "Clause Structure Analyzer",
       title: `Formal Employment Provisions (${matchedClauses.length} Detected)`,
       evidence_text: `Document incorporates structured appointment terms: ${matchedClauses.slice(0, 3).join(', ')}.`,

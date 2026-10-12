@@ -433,7 +433,7 @@ async function queryPublicWebSearch(
 
                 outputSources.push({
                   id: `EXP-NEWS-${Math.random().toString(36).substring(2, 6)}`,
-                  sourceType: 'NEWS_ARTICLE',
+                  sourceType: 'NEWS',
                   title: rawTitle,
                   url: rawLink,
                   publisher: publisher || 'Google News Syndicate',
@@ -495,7 +495,7 @@ async function queryPublicWebSearch(
 
               outputSources.push({
                 id: `EXP-NEWS-${Math.random().toString(36).substring(2, 6)}`,
-                sourceType: 'NEWS_ARTICLE',
+                sourceType: 'NEWS',
                 title: rawTitle,
                 url: rawLink,
                 publisher: publisher || 'Google News Syndicate',
@@ -557,7 +557,7 @@ async function queryPublicWebSearch(
 
             outputSources.push({
               id: `EXP-NEWS-${Math.random().toString(36).substring(2, 6)}`,
-              sourceType: 'NEWS_ARTICLE',
+              sourceType: 'NEWS',
               title: rawTitle,
               url: rawLink,
               publisher: publisher || 'Google News Syndicate',

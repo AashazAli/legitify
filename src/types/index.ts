@@ -65,7 +65,7 @@ export interface RAGKnowledgeChunk {
   title: string;
   content: string;
   source: string;
-  source_type: "GOVERNMENT_REGISTRY" | "COMPANY_CAREERS" | "CYBERCRIME_ADVISORY" | "SECURITY_DATABASE" | "COMMUNITY_FEED";
+  source_type: "GOVERNMENT_REGISTRY" | "COMPANY_CAREERS" | "CYBERCRIME_ADVISORY" | "SECURITY_DATABASE" | "COMMUNITY_FEED" | "DOCUMENT_UPLOAD";
   source_url?: string;
   publication_date?: string;
   authority_level: "TIER_1_AUTHORITATIVE" | "TIER_2_HIGH_QUALITY" | "TIER_3_COMMUNITY";

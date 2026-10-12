@@ -814,7 +814,8 @@ export function calculateDeterministicScore(inputs: ScoringInputs): Deterministi
 
   // Constraint 4: Recruiter uses free webmail for enterprise offer (max 24)
   const isFreeWebmail = Boolean(
-    inputs.recruiterData?.free_provider ||
+    inputs.recruiterData?.is_free_provider ||
+    (inputs.recruiterData as any)?.free_provider ||
     (inputs.documentData?.detected_email && /@(gmail\.com|yahoo\.com|outlook\.com|hotmail\.com)$/i.test(inputs.documentData.detected_email))
   );
   if (isFreeWebmail) {

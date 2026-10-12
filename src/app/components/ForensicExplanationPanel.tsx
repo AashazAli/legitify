@@ -61,19 +61,19 @@ export const ForensicExplanationPanel: React.FC<ForensicExplanationPanelProps> =
   return (
     <div className="space-y-5 font-sans">
       {/* Header Bar */}
-      <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+      <div className="flex items-center justify-between pb-3 border-b border-slate-200">
         <div className="flex items-center gap-2">
-          <Layers className="w-4 h-4 text-emerald-400" />
-          <h3 className="text-sm font-mono font-bold uppercase tracking-wider text-slate-200">
+          <Layers className="w-4 h-4 text-blue-600" />
+          <h3 className="text-sm font-semibold tracking-tight text-slate-900">
             Multi-Signal Forensic Synthesis & Evidence Ledger
           </h3>
         </div>
 
         <span
-          className={`text-xs font-mono px-2.5 py-1 rounded border ${
+          className={`text-xs font-medium px-2.5 py-1 rounded-md border ${
             normalizedConf > 50
-              ? 'bg-rose-950/40 border-rose-800 text-rose-300'
-              : 'bg-slate-900 border-slate-800 text-slate-300'
+              ? 'bg-rose-50 border-rose-200 text-rose-700'
+              : 'bg-slate-50 border-slate-200 text-slate-700'
           }`}
         >
           Manipulation Risk Index: {normalizedConf}%
@@ -85,14 +85,14 @@ export const ForensicExplanationPanel: React.FC<ForensicExplanationPanelProps> =
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* What We Found */}
           {explanationSummary.whatWeFound && explanationSummary.whatWeFound.length > 0 && (
-            <div className="p-4 rounded-md bg-slate-950 border border-slate-800 space-y-2">
-              <h4 className="text-xs font-mono font-bold text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
-                <AlertCircle className="w-3.5 h-3.5" /> Observed Evidence
+            <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs space-y-2">
+              <h4 className="text-xs font-semibold text-blue-700 uppercase tracking-wider flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5 text-blue-600" /> Observed Evidence
               </h4>
-              <ul className="space-y-1.5 text-xs text-slate-300">
+              <ul className="space-y-1.5 text-xs text-slate-700">
                 {explanationSummary.whatWeFound.map((item, i) => (
                   <li key={i} className="flex items-start gap-2">
-                    <span className="text-blue-400 font-mono mt-0.5">•</span>
+                    <span className="text-blue-600 font-bold mt-0.5">•</span>
                     <span>{item}</span>
                   </li>
                 ))}
@@ -102,14 +102,14 @@ export const ForensicExplanationPanel: React.FC<ForensicExplanationPanelProps> =
 
           {/* Why It Matters */}
           {explanationSummary.whyItMatters && explanationSummary.whyItMatters.length > 0 && (
-            <div className="p-4 rounded-md bg-slate-950 border border-slate-800 space-y-2">
-              <h4 className="text-xs font-mono font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                <HelpCircle className="w-3.5 h-3.5" /> Technical Implication
+            <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs space-y-2">
+              <h4 className="text-xs font-semibold text-amber-700 uppercase tracking-wider flex items-center gap-1.5">
+                <HelpCircle className="w-3.5 h-3.5 text-amber-600" /> Technical Implication
               </h4>
-              <ul className="space-y-1.5 text-xs text-slate-300">
+              <ul className="space-y-1.5 text-xs text-slate-700">
                 {explanationSummary.whyItMatters.map((item, i) => (
                   <li key={i} className="flex items-start gap-2">
-                    <span className="text-amber-400 font-mono mt-0.5">•</span>
+                    <span className="text-amber-600 font-bold mt-0.5">•</span>
                     <span>{item}</span>
                   </li>
                 ))}
@@ -119,14 +119,14 @@ export const ForensicExplanationPanel: React.FC<ForensicExplanationPanelProps> =
 
           {/* What Is Verified */}
           {explanationSummary.whatIsVerified && explanationSummary.whatIsVerified.length > 0 && (
-            <div className="p-4 rounded-md bg-slate-950 border border-slate-800 space-y-2">
-              <h4 className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5" /> Verified Authenticity Signals
+            <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs space-y-2">
+              <h4 className="text-xs font-semibold text-emerald-700 uppercase tracking-wider flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Verified Authenticity Signals
               </h4>
-              <ul className="space-y-1.5 text-xs text-slate-300">
+              <ul className="space-y-1.5 text-xs text-slate-700">
                 {explanationSummary.whatIsVerified.map((item, i) => (
                   <li key={i} className="flex items-start gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
                     <span>{item}</span>
                   </li>
                 ))}
@@ -136,14 +136,14 @@ export const ForensicExplanationPanel: React.FC<ForensicExplanationPanelProps> =
 
           {/* What Should Be Done */}
           {explanationSummary.whatShouldBeDone && explanationSummary.whatShouldBeDone.length > 0 && (
-            <div className="p-4 rounded-md bg-slate-950 border border-rose-900/60 space-y-2">
-              <h4 className="text-xs font-mono font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
-                <ShieldAlert className="w-3.5 h-3.5" /> Actionable Directives
+            <div className="p-4 rounded-xl bg-white border border-rose-200 shadow-xs space-y-2">
+              <h4 className="text-xs font-semibold text-rose-700 uppercase tracking-wider flex items-center gap-1.5">
+                <ShieldAlert className="w-3.5 h-3.5 text-rose-600" /> Actionable Directives
               </h4>
-              <ul className="space-y-1.5 text-xs text-slate-200">
+              <ul className="space-y-1.5 text-xs text-slate-700">
                 {explanationSummary.whatShouldBeDone.map((item, i) => (
                   <li key={i} className="flex items-start gap-2">
-                    <ArrowRight className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                    <ArrowRight className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
                     <span>{item}</span>
                   </li>
                 ))}
@@ -156,43 +156,43 @@ export const ForensicExplanationPanel: React.FC<ForensicExplanationPanelProps> =
       {/* Pattern Library Evaluator Matches */}
       {(fraudPatterns.length > 0 || legitimatePatterns.length > 0) && (
         <div className="space-y-3 pt-2">
-          <h4 className="text-xs font-mono uppercase font-bold text-slate-400 tracking-wider">
+          <h4 className="text-xs uppercase font-semibold text-slate-500 tracking-wider">
             Pattern Engine Matches
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {fraudPatterns.map((fp, i) => (
               <div
                 key={i}
-                className="p-3 rounded-md bg-rose-950/30 border border-rose-800/60 space-y-1.5"
+                className="p-3.5 rounded-lg bg-rose-50/70 border border-rose-200 space-y-1.5"
               >
                 <div className="flex items-center justify-between">
-                  <span className="px-2 py-0.5 rounded bg-rose-900/50 text-rose-300 font-mono text-[10px] font-bold">
+                  <span className="px-2 py-0.5 rounded bg-rose-100 text-rose-800 font-mono text-[10px] font-bold">
                     {fp.patternId}
                   </span>
-                  <span className="text-[10px] font-mono text-rose-400">
+                  <span className="text-[10px] font-medium text-rose-700">
                     Confidence: {normalizeConfidence(fp.confidence)}%
                   </span>
                 </div>
-                <h5 className="text-xs font-bold text-slate-200">{fp.name}</h5>
-                <p className="text-xs text-slate-400 leading-relaxed">{fp.description}</p>
+                <h5 className="text-xs font-semibold text-rose-950">{fp.name}</h5>
+                <p className="text-xs text-rose-800 leading-relaxed">{fp.description}</p>
               </div>
             ))}
 
             {legitimatePatterns.map((lp, i) => (
               <div
                 key={i}
-                className="p-3 rounded-md bg-emerald-950/30 border border-emerald-800/60 space-y-1.5"
+                className="p-3.5 rounded-lg bg-emerald-50/70 border border-emerald-200 space-y-1.5"
               >
                 <div className="flex items-center justify-between">
-                  <span className="px-2 py-0.5 rounded bg-emerald-900/50 text-emerald-300 font-mono text-[10px] font-bold">
+                  <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-mono text-[10px] font-bold">
                     {lp.patternId}
                   </span>
-                  <span className="text-[10px] font-mono text-emerald-400">
+                  <span className="text-[10px] font-medium text-emerald-700">
                     Confidence: {normalizeConfidence(lp.confidence)}%
                   </span>
                 </div>
-                <h5 className="text-xs font-bold text-slate-200">{lp.name}</h5>
-                <p className="text-xs text-slate-400 leading-relaxed">{lp.description}</p>
+                <h5 className="text-xs font-semibold text-emerald-950">{lp.name}</h5>
+                <p className="text-xs text-emerald-800 leading-relaxed">{lp.description}</p>
               </div>
             ))}
           </div>

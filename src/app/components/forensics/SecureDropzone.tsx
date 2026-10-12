@@ -119,19 +119,19 @@ export const SecureDropzone: React.FC<SecureDropzoneProps> = ({
   };
 
   return (
-    <div className="w-full space-y-4">
+    <div className="w-full space-y-3">
       {/* Drop Zone Box */}
       <div
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onClick={() => !isProcessing && fileInputRef.current?.click()}
-        className={`relative rounded-md border transition-all duration-200 cursor-pointer overflow-hidden p-8 text-center select-none ${
+        className={`relative rounded-xl border-2 border-dashed transition-all duration-200 cursor-pointer overflow-hidden p-8 text-center select-none ${
           isDragOver
-            ? 'border-emerald-500 bg-slate-900/90 ring-1 ring-emerald-500'
+            ? 'border-blue-500 bg-blue-50/50 ring-2 ring-blue-500/20'
             : isProcessing
-            ? 'border-slate-700 bg-slate-900/60 cursor-not-allowed'
-            : 'border-slate-800 bg-slate-950 hover:border-slate-700 hover:bg-slate-900/50'
+            ? 'border-slate-300 bg-slate-50 cursor-not-allowed'
+            : 'border-slate-300 bg-slate-50/70 hover:border-blue-500 hover:bg-blue-50/30'
         }`}
       >
         <input
@@ -144,104 +144,93 @@ export const SecureDropzone: React.FC<SecureDropzoneProps> = ({
         />
 
         {isProcessing ? (
-          <div className="py-6 space-y-5">
-            <div className="flex items-center justify-center gap-3">
-              <Cpu className="w-5 h-5 text-emerald-400 animate-spin" />
-              <span className="font-sans text-sm font-semibold tracking-wide text-slate-200">
-                FORENSIC ENGINE ACTIVE
+          <div className="py-6 space-y-4">
+            <div className="flex items-center justify-center gap-2.5">
+              <Cpu className="w-5 h-5 text-blue-600 animate-spin" />
+              <span className="font-sans text-sm font-semibold text-slate-800">
+                Analyzing Document Structure & Signals
               </span>
             </div>
 
             <div className="max-w-md mx-auto space-y-2">
-              <div className="flex justify-between text-xs font-mono text-slate-400">
+              <div className="flex justify-between text-xs font-sans text-slate-600">
                 <span>{processingStage || 'Processing file bytes...'}</span>
-                <span>{Math.round(processingProgress * 100)}%</span>
+                <span className="font-semibold text-slate-700">{Math.round(processingProgress * 100)}%</span>
               </div>
-              <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+              <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-emerald-500 transition-all duration-300"
+                  className="h-full bg-blue-600 transition-all duration-300"
                   style={{ width: `${Math.round(processingProgress * 100)}%` }}
                 />
               </div>
             </div>
 
-            <p className="text-xs font-mono text-slate-500">
-              Performing SHA-256 chain of custody, EXIF extraction, Canvas pixel variance & Tesseract OCR
+            <p className="text-xs text-slate-500">
+              Verifying cryptographic hash integrity, layout consistency, and optical markers
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="flex items-center justify-center">
-              <div className="w-12 h-12 rounded-md bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-300 group-hover:text-emerald-400 transition-colors">
+              <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-sm transition-transform hover:scale-105">
                 <Upload className="w-6 h-6" />
               </div>
             </div>
 
             <div className="space-y-1">
-              <h4 className="text-sm font-semibold text-slate-100 tracking-tight">
-                Drop document or certificate for deterministic forensic inspection
+              <h4 className="text-sm font-semibold text-slate-900 tracking-tight">
+                Select document or drag and drop
               </h4>
-              <p className="text-xs text-slate-400">
-                Click to browse or drag file. Validates magic bytes, SHA-256 custody, EXIF tags & pixel variance.
+              <p className="text-xs text-slate-500 max-w-md mx-auto">
+                Upload offer letters, certificates, or employment contracts for forensic verification.
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-[11px] font-mono text-slate-400">
-                <Lock className="w-3 h-3 text-emerald-400" />
-                Anti-DoS: Max 5MB
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-[11px] font-mono text-slate-400">
-                <Binary className="w-3 h-3 text-teal-400" />
-                Magic Bytes: PNG · JPEG · PDF
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-[11px] font-mono text-slate-400">
-                <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                Web Crypto SHA-256
-              </span>
-            </div>
+            <p className="text-[11px] text-slate-400 pt-1">
+              Supports PDF, PNG, JPEG up to 5MB. Client-side SHA-256 integrity verification applied.
+            </p>
           </div>
         )}
       </div>
 
       {/* Security Rejection Banner */}
       {errorMsg && (
-        <div className="p-4 rounded-md bg-rose-950/40 border border-rose-900/80 flex items-start gap-3">
-          <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
-          <div className="space-y-1">
-            <h5 className="text-xs font-semibold text-rose-200 tracking-wide uppercase">
-              Cybersecurity Security Violation
+        <div className="p-3.5 rounded-lg bg-rose-50 border border-rose-200 flex items-start gap-3">
+          <ShieldAlert className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+          <div className="space-y-0.5">
+            <h5 className="text-xs font-semibold text-rose-900">
+              File Validation Failed
             </h5>
-            <p className="text-xs text-rose-300 font-mono leading-relaxed">{errorMsg}</p>
+            <p className="text-xs text-rose-700 leading-relaxed">{errorMsg}</p>
           </div>
         </div>
       )}
 
       {/* Pre-flight Validated File Card */}
       {validatedFile && !isProcessing && (
-        <div className="p-4 rounded-md bg-slate-900/70 border border-slate-800 space-y-3">
+        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-sm space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2.5">
-              <FileCheck className="w-4 h-4 text-emerald-400" />
-              <span className="text-xs font-semibold text-slate-200">{validatedFile.file.name}</span>
-              <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+              <FileCheck className="w-4 h-4 text-emerald-600" />
+              <span className="text-xs font-semibold text-slate-900">{validatedFile.file.name}</span>
+              <span className="text-[11px] font-sans px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-medium">
                 {formatBytes(validatedFile.file.size)}
               </span>
-              <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-950/80 border border-emerald-800 text-emerald-300">
+              <span className="text-[11px] font-sans px-2 py-0.5 rounded bg-blue-50 border border-blue-200 text-blue-700 font-semibold">
                 {validatedFile.validation.detectedFormat}
               </span>
             </div>
 
-            <div className="flex items-center gap-1.5 text-[11px] font-mono text-slate-400">
+            <div className="flex items-center gap-1.5 text-[11px] font-mono text-slate-500">
               <span>Magic Bytes:</span>
-              <span className="text-slate-200 font-semibold">{validatedFile.validation.actualHex}</span>
+              <span className="text-slate-800 font-semibold">{validatedFile.validation.actualHex}</span>
             </div>
           </div>
 
-          <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono text-slate-400">
+          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs font-mono text-slate-500">
             <div className="flex items-center gap-2 truncate max-w-xl">
-              <span className="text-slate-500">SHA-256:</span>
-              <span className="text-slate-300 truncate">{validatedFile.sha256}</span>
+              <span className="text-slate-400">SHA-256:</span>
+              <span className="text-slate-700 truncate">{validatedFile.sha256}</span>
             </div>
             <button
               type="button"
@@ -249,9 +238,9 @@ export const SecureDropzone: React.FC<SecureDropzoneProps> = ({
                 e.stopPropagation();
                 copyHashToClipboard();
               }}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 transition-colors"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-[11px] text-slate-700 font-sans transition-colors cursor-pointer"
             >
-              {copiedHash ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+              {copiedHash ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
               {copiedHash ? 'Copied' : 'Copy'}
             </button>
           </div>

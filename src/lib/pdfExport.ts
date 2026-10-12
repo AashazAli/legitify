@@ -312,7 +312,7 @@ export function exportReportPDF(report: LegitifyReport): void {
     });
   }
 
-  if (report.recruiter_analysis?.is_free_provider) {
+  if ((report.recruiter_analysis as any)?.is_free_provider || report.recruiter_analysis?.free_email_provider) {
     rawFlags.push({
       risk: 'Recruiter Free Webmail (@gmail/@yahoo)',
       action: 'Request written verification from official enterprise domain address.',

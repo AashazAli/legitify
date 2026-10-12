@@ -10,6 +10,7 @@ import {
   GeminiEvidence,
   GeminiSource,
   GeminiSignal,
+  GeminiStructuredDossier,
 } from '../../types/forensicTypes';
 
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.6-flash';

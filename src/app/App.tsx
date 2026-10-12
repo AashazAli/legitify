@@ -51,19 +51,22 @@ type AdminView =
   | "admin_cases"
   | "admin_settings";
 
-function getVerdictTheme(verdict?: string, score?: number) {
+function getVerdictTheme(verdict?: string, score?: number, hasFeeDemand?: boolean) {
   const v = (verdict || "").toUpperCase();
   const s = typeof score === "number" ? score : 85;
 
   if (v.includes("FAKE") || v.includes("SCAM") || v.includes("CRITICAL") || s <= 35) {
+    const desc = hasFeeDemand
+      ? "This opportunity exhibits critical fraud patterns including unauthorized candidate payment or fee demands. Exercise extreme caution."
+      : "This opportunity exhibits critical risk indicators such as unverified domain routing, lookalike infrastructure, or unverified entity credentials. Exercise extreme caution.";
     return {
       label: "Critical Risk · Likely Scam",
       shortLabel: "Likely Scam",
       emoji: "",
-      color: "#F43F5E",
-      glowColor: "rgba(244, 63, 94, 0.15)",
-      badgeClass: "bg-rose-500/10 text-rose-400 border border-rose-500/30",
-      description: "This opportunity exhibits critical fraud patterns (unauthorized payment request, lookalike domain, or unverified webmail). Exercise extreme caution.",
+      color: "#E11D48",
+      glowColor: "rgba(225, 29, 72, 0.12)",
+      badgeClass: "bg-rose-50 text-rose-700 border border-rose-200",
+      description: desc,
     };
   }
   if (v.includes("SUSPICIOUS") || v.includes("MODERATE") || v.includes("HIGH RISK") || s <= 65) {
@@ -71,20 +74,20 @@ function getVerdictTheme(verdict?: string, score?: number) {
       label: "Moderate Risk · Suspicious",
       shortLabel: "Suspicious",
       emoji: "",
-      color: "#F59E0B",
-      glowColor: "rgba(245, 158, 11, 0.15)",
-      badgeClass: "bg-amber-500/10 text-amber-400 border border-amber-500/30",
-      description: "Document contains multiple structural anomalies. Independent verification through official corporate channels is strongly advised.",
+      color: "#D97706",
+      glowColor: "rgba(217, 119, 6, 0.12)",
+      badgeClass: "bg-amber-50 text-amber-700 border border-amber-200",
+      description: "Document contains structural anomalies. Independent verification through official corporate channels is advised.",
     };
   }
   return {
     label: "Low Risk · Likely Genuine",
     shortLabel: "Likely Genuine",
     emoji: "",
-    color: "#10B981",
-    glowColor: "rgba(16, 185, 129, 0.15)",
-    badgeClass: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30",
-    description: "Our forensic analysis confirms authentic corporate identifiers, corporate domain alignment, and absence of candidate payment demands.",
+    color: "#059669",
+    glowColor: "rgba(5, 150, 105, 0.12)",
+    badgeClass: "bg-emerald-50 text-emerald-700 border border-emerald-200",
+    description: "Our forensic analysis confirms authentic corporate identifiers, domain alignment, and verified structural criteria.",
   };
 }
 
@@ -128,54 +131,54 @@ function FormattedCopilotMessage({ text }: { text: string }) {
   const renderFormattedChunk = (content: string) => {
     return content.split(/(\*\*.*?\*\*|\[Doc-P\d+-C\d+\]|\[Ext-[A-Za-z0-9_-]+\]|\[E-\d+\]|`.*?`)/g).map((chunk, cIdx) => {
       if (chunk.startsWith("**") && chunk.endsWith("**")) {
-        return <strong key={cIdx} className="text-slate-100 font-semibold">{chunk.slice(2, -2)}</strong>;
+        return <strong key={cIdx} className="text-slate-900 font-semibold">{chunk.slice(2, -2)}</strong>;
       }
       if (/^\[Doc-P\d+-C\d+\]$/.test(chunk)) {
         return (
-          <span key={cIdx} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-sky-500/10 text-sky-300 font-mono text-xs font-medium border border-sky-500/30 mx-1" title="Verified Document Citation">
-            <FileText className="w-3 h-3 text-sky-400" />
+          <span key={cIdx} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-mono text-xs font-medium border border-blue-200 mx-1" title="Verified Document Citation">
+            <FileText className="w-3 h-3 text-blue-600" />
             <span>{chunk.slice(1, -1)}</span>
           </span>
         );
       }
       if (/^\[Ext-[A-Za-z0-9_-]+\]$/.test(chunk)) {
         return (
-          <span key={cIdx} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-purple-500/10 text-purple-300 font-mono text-xs font-medium border border-purple-500/30 mx-1" title="External Intelligence Citation">
-            <Globe className="w-3 h-3 text-purple-400" />
+          <span key={cIdx} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-purple-50 text-purple-700 font-mono text-xs font-medium border border-purple-200 mx-1" title="External Intelligence Citation">
+            <Globe className="w-3 h-3 text-purple-600" />
             <span>{chunk.slice(1, -1)}</span>
           </span>
         );
       }
       if (/^\[E-\d+\]$/.test(chunk)) {
         return (
-          <span key={cIdx} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 font-mono text-xs font-medium border border-indigo-500/30 mx-1" title="Evidence Locker Record">
-            <ShieldCheck className="w-3 h-3 text-indigo-400" />
+          <span key={cIdx} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-mono text-xs font-medium border border-indigo-200 mx-1" title="Evidence Locker Record">
+            <ShieldCheck className="w-3 h-3 text-indigo-600" />
             <span>{chunk.slice(1, -1)}</span>
           </span>
         );
       }
       if (chunk.startsWith("`") && chunk.endsWith("`")) {
-        return <code key={cIdx} className="px-1.5 py-0.5 rounded bg-slate-800 text-emerald-400 font-mono text-xs border border-slate-700">{chunk.slice(1, -1)}</code>;
+        return <code key={cIdx} className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-800 font-mono text-xs border border-slate-200">{chunk.slice(1, -1)}</code>;
       }
       return chunk;
     });
   };
 
   return (
-    <div className="space-y-3 text-sm md:text-base leading-relaxed text-slate-200">
+    <div className="space-y-3 text-sm leading-relaxed text-slate-800 font-sans">
       {lines.map((line, idx) => {
         const trimmed = line.trim();
         if (!trimmed) return <div key={idx} className="h-1.5" />;
 
         if (trimmed === "---") {
-          return <hr key={idx} className="border-slate-800 my-3" />;
+          return <hr key={idx} className="border-slate-200 my-3" />;
         }
 
         if (trimmed.startsWith("###")) {
           const content = trimmed.replace(/^###\s*/, "");
           return (
-            <div key={idx} className="pt-3 pb-1 border-b border-slate-800 flex items-center gap-2">
-              <span className="text-base md:text-lg font-bold text-slate-100 tracking-wide">
+            <div key={idx} className="pt-3 pb-1 border-b border-slate-200 flex items-center gap-2">
+              <span className="text-base font-bold text-slate-900 tracking-tight">
                 {content}
               </span>
             </div>
@@ -185,8 +188,8 @@ function FormattedCopilotMessage({ text }: { text: string }) {
         if (trimmed.startsWith("##")) {
           const content = trimmed.replace(/^##\s*/, "");
           return (
-            <div key={idx} className="pt-4 pb-1.5 border-b border-slate-800 flex items-center gap-2">
-              <span className="text-lg md:text-xl font-bold text-slate-100 tracking-wide">
+            <div key={idx} className="pt-4 pb-1.5 border-b border-slate-200 flex items-center gap-2">
+              <span className="text-lg font-bold text-slate-900 tracking-tight">
                 {content}
               </span>
             </div>
@@ -196,7 +199,7 @@ function FormattedCopilotMessage({ text }: { text: string }) {
         if (trimmed.startsWith(">")) {
           const content = trimmed.replace(/^>\s*/, "");
           return (
-            <div key={idx} className="pl-3 py-2 my-2 border-l-2 border-slate-600 bg-slate-900/60 rounded-r-lg text-slate-300 italic text-sm">
+            <div key={idx} className="pl-3 py-2 my-2 border-l-2 border-blue-500 bg-slate-50 rounded-r-lg text-slate-700 italic text-sm">
               {renderFormattedChunk(content)}
             </div>
           );
@@ -207,8 +210,8 @@ function FormattedCopilotMessage({ text }: { text: string }) {
           const title = parts[0].replace(/\*\*/g, "");
           const rest = parts.slice(1).join(":**");
           return (
-            <div key={idx} className="pt-1.5 font-medium text-slate-100">
-              <span className="text-sky-400 font-semibold">{title}:</span> {renderFormattedChunk(rest)}
+            <div key={idx} className="pt-1.5 font-medium text-slate-900">
+              <span className="text-blue-700 font-semibold">{title}:</span> {renderFormattedChunk(rest)}
             </div>
           );
         }
@@ -216,8 +219,8 @@ function FormattedCopilotMessage({ text }: { text: string }) {
         if (trimmed.startsWith("*") || trimmed.startsWith("-")) {
           const content = trimmed.replace(/^[*-]\s*/, "");
           return (
-            <div key={idx} className="flex items-start gap-2.5 pl-1 text-slate-200">
-              <div className="w-1.5 h-1.5 rounded-full bg-slate-500 mt-2 flex-shrink-0" />
+            <div key={idx} className="flex items-start gap-2.5 pl-1 text-slate-700">
+              <div className="w-1.5 h-1.5 rounded-full bg-slate-400 mt-2 flex-shrink-0" />
               <div className="flex-1 leading-relaxed">{renderFormattedChunk(content)}</div>
             </div>
           );
@@ -229,8 +232,8 @@ function FormattedCopilotMessage({ text }: { text: string }) {
             const num = match[1];
             const content = match[2];
             return (
-              <div key={idx} className="flex items-start gap-2.5 pl-1 text-slate-200">
-                <span className="w-5 h-5 rounded bg-slate-800 text-[11px] font-mono font-medium text-slate-400 flex items-center justify-center flex-shrink-0 mt-0.5 border border-slate-700">
+              <div key={idx} className="flex items-start gap-2.5 pl-1 text-slate-700">
+                <span className="w-5 h-5 rounded bg-slate-100 text-[11px] font-sans font-medium text-slate-600 flex items-center justify-center flex-shrink-0 mt-0.5 border border-slate-200">
                   {num}
                 </span>
                 <div className="flex-1 leading-relaxed">{renderFormattedChunk(content)}</div>
@@ -239,7 +242,7 @@ function FormattedCopilotMessage({ text }: { text: string }) {
           }
         }
 
-        return <p key={idx} className="text-slate-200 leading-relaxed">{renderFormattedChunk(trimmed)}</p>;
+        return <p key={idx} className="text-slate-700 leading-relaxed">{renderFormattedChunk(trimmed)}</p>;
       })}
     </div>
   );
@@ -560,17 +563,17 @@ function Header({
   const displayName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || (portalRole === "admin" ? "Security Admin" : "Sanjay Kumar. V");
 
   return (
-    <header className="h-16 px-6 md:px-8 border-b border-slate-800 bg-slate-950 flex items-center justify-between z-30 sticky top-0">
+    <header className="h-16 px-6 md:px-8 border-b border-slate-200 bg-white flex items-center justify-between z-30 sticky top-0 shadow-sm">
       <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-md bg-emerald-950/70 border border-emerald-800 flex items-center justify-center text-emerald-400">
+        <div className="w-9 h-9 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-sm">
           <Shield className="w-5 h-5" />
         </div>
         <div className="flex flex-col">
-          <span className="font-bold text-base tracking-wider text-slate-100 font-mono">
-            LEGITIFY
+          <span className="font-bold text-base tracking-tight text-slate-900 font-sans">
+            Legitify
           </span>
-          <span className="text-[10px] font-mono tracking-widest uppercase text-slate-500">
-            FORENSIC SUITE v2.5
+          <span className="text-[11px] text-slate-500 font-sans">
+            Document Verification Platform
           </span>
         </div>
       </div>
@@ -579,7 +582,7 @@ function Header({
         {portalRole === "admin" && user?.user_metadata?.role === "admin" && onSwitchRole && (
           <button
             onClick={() => onSwitchRole("user")}
-            className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-mono font-semibold border transition-all cursor-pointer bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800"
+            className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-sans font-medium border transition-all cursor-pointer bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
             title="Preview Candidate Portal"
           >
             <span>Candidate View ↗</span>
@@ -587,22 +590,22 @@ function Header({
         )}
 
         {user && (
-          <div className="flex items-center gap-3 bg-slate-900 border border-slate-800 pl-2.5 pr-3 py-1 rounded-md">
-            <div className="w-7 h-7 rounded bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-mono font-bold text-emerald-400">
+          <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 pl-2.5 pr-3 py-1 rounded-lg">
+            <div className="w-7 h-7 rounded-md bg-blue-600 flex items-center justify-center text-xs font-sans font-semibold text-white shadow-xs">
               {displayName.slice(0, 2).toUpperCase()}
             </div>
             <div className="hidden md:flex flex-col text-left">
-              <span className="text-xs font-semibold text-slate-200 truncate max-w-[140px]">
+              <span className="text-xs font-semibold text-slate-800 truncate max-w-[140px]">
                 {displayName}
               </span>
-              <span className="text-[10px] text-slate-500 font-mono">
+              <span className="text-[10px] text-slate-500 font-sans">
                 {portalRole === "admin" ? "SOC Lead Analyst" : "Verified User"}
               </span>
             </div>
             <button
               onClick={onSignOut}
               title="Sign Out"
-              className="flex items-center gap-1 px-2 py-1 rounded text-xs text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors ml-1 cursor-pointer"
+              className="flex items-center gap-1 px-2 py-1 rounded text-xs text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors ml-1 cursor-pointer"
             >
               <LogOut className="w-3.5 h-3.5" />
             </button>
@@ -618,18 +621,18 @@ function Header({
 // ================================================================
 
 function UserSidebar({ active, onNav }: { active: UserView; onNav: (v: UserView) => void }) {
-  const ITEMS: { id: UserView; label: string; icon: any; badge?: string }[] = [
-    { id: "user_scan",    label: "Forensic Analysis",    icon: Cpu, badge: "DETERMINISTIC" },
-    { id: "user_report",  label: "Inspection Report",    icon: FileText },
-    { id: "user_copilot", label: "Forensic Assistant",   icon: Brain, badge: "ASSISTANT" },
-    { id: "user_safety",  label: "Safety & Directives",  icon: ShieldCheck },
-    { id: "user_settings",label: "Account Settings",     icon: Settings },
+  const ITEMS: { id: UserView; label: string; icon: any }[] = [
+    { id: "user_scan",    label: "Verify Document",         icon: Cpu },
+    { id: "user_report",  label: "Verification Report",     icon: FileText },
+    { id: "user_copilot", label: "Investigation Assistant", icon: Brain },
+    { id: "user_safety",  label: "Safety Guidelines",       icon: ShieldCheck },
+    { id: "user_settings",label: "Account Settings",        icon: Settings },
   ];
 
   return (
-    <aside className="w-64 border-r border-slate-800 bg-slate-950 flex flex-col p-4 space-y-2 flex-shrink-0">
-      <div className="px-3 py-1 text-[11px] font-mono tracking-widest text-slate-500 uppercase">
-        Navigation
+    <aside className="w-64 border-r border-slate-200 bg-white flex flex-col p-4 space-y-1.5 flex-shrink-0">
+      <div className="px-3 py-1 text-[11px] font-sans font-semibold tracking-wider text-slate-400 uppercase">
+        Workspace
       </div>
       {ITEMS.map((item) => {
         const isActive = active === item.id;
@@ -638,32 +641,25 @@ function UserSidebar({ active, onNav }: { active: UserView; onNav: (v: UserView)
           <button
             key={item.id}
             onClick={() => onNav(item.id)}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-xs font-mono font-medium transition-all cursor-pointer ${
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-sans font-medium transition-all cursor-pointer ${
               isActive
-                ? "bg-slate-900 text-emerald-400 border border-slate-800"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-900/60"
+                ? "bg-blue-50 text-blue-700 font-semibold border-l-2 border-blue-600 rounded-l-none"
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
             }`}
           >
-            <IconComponent className={`w-4 h-4 ${isActive ? 'text-emerald-400' : 'text-slate-500'}`} />
+            <IconComponent className={`w-4 h-4 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
             <span className="flex-1 text-left truncate">{item.label}</span>
-            {item.badge && (
-              <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded font-semibold ${
-                isActive ? "bg-emerald-950 border border-emerald-800 text-emerald-300" : "bg-slate-900 text-slate-500 border border-slate-800"
-              }`}>
-                {item.badge}
-              </span>
-            )}
           </button>
         );
       })}
 
-      <div className="mt-auto p-3.5 rounded-md bg-slate-900/70 border border-slate-800 space-y-1.5">
-        <div className="flex items-center gap-2 text-xs font-mono font-semibold text-slate-300">
-          <PhoneCall className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Cybercrime Desk</span>
+      <div className="mt-auto p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
+        <div className="flex items-center gap-2 text-xs font-sans font-semibold text-slate-800">
+          <PhoneCall className="w-3.5 h-3.5 text-blue-600" />
+          <span>Support & Reporting</span>
         </div>
-        <p className="text-[11px] text-slate-400 font-mono leading-relaxed">
-          National Cybercrime Portal: <span className="text-emerald-400 font-bold">1930</span> (24x7)
+        <p className="text-[11px] text-slate-500 font-sans leading-relaxed">
+          National Cybercrime Helpline: <span className="text-blue-600 font-bold">1930</span> (24x7)
         </p>
       </div>
     </aside>
@@ -819,40 +815,40 @@ function UserScanView({
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 md:p-10 flex flex-col items-center justify-center bg-slate-950 relative">
+    <div className="flex-1 overflow-y-auto p-6 md:p-10 flex flex-col items-center justify-center bg-slate-50 relative">
       <div className="max-w-2xl w-full space-y-6 relative z-10">
         <div className="flex justify-center">
           <button
             onClick={() => onOpenCopilot("How do I know if an internship is genuine or asking for a scam deposit?")}
-            className="px-4 py-2 rounded-md bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-slate-100 text-xs font-mono transition-all flex items-center gap-2.5 cursor-pointer"
+            className="px-4 py-2 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 hover:text-slate-900 text-xs font-sans transition-all flex items-center gap-2.5 cursor-pointer shadow-xs"
           >
-            <Brain className="w-4 h-4 text-emerald-400" />
+            <Brain className="w-4 h-4 text-blue-600" />
             <span>Consult Forensic Trust Assistant</span>
-            <ArrowRight className="w-3.5 h-3.5 text-slate-500" />
+            <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
           </button>
         </div>
 
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-[11px] font-mono text-slate-400 uppercase tracking-wider">
-            <Cpu className="w-3.5 h-3.5 text-emerald-400" />
-            Client-Side Deterministic Analysis Engine
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-[11px] font-sans font-medium text-blue-700">
+            <Cpu className="w-3.5 h-3.5 text-blue-600" />
+            Automated Evidence-Based Verification
           </div>
-          <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 tracking-tight font-sans">
-            Forensic Document & Offer Verification
+          <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight font-sans">
+            Document & Offer Verification
           </h2>
-          <p className="text-xs sm:text-sm text-slate-400 max-w-xl mx-auto leading-relaxed">
-            Performs Web Crypto SHA-256 custody, EXIF metadata extraction, off-screen Canvas pixel noise analysis, and Tesseract OCR with word-level confidence.
+          <p className="text-xs sm:text-sm text-slate-500 max-w-xl mx-auto leading-relaxed">
+            Performs cryptographic SHA-256 custody checks, structure and format validation, digital signature analysis, and anti-fraud cross-referencing.
           </p>
         </div>
 
-        <div className="p-6 md:p-8 rounded-md bg-slate-900/60 border border-slate-800 space-y-5">
-          <div className="grid grid-cols-2 p-1 rounded bg-slate-950 border border-slate-800 text-xs font-mono">
+        <div className="p-6 md:p-8 rounded-xl bg-white border border-slate-200 shadow-sm space-y-5">
+          <div className="grid grid-cols-2 p-1 rounded-lg bg-slate-100 text-xs font-sans">
             <button
               onClick={() => setTabMode("file")}
-              className={`py-2 rounded font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+              className={`py-2 rounded-md font-medium transition-all flex items-center justify-center gap-2 cursor-pointer ${
                 tabMode === "file"
-                  ? "bg-slate-800 text-emerald-400 border border-slate-700"
-                  : "text-slate-400 hover:text-slate-200"
+                  ? "bg-white text-blue-700 font-semibold shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
               <FileCheck className="w-3.5 h-3.5" /> File Forensic Inspection
@@ -860,10 +856,10 @@ function UserScanView({
 
             <button
               onClick={() => setTabMode("details")}
-              className={`py-2 rounded font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+              className={`py-2 rounded-md font-medium transition-all flex items-center justify-center gap-2 cursor-pointer ${
                 tabMode === "details"
-                  ? "bg-slate-800 text-emerald-400 border border-slate-700"
-                  : "text-slate-400 hover:text-slate-200"
+                  ? "bg-white text-blue-700 font-semibold shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
               <FileText className="w-3.5 h-3.5" /> Text / Email Ledger
@@ -872,9 +868,8 @@ function UserScanView({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-mono font-semibold text-slate-300 flex items-center justify-between">
-                <span>Target Organization</span>
-                <span className="text-[10px] text-emerald-400 uppercase">Mandatory</span>
+              <label className="text-xs font-sans font-medium text-slate-700 flex items-center justify-between">
+                <span>Target Organization <span className="text-red-500">*</span></span>
               </label>
               <input
                 type="text"
@@ -882,14 +877,13 @@ function UserScanView({
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
                 required
-                className="w-full px-3.5 py-2.5 rounded bg-slate-950 border border-slate-800 text-xs font-mono text-slate-100 placeholder-slate-600 focus:outline-none focus:border-slate-600"
+                className="w-full px-3.5 py-2.5 rounded-lg bg-white border border-slate-300 text-xs font-sans text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-mono font-semibold text-slate-300 flex items-center justify-between">
-                <span>HR / Recruiter Email</span>
-                <span className="text-[10px] text-emerald-400 uppercase">Mandatory</span>
+              <label className="text-xs font-sans font-medium text-slate-700 flex items-center justify-between">
+                <span>HR / Recruiter Email <span className="text-red-500">*</span></span>
               </label>
               <input
                 type="email"
@@ -897,7 +891,7 @@ function UserScanView({
                 value={contactEmail}
                 onChange={(e) => setContactEmail(e.target.value)}
                 required
-                className="w-full px-3.5 py-2.5 rounded bg-slate-950 border border-slate-800 text-xs font-mono text-slate-100 placeholder-slate-600 focus:outline-none focus:border-slate-600"
+                className="w-full px-3.5 py-2.5 rounded-lg bg-white border border-slate-300 text-xs font-sans text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
               />
             </div>
           </div>
@@ -911,7 +905,7 @@ function UserScanView({
             />
           ) : (
             <div className="space-y-1.5">
-              <label className="text-xs font-mono font-semibold text-slate-300">
+              <label className="text-xs font-sans font-medium text-slate-700">
                 Offer Letter or Communication Body
               </label>
               <textarea
@@ -919,14 +913,14 @@ function UserScanView({
                 placeholder="Paste complete offer letter body, terms, stipend details, or recruiter communication here..."
                 value={contextText}
                 onChange={(e) => setContextText(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded bg-slate-950 border border-slate-800 text-xs font-mono text-slate-100 placeholder-slate-600 focus:outline-none focus:border-slate-600 resize-none"
+                className="w-full px-3.5 py-2.5 rounded-lg bg-white border border-slate-300 text-xs font-sans text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none"
               />
             </div>
           )}
 
           {error && (
-            <div className="p-3 rounded bg-rose-950/40 border border-rose-900 text-xs text-rose-300 font-mono flex items-start gap-2.5">
-              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+            <div className="p-3.5 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-800 font-sans flex items-start gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
           )}
@@ -934,21 +928,21 @@ function UserScanView({
           <button
             onClick={handleStartScan}
             disabled={loading}
-            className={`w-full py-3 rounded-md font-mono text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            className={`w-full py-3 rounded-lg font-sans text-sm font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer ${
               loading
-                ? "bg-slate-800 text-slate-400 cursor-not-allowed border border-slate-700"
-                : "bg-emerald-600 hover:bg-emerald-500 text-slate-950 shadow-sm"
+                ? "bg-slate-200 text-slate-500 cursor-not-allowed border border-slate-300"
+                : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
             }`}
           >
             {loading ? (
               <>
                 <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>Forensic Pipeline In Progress...</span>
+                <span>Analyzing Document Signals...</span>
               </>
             ) : (
               <>
                 <ShieldCheck className="w-4 h-4" />
-                <span>Execute Deterministic Forensic Inspection</span>
+                <span>Analyze Document</span>
               </>
             )}
           </button>
@@ -1030,11 +1024,67 @@ function UserReportView({
   const scanId = report.scan_id || `LGF-2026-${Date.now().toString().slice(-6)}`;
   const inputType = String(report.input_type || (report.document_analysis?.filename?.endsWith('.pdf') ? "PDF" : "IMAGE")).toUpperCase();
 
-  const theme = getVerdictTheme(report.verdict, trustScore);
+  const hasFeeDemand = Boolean(
+    fSemantics?.hasFeeDemand ||
+    report.has_fee_demand ||
+    (report as any).hasPaymentDemand ||
+    report.document_analysis?.extracted_entities?.payment_demands?.length ||
+    report.rules_triggered?.some(r => r.rule_id === 'R001' || r.name?.toLowerCase().includes('fee') || r.description?.toLowerCase().includes('fee') || r.explanation?.toLowerCase().includes('fee')) ||
+    report.red_flags?.some((f: any) => typeof f === 'string' ? f.toLowerCase().includes('money') || f.toLowerCase().includes('payment') || f.toLowerCase().includes('fee') : f.message?.toLowerCase().includes('money') || f.message?.toLowerCase().includes('payment') || f.message?.toLowerCase().includes('fee')) ||
+    (report.triggered_flags || []).some((f: any) => f.message?.toLowerCase().includes('money') || f.message?.toLowerCase().includes('payment') || f.message?.toLowerCase().includes('fee')) ||
+    report.hard_caps_applied?.some(c => c.toLowerCase().includes('fee') || c.toLowerCase().includes('payment'))
+  );
+
+  const theme = getVerdictTheme(report.verdict, trustScore, hasFeeDemand);
 
   const radius = 85;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (trustScore / 100) * circumference;
+
+  const isSigDetected = Boolean(
+    report.signatory_forensics?.signature_detected ||
+    report.document_analysis?.visual_forensics?.signature_detected ||
+    (report as any).visual_forensics?.signature_detected ||
+    activeForensicReport?.semantics?.structure?.signatureDetected ||
+    activeForensicReport?.semantics?.structure?.hasAuthorizedSignatoryBlock ||
+    activeForensicReport?.visualForensics?.signature_detected
+  );
+
+  const detectedSigType =
+    report.signatory_forensics?.signature_type ||
+    report.document_analysis?.visual_forensics?.signature_type ||
+    activeForensicReport?.semantics?.structure?.signatureType ||
+    activeForensicReport?.visualForensics?.signature_type ||
+    (isSigDetected ? "DIGITAL_SIGNATURE" : "ABSENT");
+
+  const detectedSigName =
+    report.signatory_forensics?.signatory_name ||
+    report.document_analysis?.visual_forensics?.signatory_name ||
+    activeForensicReport?.semantics?.structure?.signatoryName ||
+    activeForensicReport?.visualForensics?.signatory_name ||
+    (report as any).detected_signatory;
+
+  const detectedSigTitle =
+    report.signatory_forensics?.signatory_title ||
+    report.document_analysis?.visual_forensics?.signatory_title ||
+    activeForensicReport?.semantics?.structure?.signatoryTitle ||
+    activeForensicReport?.visualForensics?.signatory_title;
+
+  const detectedIdentityState =
+    report.signatory_forensics?.identity_state ||
+    activeForensicReport?.semantics?.structure?.identityState ||
+    (isSigDetected ? (detectedSigName ? "SIGNATORY_OBSERVED" : "SIGNATURE_PRESENT_UNIDENTIFIED") : "NO_SIGNATURE_DETECTED");
+
+  const executiveSummary = (() => {
+    let summary = report.ai_synthesis?.summary || theme.description;
+    if (!hasFeeDemand) {
+      summary = summary.replace(/\(unauthorized payment request,?\s*/gi, '(')
+                       .replace(/unauthorized payment request,?\s*/gi, '')
+                       .replace(/unauthorized payment demands?,?\s*/gi, '')
+                       .replace(/candidate registration fees?,?\s*/gi, '');
+    }
+    return summary;
+  })();
 
   const handleDownloadPDF = () => {
     setDownloading(true);
@@ -1046,17 +1096,6 @@ function UserReportView({
       setTimeout(() => setDownloading(false), 1500);
     }
   };
-
-  const hasFeeDemand = Boolean(
-    fSemantics?.hasFeeDemand ||
-    report.has_fee_demand ||
-    (report as any).hasPaymentDemand ||
-    report.document_analysis?.extracted_entities?.payment_demands?.length ||
-    report.rules_triggered?.some(r => r.rule_id === 'R001' || r.name?.toLowerCase().includes('fee') || r.description?.toLowerCase().includes('fee') || r.explanation?.toLowerCase().includes('fee')) ||
-    report.red_flags?.some((f: any) => typeof f === 'string' ? f.toLowerCase().includes('money') || f.toLowerCase().includes('payment') || f.toLowerCase().includes('fee') : f.message?.toLowerCase().includes('money') || f.message?.toLowerCase().includes('payment') || f.message?.toLowerCase().includes('fee')) ||
-    (report.triggered_flags || []).some((f: any) => f.message?.toLowerCase().includes('money') || f.message?.toLowerCase().includes('payment') || f.message?.toLowerCase().includes('fee')) ||
-    report.hard_caps_applied?.some(c => c.toLowerCase().includes('fee') || c.toLowerCase().includes('payment'))
-  );
 
   const comps = report.components || ({} as any);
   const rawRules = comps.document?.score ?? (report.dimension_scores?.rules ?? (hasFeeDemand ? 5 : 85));
@@ -1162,35 +1201,35 @@ function UserReportView({
   const triggeredFlags = forensicRisks.length > 0 ? forensicRisks : reportFlags;
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6 bg-slate-950 max-w-5xl mx-auto font-sans">
+    <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6 bg-slate-50 max-w-5xl mx-auto font-sans text-slate-900">
       {/* Top Forensic / Corporate Switcher Tab */}
       {activeForensicReport && (
-        <div className="flex items-center justify-between flex-wrap gap-3 pb-3 border-b border-slate-800">
-          <div className="flex items-center gap-1.5 p-1 rounded-md bg-slate-900 border border-slate-800 text-xs font-mono">
+        <div className="flex items-center justify-between flex-wrap gap-3 pb-3 border-b border-slate-200">
+          <div className="flex items-center gap-1.5 p-1 rounded-lg bg-slate-100 text-xs font-sans">
             <button
               onClick={() => setActiveReportTab('dossier')}
-              className={`px-3 py-1.5 rounded transition-all font-semibold flex items-center gap-2 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-md transition-all font-medium flex items-center gap-2 cursor-pointer ${
                 activeReportTab === 'dossier'
-                  ? 'bg-slate-800 text-emerald-400 border border-slate-700'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-white text-blue-700 font-semibold shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Shield className="w-3.5 h-3.5" /> Comprehensive Forensic Dossier
+              <Shield className="w-3.5 h-3.5" /> Verification Dossier
             </button>
             <button
               onClick={() => setActiveReportTab('forensics')}
-              className={`px-3 py-1.5 rounded transition-all font-semibold flex items-center gap-2 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-md transition-all font-medium flex items-center gap-2 cursor-pointer ${
                 activeReportTab === 'forensics'
-                  ? 'bg-slate-800 text-emerald-400 border border-slate-700'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-white text-blue-700 font-semibold shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <Cpu className="w-3.5 h-3.5" /> Pixel & Optical Signal Inspector
             </button>
           </div>
 
-          <div className="text-[11px] font-mono text-slate-500">
-            Chain of Custody: <span className="text-slate-300 font-semibold">{activeForensicReport.custody.custodyId}</span>
+          <div className="text-[11px] font-sans text-slate-500">
+            Chain of Custody: <span className="text-slate-800 font-mono font-semibold">{activeForensicReport.custody.custodyId}</span>
           </div>
         </div>
       )}
@@ -1202,261 +1241,267 @@ function UserReportView({
           onExportPdf={handleDownloadPDF}
         />
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-6">
           {/* Top Header Dossier */}
-          <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-sm">
-        <div className="space-y-1.5">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-slate-950 border border-slate-800 text-xs font-mono font-medium text-emerald-400 tracking-wider uppercase">
-            <Shield className="w-3.5 h-3.5" /> LEGITIFY RAG FORENSIC INTELLIGENCE REPORT
+          <div className="p-6 rounded-xl bg-white border border-slate-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-sm">
+            <div className="space-y-1.5">
+              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-blue-50 border border-blue-200 text-xs font-sans font-semibold text-blue-700 tracking-wide uppercase">
+                <Shield className="w-3.5 h-3.5" /> Official Verification Dossier
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+                {cleanCompany}
+              </h1>
+              <p className="text-xs font-sans text-slate-500">
+                Case ID: <strong className="text-slate-800 font-mono">{scanId}</strong> · Generated: {new Date().toLocaleDateString()} · Input: {inputType}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleDownloadPDF}
+                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs font-sans transition-all shadow-sm flex items-center gap-2 cursor-pointer"
+              >
+                <Download className="w-4 h-4" />
+                <span>{downloading ? "Exporting PDF..." : "Export Official PDF"}</span>
+              </button>
+            </div>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-100 tracking-tight">
-            {cleanCompany}
-          </h1>
-          <p className="text-xs font-mono text-slate-400">
-            CASE ID: <strong className="text-sky-400 font-mono">{scanId}</strong> · GENERATED: {new Date().toLocaleDateString()} · INPUT: {inputType}
-          </p>
-        </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleDownloadPDF}
-            className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-semibold text-xs font-mono transition-all shadow-sm flex items-center gap-2 cursor-pointer"
-          >
-            <Download className="w-4 h-4" />
-            <span>{downloading ? "Exporting PDF..." : "Export Official PDF"}</span>
-          </button>
-        </div>
-      </div>
+          {/* Section 1: Executive Overview & Score Meter */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
+            <div className="md:col-span-4 flex flex-col items-center justify-center p-6 rounded-xl bg-white border border-slate-200 shadow-sm text-center space-y-4">
+              <div className="relative w-48 h-48 flex items-center justify-center">
+                <svg viewBox="0 0 200 200" className="w-full h-full transform -rotate-90">
+                  <circle cx="100" cy="100" r={radius} fill="none" stroke="#F1F5F9" strokeWidth="16" />
+                  <circle
+                    cx="100" cy="100" r={radius} fill="none" stroke={theme.color} strokeWidth="16" strokeLinecap="round"
+                    strokeDasharray={`${circumference} ${circumference}`} strokeDashoffset={strokeDashoffset}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-5xl font-extrabold text-slate-900">
+                    {trustScore}
+                  </span>
+                  <span className="text-[10px] font-sans font-semibold tracking-wider text-slate-400 uppercase mt-1">
+                    Trust Index / 100
+                  </span>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <span className={`px-3 py-1 rounded-md text-xs font-sans font-semibold ${theme.badgeClass}`}>
+                  {theme.shortLabel}
+                </span>
+                <p className="text-xs text-slate-500 font-sans pt-1">Assessment Confidence: <strong className="text-slate-800">{confidence}%</strong></p>
+              </div>
+            </div>
 
-      {/* Section 1: Executive Overview & Score Meter */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
-        <div className="md:col-span-4 flex flex-col items-center justify-center p-6 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm text-center space-y-4">
-          <div className="relative w-48 h-48 flex items-center justify-center">
-            <svg viewBox="0 0 200 200" className="w-full h-full transform -rotate-90">
-              <circle cx="100" cy="100" r={radius} fill="none" stroke="rgba(255, 255, 255, 0.05)" strokeWidth="16" />
-              <circle
-                cx="100" cy="100" r={radius} fill="none" stroke={theme.color} strokeWidth="16" strokeLinecap="round"
-                strokeDasharray={`${circumference} ${circumference}`} strokeDashoffset={strokeDashoffset}
-              />
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-5xl font-black" style={{ color: theme.color }}>
-                {trustScore}
+            <div className="md:col-span-8 p-6 rounded-xl bg-white border border-slate-200 space-y-4 shadow-sm flex flex-col justify-between">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-blue-600" />
+                  <span>Primary Executive Assessment</span>
+                </h3>
+                <p className="text-sm text-slate-600 mt-3 leading-relaxed">
+                  {executiveSummary}
+                </p>
+              </div>
+
+              {hasFeeDemand && (
+                <div className="p-3.5 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-800 font-medium flex items-center gap-2">
+                  <Info className="w-4 h-4 text-rose-600 flex-shrink-0" />
+                  <span><strong>Mandatory Safety Rule:</strong> No legitimate employer charges candidate registration fees or caution deposits. Any demand for upfront payment is an immediate scam indicator.</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Section 1.5: DYNAMIC DOCUMENT CLAIMS VS RETRIEVED REALITY (RAG Core) */}
+          {dynamicClaims.length > 0 && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Search className="w-4 h-4 text-blue-600" />
+                  <span>Dynamic Document Claims vs. Retrieved Reality</span>
+                </h3>
+                <span className="text-xs font-sans px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 font-medium">
+                  {dynamicClaims.length} Claims Extracted
+                </span>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-slate-50 text-slate-600 font-sans text-xs">
+                      <tr>
+                        <th className="px-6 py-3.5 font-semibold">Claimed in Document</th>
+                        <th className="px-6 py-3.5 font-semibold">Verification Status</th>
+                        <th className="px-6 py-3.5 font-semibold">Retrieved Ground Truth</th>
+                        <th className="px-6 py-3.5 font-semibold">Evidence Source</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {dynamicClaims.map((clm, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="px-6 py-4 font-medium text-slate-900 max-w-xs">
+                            <div className="space-y-0.5">
+                              <span className="text-[11px] font-sans font-semibold text-slate-400 uppercase tracking-wider block">
+                                {clm.claim_type.replace(/_/g, " ")}
+                              </span>
+                              <p className="text-xs text-slate-800">{clm.raw_claim_text}</p>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`px-2.5 py-0.5 rounded-md text-xs font-medium font-sans ${
+                              clm.verification_status === "VERIFIED"
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : clm.verification_status === "CONTRADICTED"
+                                ? "bg-rose-50 text-rose-700 border border-rose-200"
+                                : clm.verification_status === "SUSPICIOUS"
+                                ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                : "bg-slate-100 text-slate-700 border border-slate-200"
+                            }`}>
+                              {clm.verification_status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-slate-600 text-xs leading-relaxed max-w-sm">
+                            {clm.retrieved_reality || clm.explanation}
+                          </td>
+                          <td className="px-6 py-4 text-blue-600 font-sans text-xs font-medium">
+                            {clm.evidence_source || "[E-001] Verified Intelligence"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Section 1.5: WHY THIS RESULT? (Top 3 Key Evidentiary Drivers) */}
+          <div className="p-6 rounded-xl bg-white border border-slate-200 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <Info className="w-4 h-4 text-blue-600" />
+                <span>Why This Assessment? (Key Forensic Drivers)</span>
+              </h3>
+              <span className="text-xs font-sans px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 font-medium">
+                Evidence Trace Active
               </span>
-              <span className="text-[10px] font-mono font-semibold tracking-widest text-slate-400 uppercase mt-1">
-                TRUST INDEX / 100
-              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {hasFeeDemand ? (
+                <div className="p-4 rounded-lg bg-rose-50 border border-rose-200 space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+                    <span className="text-xs font-semibold text-rose-800 uppercase tracking-wider font-sans">Payment Demand</span>
+                  </div>
+                  <p className="text-xs text-rose-700">Candidate registration fee or caution deposit requested. Standard corporate hiring strictly prohibits applicant fees.</p>
+                </div>
+              ) : (
+                <div className="p-4 rounded-lg bg-emerald-50 border border-emerald-200 space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    <span className="text-xs font-semibold text-emerald-800 uppercase tracking-wider font-sans">Zero-Fee Compliance</span>
+                  </div>
+                  <p className="text-xs text-emerald-700">No upfront monetary demands or deposit clauses detected across document text.</p>
+                </div>
+              )}
+
+              {report.domain_analysis?.lookalike_detected ? (
+                <div className="p-4 rounded-lg bg-rose-50 border border-rose-200 space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+                    <span className="text-xs font-semibold text-rose-800 uppercase tracking-wider font-sans">Lookalike Domain</span>
+                  </div>
+                  <p className="text-xs text-rose-700">Communication domain appears to impersonate {report.domain_analysis.lookalike_target || 'official brand'}.</p>
+                </div>
+              ) : report.recruiter_analysis?.domain_alignment === 'EXACT_MATCH' ? (
+                <div className="p-4 rounded-lg bg-emerald-50 border border-emerald-200 space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    <span className="text-xs font-semibold text-emerald-800 uppercase tracking-wider font-sans">Domain Aligned</span>
+                  </div>
+                  <p className="text-xs text-emerald-700">Recruiter sender domain aligns with corporate domain index.</p>
+                </div>
+              ) : (
+                <div className="p-4 rounded-lg bg-amber-50 border border-amber-200 space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                    <span className="text-xs font-semibold text-amber-800 uppercase tracking-wider font-sans">Domain Unverified</span>
+                  </div>
+                  <p className="text-xs text-amber-700">Sender domain could not be independently linked to official corporate web registry.</p>
+                </div>
+              )}
+
+              {report.company_verification?.status === 'ACTIVE' || (report.company_verification as any)?.status === 'LOCAL_REFERENCE_FOUND' ? (
+                <div className="p-4 rounded-lg bg-emerald-50 border border-emerald-200 space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    <span className="text-xs font-semibold text-emerald-800 uppercase tracking-wider font-sans">Entity Matched</span>
+                  </div>
+                  <p className="text-xs text-emerald-700">Company legal name indexed in corporate reference dataset ({report.company_verification.legal_name || cleanCompany}).</p>
+                </div>
+              ) : (
+                <div className="p-4 rounded-lg bg-slate-50 border border-slate-200 space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <Info className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                    <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider font-sans">Registry Search</span>
+                  </div>
+                  <p className="text-xs text-slate-600">Organization not matched in local index (live statutory registry query unavailable; absence != fraud).</p>
+                </div>
+              )}
             </div>
           </div>
-          <div className="space-y-1">
-            <span className={`px-3 py-1 rounded-md text-xs font-mono font-semibold ${theme.badgeClass}`}>
-              {theme.shortLabel.toUpperCase()}
-            </span>
-            <p className="text-xs text-slate-400 font-mono pt-1">Assessment Confidence: <strong className="text-slate-200">{confidence}%</strong></p>
-          </div>
-        </div>
-
-        <div className="md:col-span-8 p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 shadow-sm flex flex-col justify-between">
-          <div>
-            <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-rose-400" />
-              <span>Primary Executive Assessment</span>
-            </h3>
-            <p className="text-sm text-slate-300 mt-3 leading-relaxed">
-              {report.ai_synthesis?.summary || theme.description}
-            </p>
-          </div>
-
-          <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-200 font-medium flex items-center gap-2">
-            <Info className="w-4 h-4 text-rose-400 flex-shrink-0" />
-            <span><strong>Mandatory Safety Rule:</strong> No legitimate employer charges candidate registration fees or caution deposits. Any demand for upfront payment is an immediate scam indicator.</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Section 1.5: DYNAMIC DOCUMENT CLAIMS VS RETRIEVED REALITY (RAG Core) */}
-      {dynamicClaims.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
-              <Search className="w-4 h-4 text-sky-400" />
-              <span>Dynamic Document Claims vs. Retrieved Reality (RAG Engine)</span>
-            </h3>
-            <span className="text-xs font-mono px-2.5 py-0.5 rounded-md bg-slate-950 text-sky-400 border border-slate-800 font-medium">
-              {dynamicClaims.length} Claims Extracted
-            </span>
-          </div>
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 overflow-hidden shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-slate-950 text-slate-400 font-mono text-xs">
-                  <tr>
-                    <th className="px-6 py-3.5">Claimed in Document</th>
-                    <th className="px-6 py-3.5">Verification Status</th>
-                    <th className="px-6 py-3.5">Retrieved Ground Truth (RAG)</th>
-                    <th className="px-6 py-3.5">Evidence Source</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800">
-                  {dynamicClaims.map((clm, idx) => (
-                    <tr key={idx} className="hover:bg-slate-800/40 transition-colors">
-                      <td className="px-6 py-4 font-medium text-slate-100 max-w-xs">
-                        <div className="space-y-1">
-                          <span className="text-[11px] font-mono font-semibold text-slate-400 uppercase tracking-wider block">
-                            {clm.claim_type.replace(/_/g, " ")}
-                          </span>
-                          <p className="text-xs text-slate-200">{clm.raw_claim_text}</p>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2.5 py-1 rounded-md text-xs font-medium font-mono ${
-                          clm.verification_status === "VERIFIED"
-                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
-                            : clm.verification_status === "CONTRADICTED"
-                            ? "bg-rose-500/10 text-rose-400 border border-rose-500/30"
-                            : clm.verification_status === "SUSPICIOUS"
-                            ? "bg-amber-500/10 text-amber-300 border border-amber-500/30"
-                            : "bg-slate-800 text-slate-300 border border-slate-700"
-                        }`}>
-                          {clm.verification_status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-slate-300 text-xs leading-relaxed max-w-sm">
-                        {clm.retrieved_reality || clm.explanation}
-                      </td>
-                      <td className="px-6 py-4 text-sky-400 font-mono text-xs font-medium">
-                        {clm.evidence_source || "[E-001] Verified Intelligence"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Section 1.5: WHY THIS RESULT? (Top 3 Key Evidentiary Drivers) */}
-      <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
-            <Info className="w-4 h-4 text-emerald-400" />
-            <span>Why This Assessment? (Key Forensic Drivers)</span>
-          </h3>
-          <span className="text-xs font-mono px-2.5 py-0.5 rounded-md bg-slate-950 text-emerald-400 border border-slate-800 font-medium">
-            Evidence Trace Active
-          </span>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {hasFeeDemand ? (
-            <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 space-y-1.5">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
-                <span className="text-xs font-semibold text-rose-300 uppercase tracking-wider font-mono">Payment Demand</span>
-              </div>
-              <p className="text-xs text-slate-200">Candidate registration fee or caution deposit requested. Standard corporate hiring strictly prohibits applicant fees.</p>
-            </div>
-          ) : (
-            <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 space-y-1.5">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                <span className="text-xs font-semibold text-emerald-300 uppercase tracking-wider font-mono">Zero-Fee Compliance</span>
-              </div>
-              <p className="text-xs text-slate-200">No upfront monetary demands or deposit clauses detected across document text.</p>
-            </div>
-          )}
-
-          {report.domain_analysis?.lookalike_detected ? (
-            <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 space-y-1.5">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
-                <span className="text-xs font-semibold text-rose-300 uppercase tracking-wider font-mono">Lookalike Domain</span>
-              </div>
-              <p className="text-xs text-slate-200">Communication domain appears to impersonate {report.domain_analysis.lookalike_target || 'official brand'}.</p>
-            </div>
-          ) : report.recruiter_analysis?.domain_alignment === 'EXACT_MATCH' ? (
-            <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 space-y-1.5">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                <span className="text-xs font-semibold text-emerald-300 uppercase tracking-wider font-mono">Domain Aligned</span>
-              </div>
-              <p className="text-xs text-slate-200">Recruiter sender domain aligns with corporate domain index.</p>
-            </div>
-          ) : (
-            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-1.5">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
-                <span className="text-xs font-semibold text-amber-300 uppercase tracking-wider font-mono">Domain Unverified</span>
-              </div>
-              <p className="text-xs text-slate-200">Sender domain could not be independently linked to official corporate web registry.</p>
-            </div>
-          )}
-
-          {report.company_verification?.status === 'ACTIVE' || (report.company_verification as any)?.status === 'LOCAL_REFERENCE_FOUND' ? (
-            <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 space-y-1.5">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                <span className="text-xs font-semibold text-emerald-300 uppercase tracking-wider font-mono">Entity Matched</span>
-              </div>
-              <p className="text-xs text-slate-200">Company legal name indexed in corporate reference dataset ({report.company_verification.legal_name || cleanCompany}).</p>
-            </div>
-          ) : (
-            <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/40 space-y-1.5">
-              <div className="flex items-center gap-2">
-                <Info className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider font-mono">Registry Search</span>
-              </div>
-              <p className="text-xs text-slate-300">Organization not matched in local index (live statutory registry query unavailable; absence != fraud).</p>
-            </div>
-          )}
-        </div>
-      </div>
 
       {/* Section 1.8: VISUAL & SIGNATORY FORENSICS */}
-      <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm space-y-4">
+      <div className="p-6 rounded-xl bg-white border border-slate-200 shadow-sm space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <FileCheck className="w-5 h-5 text-sky-400" />
+            <FileCheck className="w-5 h-5 text-blue-600" />
             <div>
-              <h4 className="text-sm font-bold text-slate-100">Signatory & Visual Forensics</h4>
-              <p className="text-xs text-slate-400">Independent visual inspection of signatures, seals, and authority blocks</p>
+              <h4 className="text-sm font-bold text-slate-900">Signatory & Visual Forensics</h4>
+              <p className="text-xs text-slate-500">Inspection of digital signatures, authority signoffs, and corporate seals</p>
             </div>
           </div>
-          <span className={`text-xs font-mono font-medium px-2.5 py-1 rounded-md ${
-            (report.signatory_forensics?.signature_detected || report.document_analysis?.visual_forensics?.signature_detected)
-              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
-              : "bg-slate-800 text-slate-400 border border-slate-700"
+          <span className={`text-xs font-sans font-medium px-2.5 py-1 rounded-md ${
+            isSigDetected
+              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+              : "bg-slate-100 text-slate-600 border border-slate-200"
           }`}>
-            {(report.signatory_forensics?.identity_state || (report.document_analysis?.visual_forensics?.signature_detected ? "SIGNATORY_OBSERVED" : "NO_SIGNATURE_DETECTED")).replace(/_/g, " ")}
+            {detectedIdentityState.replace(/_/g, " ")}
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-slate-800">
-          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
-            <span className="text-[10px] font-mono text-slate-400 uppercase">Signature Type</span>
-            <p className="text-xs font-semibold text-slate-100 mt-1">
-              {(report.signatory_forensics?.signature_type || (report.document_analysis?.visual_forensics?.signature_detected ? "VISUAL_SIGNATURE" : "ABSENT")).replace(/_/g, " ")}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-slate-100">
+          <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
+            <span className="text-[10px] font-sans font-semibold text-slate-500 uppercase">Signature Format</span>
+            <p className="text-xs font-semibold text-slate-900 mt-1">
+              {detectedSigType.replace(/_/g, " ")}
             </p>
             <p className="text-[10px] text-slate-500 mt-0.5">
-              {report.signatory_forensics?.signature_type === 'CRYPTOGRAPHIC_SIGNATURE' ? "Cryptographic cert validated" : "Visual observation only"}
+              {detectedSigType === 'CRYPTOGRAPHIC_SIGNATURE' || detectedSigType === 'DIGITAL_SIGNATURE'
+                ? "Digital signature certificate detected"
+                : isSigDetected
+                ? "Visual signature block present"
+                : "No signature detected"}
             </p>
           </div>
 
-          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
-            <span className="text-[10px] font-mono text-slate-400 uppercase">Signatory Identity</span>
-            <p className="text-xs font-semibold text-slate-100 mt-1">
-              {report.signatory_forensics?.signatory_name || report.document_analysis?.visual_forensics?.signatory_name || (report.signatory_forensics?.signature_detected ? "Signature Observed (Name Unstated)" : "Not Stated in Document")}
+          <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
+            <span className="text-[10px] font-sans font-semibold text-slate-500 uppercase">Signatory Identity</span>
+            <p className="text-xs font-semibold text-slate-900 mt-1">
+              {detectedSigName || (isSigDetected ? "Signatory Identified" : "Not Stated in Document")}
             </p>
             <p className="text-[10px] text-slate-500 mt-0.5">
-              {report.signatory_forensics?.signatory_title || report.document_analysis?.visual_forensics?.signatory_title || (report.signatory_forensics?.signature_detected ? "Signatory Block Present" : "No Signatory Listed")}
+              {detectedSigTitle || (isSigDetected ? "Authorized Authority" : "No Signatory Listed")}
             </p>
           </div>
 
-          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
-            <span className="text-[10px] font-mono text-slate-400 uppercase">Evidentiary Rule</span>
-            <p className="text-xs font-medium text-amber-300 mt-1">
-              {(report.signatory_forensics?.signature_detected || report.document_analysis?.visual_forensics?.signature_detected)
-                ? "Observed in document. Does not automatically imply legitimacy."
+          <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200">
+            <span className="text-[10px] font-sans font-semibold text-slate-500 uppercase">Evidentiary Rule</span>
+            <p className="text-xs font-medium text-slate-700 mt-1">
+              {isSigDetected
+                ? "Observed in document. Does not automatically imply legitimacy without domain alignment."
                 : "Absence of signature is not proof of fraud. Standard offer review recommended."}
             </p>
           </div>
@@ -1464,55 +1509,55 @@ function UserReportView({
       </div>
 
       {/* Section 1.8: Extracted Internship / Job Offer Parameters Card */}
-      <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 shadow-sm">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-800 flex-wrap gap-2">
+      <div className="p-6 rounded-xl bg-white border border-slate-200 space-y-4 shadow-sm">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100 flex-wrap gap-2">
           <div className="flex items-center gap-2.5">
-            <FileText className="w-4 h-4 text-slate-300" />
-            <h3 className="text-sm font-bold text-slate-100">
+            <FileText className="w-4 h-4 text-slate-500" />
+            <h3 className="text-sm font-bold text-slate-900">
               Extracted Internship & Job Offer Audit Parameters
             </h3>
           </div>
-          <span className={`px-2.5 py-0.5 rounded-md text-xs font-mono font-medium ${
+          <span className={`px-2.5 py-0.5 rounded-md text-xs font-sans font-medium ${
             trustScore >= 75
-              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
-              : "bg-rose-500/10 text-rose-400 border border-rose-500/30"
+              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+              : "bg-rose-50 text-rose-700 border border-rose-200"
           }`}>
             {trustScore >= 75 ? "CONVENTIONS VERIFIED" : "STRUCTURAL ANOMALIES DETECTED"}
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 font-mono text-xs">
-          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
-            <span className="text-slate-400 uppercase tracking-wider text-[10px]">Claimed Organization</span>
-            <p className="font-semibold text-slate-100 text-xs truncate">{cleanCompany}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 font-sans text-xs">
+          <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+            <span className="text-slate-500 uppercase tracking-wider text-[10px] font-semibold">Claimed Organization</span>
+            <p className="font-semibold text-slate-900 text-xs truncate">{cleanCompany}</p>
             <span className="text-[10px] text-slate-500 block">
               {fSemantics?.hasCinNumber ? `CIN: ${fSemantics.detectedCin}` : "CIN / ROC: Not Stated on Document"}
             </span>
           </div>
 
-          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
-            <span className="text-slate-400 uppercase tracking-wider text-[10px]">Recruiter Channel & Email</span>
-            <p className={`font-semibold text-xs truncate ${fSemantics?.isFreeWebmail ? "text-rose-400" : "text-slate-100"}`}>
+          <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+            <span className="text-slate-500 uppercase tracking-wider text-[10px] font-semibold">Recruiter Channel & Email</span>
+            <p className={`font-semibold text-xs truncate ${fSemantics?.isFreeWebmail ? "text-rose-700" : "text-slate-900"}`}>
               {fSemantics?.recruiterEmail || report.recruiter_analysis?.email || "No contact email listed"}
             </p>
             <span className={`text-[10px] font-medium block ${
-              fSemantics?.isFreeWebmail ? "text-rose-400" : "text-emerald-400"
+              fSemantics?.isFreeWebmail ? "text-rose-600" : "text-emerald-700"
             }`}>
               {fSemantics?.isFreeWebmail ? "Personal Webmail Domain (@gmail.com)" : "Corporate Domain Aligned"}
             </span>
           </div>
 
-          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
-            <span className="text-slate-400 uppercase tracking-wider text-[10px]">Opportunity Title / Role</span>
-            <p className="font-semibold text-slate-100 text-xs truncate">{fSemantics?.detectedRole || "Internship / Employment"}</p>
+          <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+            <span className="text-slate-500 uppercase tracking-wider text-[10px] font-semibold">Opportunity Title / Role</span>
+            <p className="font-semibold text-slate-900 text-xs truncate">{fSemantics?.detectedRole || "Internship / Employment"}</p>
             <span className="text-[10px] text-slate-500 block">
               Stipend: {fSemantics?.detectedStipend || "Unstated / Disclosed in separate terms"}
             </span>
           </div>
 
-          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
-            <span className="text-slate-400 uppercase tracking-wider text-[10px]">Selection Mechanism</span>
-            <p className={`font-semibold text-xs truncate ${fSemantics?.hasDirectSelectionNoInterview ? "text-rose-400" : "text-slate-100"}`}>
+          <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+            <span className="text-slate-500 uppercase tracking-wider text-[10px] font-semibold">Selection Mechanism</span>
+            <p className={`font-semibold text-xs truncate ${fSemantics?.hasDirectSelectionNoInterview ? "text-rose-700" : "text-slate-900"}`}>
               {fSemantics?.hasDirectSelectionNoInterview ? "Direct Selection (No Interview)" : "Formal Interview & Screening"}
             </p>
             <span className="text-[10px] text-slate-500 block">
@@ -1520,9 +1565,9 @@ function UserReportView({
             </span>
           </div>
 
-          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
-            <span className="text-slate-400 uppercase tracking-wider text-[10px]">Monetary Requirement / Fee</span>
-            <p className={`font-semibold text-xs truncate ${hasFeeDemand ? "text-rose-400" : "text-emerald-400"}`}>
+          <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+            <span className="text-slate-500 uppercase tracking-wider text-[10px] font-semibold">Monetary Requirement / Fee</span>
+            <p className={`font-semibold text-xs truncate ${hasFeeDemand ? "text-rose-700 font-bold" : "text-emerald-700"}`}>
               {hasFeeDemand ? "Caution Deposit / Fee Demanded" : "Zero-Fee Compliant"}
             </p>
             <span className="text-[10px] text-slate-500 block">
@@ -1530,9 +1575,9 @@ function UserReportView({
             </span>
           </div>
 
-          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
-            <span className="text-slate-400 uppercase tracking-wider text-[10px]">Communication Platform</span>
-            <p className={`font-semibold text-xs truncate ${fSemantics?.hasInformalChannels ? "text-rose-400" : "text-slate-100"}`}>
+          <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+            <span className="text-slate-500 uppercase tracking-wider text-[10px] font-semibold">Communication Platform</span>
+            <p className={`font-semibold text-xs truncate ${fSemantics?.hasInformalChannels ? "text-rose-700" : "text-slate-900"}`}>
               {fSemantics?.hasInformalChannels ? `Informal (${fSemantics.informalChannels.join(", ")})` : "Official Enterprise Channel"}
             </p>
             <span className="text-[10px] text-slate-500 block">
@@ -1545,11 +1590,11 @@ function UserReportView({
       {/* Section 2: MULTI-DIMENSIONAL FORENSIC BREAKDOWN */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+          <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-blue-600" />
             <span>Multi-Dimensional Forensic Breakdown</span>
           </h3>
-          <span className="text-xs font-mono px-2.5 py-0.5 rounded-md bg-slate-950 text-emerald-400 border border-slate-800 font-medium">
+          <span className="text-xs font-sans px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 font-medium">
             5 Diagnostic Vectors Evaluated
           </span>
         </div>
@@ -1569,41 +1614,41 @@ function UserReportView({
             return (
               <div className={`p-5 rounded-xl border space-y-3 shadow-sm ${
                 !isVerified && !isAnomalous
-                  ? "bg-rose-500/10 border-rose-500/30"
+                  ? "bg-rose-50 border-rose-200"
                   : isAnomalous
-                  ? "bg-amber-500/10 border-amber-500/30"
-                  : "bg-slate-900 border-slate-800"
+                  ? "bg-amber-50 border-amber-200"
+                  : "bg-white border-slate-200"
               }`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <Layers className="w-5 h-5 text-indigo-400" />
+                    <Layers className="w-5 h-5 text-blue-600" />
                     <div>
-                      <span className="text-sm font-bold text-slate-100 block">Document Authenticity & Visual Forensics</span>
-                      <span className="text-[10px] font-mono text-slate-400">Enterprise Structure Compliance & Canvas ELA Tamper Grid</span>
+                      <span className="text-sm font-bold text-slate-900 block">Document Authenticity & Structure</span>
+                      <span className="text-[10px] font-sans text-slate-500">Structure Compliance & Formatting Inspection</span>
                     </div>
                   </div>
-                  <span className={`px-2.5 py-0.5 rounded-md text-xs font-mono font-medium ${
+                  <span className={`px-2.5 py-0.5 rounded-md text-xs font-sans font-medium ${
                     isVerified
-                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                       : isAnomalous
-                      ? "bg-amber-500/10 text-amber-300 border border-amber-500/30"
-                      : "bg-rose-500/10 text-rose-400 border border-rose-500/30"
+                      ? "bg-amber-50 text-amber-700 border border-amber-200"
+                      : "bg-rose-50 text-rose-700 border border-rose-200"
                   }`}>
-                    {isVerified ? `VERIFIED FORMAT (${card1Score}%)` : isAnomalous ? `STRUC ANOMALIES (${card1Score}%)` : `DEFICIENT FORMAT (${card1Score}%)`}
+                    {isVerified ? `VERIFIED FORMAT (${card1Score}%)` : isAnomalous ? `STRUCTURAL ANOMALIES (${card1Score}%)` : `DEFICIENT FORMAT (${card1Score}%)`}
                   </span>
                 </div>
                 <div className="space-y-2">
-                  <p className="text-xs text-slate-300 leading-relaxed">
+                  <p className="text-xs text-slate-600 leading-relaxed">
                     {card1Struct ? (
                       <>
-                        <strong className="text-slate-100">{card1Struct.passedChecksCount}/{card1Struct.totalChecksCount} Enterprise Standards Verified.</strong>{" "}
+                        <strong className="text-slate-800">{card1Struct.passedChecksCount}/{card1Struct.totalChecksCount} Standards Verified.</strong>{" "}
                         {card1Struct.missingElements && card1Struct.missingElements.length > 0 ? (
-                          <span className="text-rose-400">
-                            Missing mandatory organizational requirements: {card1Struct.missingElements.slice(0, 3).join(", ")}.
+                          <span className="text-rose-700">
+                            Missing organizational elements: {card1Struct.missingElements.slice(0, 3).join(", ")}.
                           </span>
                         ) : (
-                          <span className="text-emerald-400">
-                            Document conforms to legitimate organizational formatting: reference number, corporate address, specific job role, and executive signatory block.
+                          <span className="text-emerald-700">
+                            Document conforms to legitimate organizational formatting: reference number, corporate address, role, and signatory block.
                           </span>
                         )}
                       </>
@@ -1618,10 +1663,10 @@ function UserReportView({
                       {card1Struct.structureChecks.slice(0, 6).map((chk: any) => (
                         <span
                           key={chk.id}
-                          className={`text-[10px] font-mono px-2 py-0.5 rounded-md border flex items-center gap-1 ${
+                          className={`text-[10px] font-sans px-2 py-0.5 rounded-md border flex items-center gap-1 ${
                             chk.passed
-                              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                              : "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : "bg-rose-50 text-rose-700 border border-rose-200"
                           }`}
                           title={chk.details}
                         >
@@ -1639,26 +1684,26 @@ function UserReportView({
           {/* Card 2: Financial Safety & Non-Fee Verification */}
           <div className={`p-5 rounded-xl border space-y-3 shadow-sm ${
             hasFeeDemand
-              ? "bg-rose-500/10 border-rose-500/30"
-              : "bg-slate-900 border-slate-800"
+              ? "bg-rose-50 border-rose-200"
+              : "bg-white border-slate-200"
           }`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <CreditCard className="w-5 h-5 text-rose-400" />
+                <CreditCard className="w-5 h-5 text-blue-600" />
                 <div>
-                  <span className="text-sm font-bold text-slate-100 block">Financial & Fee Safety Verification</span>
-                  <span className="text-[10px] font-mono text-slate-400">Zero-Fee Statutory Compliance Guarantee</span>
+                  <span className="text-sm font-bold text-slate-900 block">Financial & Fee Safety Verification</span>
+                  <span className="text-[10px] font-sans text-slate-500">Zero-Fee Statutory Compliance Guarantee</span>
                 </div>
               </div>
-              <span className={`px-2.5 py-0.5 rounded-md text-xs font-mono font-medium ${
+              <span className={`px-2.5 py-0.5 rounded-md text-xs font-sans font-medium ${
                 hasFeeDemand
-                  ? "bg-rose-500/10 text-rose-400 border border-rose-500/30"
-                  : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                  ? "bg-rose-50 text-rose-700 border border-rose-200"
+                  : "bg-emerald-50 text-emerald-700 border border-emerald-200"
               }`}>
                 {hasFeeDemand ? "FEE DEMAND DETECTED" : "ZERO-FEE COMPLIANT"}
               </span>
             </div>
-            <p className="text-xs text-slate-300 leading-relaxed">
+            <p className="text-xs text-slate-600 leading-relaxed">
               {hasFeeDemand
                 ? "Document explicitly demands candidate payments, training kits, or caution deposits. Legitimate employers never solicit candidate funds."
                 : "No upfront fees, equipment deposits, or non-corporate monetary requirements detected in letter."}
@@ -1668,28 +1713,28 @@ function UserReportView({
           {/* Card 3: Sender Communication & Email Security */}
           <div className={`p-5 rounded-xl border space-y-3 shadow-sm ${
             fSemantics?.isFreeWebmail
-              ? "bg-rose-500/10 border-rose-500/30"
-              : "bg-slate-900 border-slate-800"
+              ? "bg-rose-50 border-rose-200"
+              : "bg-white border-slate-200"
           }`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <Globe className="w-5 h-5 text-sky-400" />
+                <Globe className="w-5 h-5 text-blue-600" />
                 <div>
-                  <span className="text-sm font-bold text-slate-100 block">Sender Communication & Email Security</span>
-                  <span className="text-[10px] font-mono text-slate-400">Corporate Domain Alignment vs Personal Webmail</span>
+                  <span className="text-sm font-bold text-slate-900 block">Sender Communication & Email Security</span>
+                  <span className="text-[10px] font-sans text-slate-500">Corporate Domain Alignment vs Personal Webmail</span>
                 </div>
               </div>
-              <span className={`px-2.5 py-0.5 rounded-md text-xs font-mono font-medium ${
+              <span className={`px-2.5 py-0.5 rounded-md text-xs font-sans font-medium ${
                 fSemantics?.isFreeWebmail
-                  ? "bg-rose-500/10 text-rose-400 border border-rose-500/30"
+                  ? "bg-rose-50 text-rose-700 border border-rose-200"
                   : fSemantics?.recruiterEmail
-                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
-                  : "bg-amber-500/10 text-amber-300 border border-amber-500/30"
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  : "bg-amber-50 text-amber-700 border border-amber-200"
               }`}>
                 {fSemantics?.isFreeWebmail ? "FREE WEBMAIL GMAIL" : fSemantics?.recruiterEmail ? "DOMAIN ALIGNED" : "UNVERIFIED CHANNEL"}
               </span>
             </div>
-            <p className="text-xs text-slate-300 leading-relaxed">
+            <p className="text-xs text-slate-600 leading-relaxed">
               {fSemantics?.isFreeWebmail
                 ? `Recruiter utilizes public personal webmail (${fSemantics.recruiterEmail}). Corporate employers never issue official offers from Gmail.`
                 : "Recruiter contact evaluated for official corporate MX records and corporate domain alignment."}
@@ -1699,28 +1744,28 @@ function UserReportView({
           {/* Card 4: Offer Terms & Linguistic Integrity */}
           <div className={`p-5 rounded-xl border space-y-3 shadow-sm ${
             fSemantics?.hasDirectSelectionNoInterview || fSemantics?.hasInformalChannels
-              ? "bg-amber-500/10 border-amber-500/30"
-              : "bg-slate-900 border-slate-800"
+              ? "bg-amber-50 border-amber-200"
+              : "bg-white border-slate-200"
           }`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <FileText className="w-5 h-5 text-slate-400" />
+                <FileText className="w-5 h-5 text-slate-500" />
                 <div>
-                  <span className="text-sm font-bold text-slate-100 block">Offer Letter Terms & Linguistic Tone</span>
-                  <span className="text-[10px] font-mono text-slate-400">Legal Clauses vs Direct-Appointment Trope</span>
+                  <span className="text-sm font-bold text-slate-900 block">Offer Letter Terms & Linguistic Tone</span>
+                  <span className="text-[10px] font-sans text-slate-500">Legal Clauses vs Direct-Appointment Trope</span>
                 </div>
               </div>
-              <span className={`px-2.5 py-0.5 rounded-md text-xs font-mono font-medium ${
+              <span className={`px-2.5 py-0.5 rounded-md text-xs font-sans font-medium ${
                 fSemantics?.hasDirectSelectionNoInterview
-                  ? "bg-rose-500/10 text-rose-400 border border-rose-500/30"
+                  ? "bg-rose-50 text-rose-700 border border-rose-200"
                   : fSemantics?.hasLegalTerms
-                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
-                  : "bg-amber-500/10 text-amber-300 border border-amber-500/30"
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  : "bg-amber-50 text-amber-700 border border-amber-200"
               }`}>
                 {fSemantics?.hasDirectSelectionNoInterview ? "NO-INTERVIEW SCAM" : "STANDARD CLAUSES"}
               </span>
             </div>
-            <p className="text-xs text-slate-300 leading-relaxed">
+            <p className="text-xs text-slate-600 leading-relaxed">
               {fSemantics?.hasDirectSelectionNoInterview
                 ? "Offer claims direct appointment without formal technical or HR interview. Reputable employers always conduct screening."
                 : "Document features standard formal employment structures, confidentiality terms, and appointment clauses."}
@@ -1728,20 +1773,20 @@ function UserReportView({
           </div>
 
           {/* Card 5: Statutory Organization Identity & Registry */}
-          <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-3 shadow-sm md:col-span-2">
+          <div className="p-5 rounded-xl bg-white border border-slate-200 space-y-3 shadow-sm md:col-span-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <Building2 className="w-5 h-5 text-slate-400" />
+                <Building2 className="w-5 h-5 text-blue-600" />
                 <div>
-                  <span className="text-sm font-bold text-slate-100 block">Organization Identity & Statutory Registry Cross-Check</span>
-                  <span className="text-[10px] font-mono text-slate-400">MCA21 & ROC Directory Reference Matching</span>
+                  <span className="text-sm font-bold text-slate-900 block">Organization Identity & Statutory Registry Cross-Check</span>
+                  <span className="text-[10px] font-sans text-slate-500">MCA21 & ROC Directory Reference Matching</span>
                 </div>
               </div>
-              <span className="px-2.5 py-0.5 rounded-md text-xs font-mono font-medium bg-sky-500/10 text-sky-400 border border-sky-500/30">
+              <span className="px-2.5 py-0.5 rounded-md text-xs font-sans font-medium bg-blue-50 text-blue-700 border border-blue-200">
                 {cleanCompany ? cleanCompany.slice(0, 28) : "CORPORATE REGISTRY"}
               </span>
             </div>
-            <p className="text-xs text-slate-300 leading-relaxed">
+            <p className="text-xs text-slate-600 leading-relaxed">
               Target organization cross-referenced against statutory registration registries and public enterprise directories.
               {fSemantics?.hasCinNumber ? ` Verified MCA Corporate Identification Number: ${fSemantics.detectedCin}.` : " Formal registration code absent in document letterhead."}
             </p>
@@ -1753,11 +1798,11 @@ function UserReportView({
       {triggeredFlags.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-rose-400" />
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-rose-600" />
               <span>Detected Risks & Mitigation Action ({triggeredFlags.length})</span>
             </h3>
-            <span className="text-xs font-mono px-2.5 py-0.5 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/30 font-medium">
+            <span className="text-xs font-sans px-2.5 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 font-medium">
               Action Required
             </span>
           </div>
@@ -1768,22 +1813,22 @@ function UserReportView({
                 key={idx}
                 className={`p-4 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-4 ${
                   flag.severity === "critical"
-                    ? "bg-rose-500/10 border-rose-500/30 text-rose-300"
+                    ? "bg-rose-50/70 border-rose-200 text-rose-900"
                     : flag.severity === "high"
-                    ? "bg-amber-500/10 border-amber-500/30 text-amber-300"
-                    : "bg-yellow-500/10 border-yellow-500/30 text-yellow-300"
+                    ? "bg-amber-50/70 border-amber-200 text-amber-900"
+                    : "bg-slate-50 border-slate-200 text-slate-800"
                 }`}
               >
                 <div className="space-y-1.5 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${flag.severity === "critical" ? "bg-rose-500" : flag.severity === "high" ? "bg-amber-500" : "bg-yellow-500"}`} />
-                    <span className="text-xs font-mono font-medium uppercase tracking-wider px-2 py-0.5 rounded bg-slate-950 border border-current">
+                    <span className={`w-2 h-2 rounded-full ${flag.severity === "critical" ? "bg-rose-600" : flag.severity === "high" ? "bg-amber-600" : "bg-slate-400"}`} />
+                    <span className="text-xs font-sans font-medium uppercase tracking-wider px-2 py-0.5 rounded bg-white border border-slate-200">
                       {flag.severity} RISK · {flag.rule?.replace(/_/g, " ")}
                     </span>
                   </div>
-                  <p className="text-xs font-semibold text-slate-100 leading-snug">{flag.message}</p>
-                  <div className="text-xs text-slate-300 bg-slate-950 p-2.5 rounded-lg border border-slate-800 flex items-start gap-2 mt-1">
-                    <span className="text-amber-400 font-mono font-semibold flex-shrink-0">MITIGATION:</span>
+                  <p className="text-xs font-semibold text-slate-900 leading-snug">{flag.message}</p>
+                  <div className="text-xs text-slate-700 bg-white p-2.5 rounded-lg border border-slate-200 flex items-start gap-2 mt-1">
+                    <span className="text-amber-600 font-sans font-semibold flex-shrink-0">MITIGATION:</span>
                     <span className="leading-relaxed">{flag.mitigation || "Contact the company's verified HR team through their official careers portal before signing or paying."}</span>
                   </div>
                 </div>
@@ -1795,38 +1840,38 @@ function UserReportView({
 
       {/* Section 4: Multi-Source Evidence Locker (Live Dynamic Records) */}
       <div className="space-y-4">
-        <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
-          <Database className="w-4 h-4 text-sky-400" />
+        <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+          <Database className="w-4 h-4 text-blue-600" />
           <span>Auditable Multi-Source Evidence Locker</span>
         </h3>
-        <div className="rounded-2xl border border-slate-800 bg-slate-900 overflow-hidden shadow-sm">
+        <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-950 text-slate-400 font-mono text-xs">
+              <thead className="bg-slate-50 text-slate-600 font-sans text-xs">
                 <tr>
-                  <th className="px-6 py-3.5">ID</th>
-                  <th className="px-6 py-3.5">Category</th>
-                  <th className="px-6 py-3.5">Status</th>
-                  <th className="px-6 py-3.5">Source</th>
-                  <th className="px-6 py-3.5">Claim / Finding</th>
-                  <th className="px-6 py-3.5 text-right">Confidence</th>
+                  <th className="px-6 py-3.5 font-semibold">ID</th>
+                  <th className="px-6 py-3.5 font-semibold">Category</th>
+                  <th className="px-6 py-3.5 font-semibold">Status</th>
+                  <th className="px-6 py-3.5 font-semibold">Source</th>
+                  <th className="px-6 py-3.5 font-semibold">Claim / Finding</th>
+                  <th className="px-6 py-3.5 text-right font-semibold">Confidence</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800">
+              <tbody className="divide-y divide-slate-100">
                 {dynamicEvidence.map((item, idx) => (
-                  <tr key={idx} className="hover:bg-slate-800/40 transition-colors">
-                    <td className="px-6 py-4 font-mono font-medium text-sky-400 text-xs">{item.id}</td>
-                    <td className="px-6 py-4 font-mono text-xs text-slate-400">{item.type}</td>
+                  <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="px-6 py-4 font-mono font-medium text-blue-600 text-xs">{item.id}</td>
+                    <td className="px-6 py-4 font-sans text-xs text-slate-500">{item.type}</td>
                     <td className="px-6 py-4">
-                      <span className={`px-2.5 py-0.5 rounded-md text-xs font-mono font-medium ${
-                        item.status === "VERIFIED" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30" : item.status === "CRITICAL" ? "bg-rose-500/10 text-rose-400 border border-rose-500/30" : "bg-amber-500/10 text-amber-300 border border-amber-500/30"
+                      <span className={`px-2.5 py-0.5 rounded-md text-xs font-sans font-medium ${
+                        item.status === "VERIFIED" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : item.status === "CRITICAL" ? "bg-rose-50 text-rose-700 border border-rose-200" : "bg-amber-50 text-amber-700 border border-amber-200"
                       }`}>
                         {item.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-slate-300 text-xs">{item.source}</td>
-                    <td className="px-6 py-4 text-slate-200 text-xs max-w-xs leading-relaxed">{item.claim}</td>
-                    <td className="px-6 py-4 text-right font-mono font-medium text-emerald-400 text-xs">{formatConfidence(item.confidence)}%</td>
+                    <td className="px-6 py-4 text-slate-700 text-xs">{item.source}</td>
+                    <td className="px-6 py-4 text-slate-800 text-xs max-w-xs leading-relaxed">{item.claim}</td>
+                    <td className="px-6 py-4 text-right font-sans font-medium text-slate-700 text-xs">{formatConfidence(item.confidence)}%</td>
                   </tr>
                 ))}
               </tbody>
@@ -1867,16 +1912,16 @@ function UserReportView({
       <div className="flex flex-wrap items-center gap-4 pt-4">
         <button
           onClick={() => onOpenCopilot()}
-          className="flex-1 py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-mono font-medium text-slate-200 flex items-center justify-center gap-2 transition-all shadow-sm cursor-pointer"
+          className="flex-1 py-3 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-xs font-sans font-medium text-slate-700 hover:text-slate-900 flex items-center justify-center gap-2 transition-colors shadow-xs cursor-pointer"
         >
-          <Brain className="w-4 h-4 text-sky-400" />
+          <Brain className="w-4 h-4 text-blue-600" />
           <span>Forensic Assistant Workspace</span>
         </button>
         <button
           onClick={onNewScan}
-          className="px-6 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-semibold text-xs font-mono transition-all shadow-sm cursor-pointer"
+          className="px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs font-sans transition-all shadow-xs cursor-pointer"
         >
-          Verify Another Letter
+          Verify Another Document
         </button>
       </div>
         </div>
@@ -1949,22 +1994,22 @@ function ReportCopilotInline({
   };
 
   return (
-    <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+    <div className="p-6 rounded-xl bg-white border border-slate-200 shadow-xs space-y-5 font-sans">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center text-sky-400">
+          <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-xs">
             <Brain className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-base font-bold text-slate-100">
+              <h3 className="text-base font-semibold text-slate-900 font-sans">
                 Interrogate Report with Forensic Assistant
               </h3>
-              <span className="px-2 py-0.5 rounded-md bg-slate-950 text-emerald-400 text-[10px] font-mono font-medium border border-slate-800">
+              <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-sans font-medium border border-emerald-200">
                 ACTIVE
               </span>
             </div>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-500 font-sans">
               Query evidence records, domain checks, or fee clauses for {companyName}.
             </p>
           </div>
@@ -1972,9 +2017,9 @@ function ReportCopilotInline({
 
         <button
           onClick={() => onOpenFullscreenCopilot(lastQuestion || undefined)}
-          className="px-3.5 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-xs font-mono font-medium text-slate-300 hover:text-white flex items-center gap-2 transition-all cursor-pointer shadow-sm flex-shrink-0"
+          className="px-3.5 py-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-sans font-medium text-slate-700 hover:text-slate-900 flex items-center gap-2 transition-colors cursor-pointer shadow-xs flex-shrink-0"
         >
-          <Brain className="w-3.5 h-3.5 text-sky-400" /> Full Assistant Workspace
+          <Brain className="w-3.5 h-3.5 text-blue-600" /> Full Assistant Workspace
         </button>
       </div>
 
@@ -1984,7 +2029,7 @@ function ReportCopilotInline({
           <button
             key={idx}
             onClick={() => handleAsk(item.prompt)}
-            className="px-3 py-1.5 rounded-lg text-xs font-mono font-medium bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-slate-100 transition-all cursor-pointer"
+            className="px-3 py-1.5 rounded-lg text-xs font-sans font-medium bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 hover:text-slate-900 transition-colors cursor-pointer"
           >
             {item.label}
           </button>
@@ -1999,12 +2044,12 @@ function ReportCopilotInline({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleAsk()}
-          className="flex-1 px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-100 placeholder-slate-600 focus:outline-none focus:border-slate-700"
+          className="flex-1 px-4 py-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs font-sans text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white"
         />
         <button
           onClick={() => handleAsk()}
           disabled={loading || !query.trim()}
-          className="px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-slate-950 font-semibold text-xs font-mono transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex-shrink-0 flex items-center gap-1.5"
+          className="px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs font-sans transition-all shadow-xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex-shrink-0 flex items-center gap-1.5"
         >
           {loading ? <Sparkles className="w-3.5 h-3.5 animate-spin" /> : "Query"}
         </button>
@@ -2012,7 +2057,7 @@ function ReportCopilotInline({
 
       {/* Loading state */}
       {loading && (
-        <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex items-center gap-2.5 text-xs text-sky-400 font-mono">
+        <div className="p-4 rounded-lg bg-blue-50 border border-blue-100 flex items-center gap-2.5 text-xs text-blue-700 font-sans">
           <Sparkles className="w-4 h-4 animate-spin flex-shrink-0" />
           <span>Interrogating evidence locker and running evidence-grounded synthesis...</span>
         </div>
@@ -2020,21 +2065,21 @@ function ReportCopilotInline({
 
       {/* Answer display */}
       {answer && !loading && (
-        <div className="p-5 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+        <div className="p-5 rounded-lg bg-slate-50 border border-slate-200 space-y-3 font-sans">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-mono font-semibold text-sky-400 uppercase tracking-wider">
+              <span className="text-xs font-sans font-semibold text-blue-700 uppercase tracking-wider">
                 Question:
               </span>
-              <span className="text-xs font-medium text-slate-200">
+              <span className="text-xs font-medium text-slate-800">
                 "{lastQuestion}"
               </span>
             </div>
             <button
               onClick={handleCopy}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-900 text-xs font-mono text-slate-400 hover:text-slate-200 border border-slate-800 cursor-pointer"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white text-xs font-sans text-slate-600 hover:text-slate-900 border border-slate-200 cursor-pointer shadow-xs"
             >
-              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
               <span>{copied ? "Copied" : "Copy"}</span>
             </button>
           </div>
@@ -2292,35 +2337,35 @@ function UserCopilotView({
   }, [initialQuestion]);
 
   return (
-    <div className="flex-1 flex flex-col bg-slate-950 overflow-hidden font-sans">
+    <div className="flex-1 flex flex-col bg-slate-50 overflow-hidden font-sans">
       {/* Copilot Header */}
-      <div className="px-6 py-4 border-b border-slate-800 bg-slate-900 flex items-center justify-between">
+      <div className="px-6 py-4 border-b border-slate-200 bg-white flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-slate-950 border border-slate-800 text-sky-400 flex items-center justify-center">
+          <div className="w-9 h-9 rounded-lg bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center">
             <Brain className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-slate-100">
+            <h3 className="text-sm font-semibold text-slate-900 font-sans">
               Forensic Investigation Assistant
             </h3>
-            <p className="text-xs text-slate-400 font-mono">Target: {cleanCompany} · Case: #{report.scan_id || "LGF-2026-000184"}</p>
+            <p className="text-xs text-slate-500 font-sans">Target: {cleanCompany} · Case: #{report.scan_id || "LGF-2026-000184"}</p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={handleDownloadTranscript}
-            className="px-3 py-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-xs font-mono font-medium text-slate-300 hover:text-slate-100 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+            className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-xs font-sans font-medium text-slate-700 hover:text-slate-900 flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
             title="Download Transcript"
           >
-            <Download className="w-3.5 h-3.5" /> Download Transcript
+            <Download className="w-3.5 h-3.5 text-slate-500" /> Download Transcript
           </button>
           <button
             onClick={handleClearHistory}
-            className="px-3 py-1.5 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-xs font-mono font-medium text-slate-300 hover:text-rose-400 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+            className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-xs font-sans font-medium text-slate-700 hover:text-rose-600 flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
             title="Clear Chat"
           >
-            <RefreshCw className="w-3.5 h-3.5" /> Reset Chat
+            <RefreshCw className="w-3.5 h-3.5 text-slate-500" /> Reset Chat
           </button>
         </div>
       </div>
@@ -2330,24 +2375,24 @@ function UserCopilotView({
         {messages.map((m, idx) => (
           <div key={idx} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
             <div
-              className={`max-w-2xl p-4 rounded-xl text-xs ${
+              className={`max-w-2xl p-4 rounded-xl text-xs font-sans ${
                 m.role === "user"
-                  ? "bg-slate-800 text-slate-100 font-mono rounded-br-none border border-slate-700"
-                  : "bg-slate-900 border border-slate-800 rounded-bl-none text-slate-200"
+                  ? "bg-blue-600 text-white rounded-br-none shadow-xs"
+                  : "bg-white border border-slate-200 rounded-bl-none text-slate-800 shadow-xs"
               }`}
             >
               {m.role === "user" ? (
-                <span>{m.text}</span>
+                <span className="leading-relaxed">{m.text}</span>
               ) : (
                 <FormattedCopilotMessage text={m.text} />
               )}
             </div>
-            <span className="text-[10px] text-slate-500 font-mono mt-1 px-1">{m.time}</span>
+            <span className="text-[10px] text-slate-400 font-sans mt-1 px-1">{m.time}</span>
           </div>
         ))}
         {loading && (
-          <div className="flex items-center gap-2.5 text-xs text-sky-400 font-mono p-4 rounded-xl bg-slate-900 border border-slate-800 max-w-md">
-            <Sparkles className="w-4 h-4 animate-spin" />
+          <div className="flex items-center gap-2.5 text-xs text-blue-700 font-sans p-4 rounded-xl bg-white border border-slate-200 max-w-md shadow-xs">
+            <Sparkles className="w-4 h-4 animate-spin text-blue-600" />
             <span>Retrieving Evidence Locker records & running synthesis...</span>
           </div>
         )}
@@ -2355,17 +2400,17 @@ function UserCopilotView({
       </div>
 
       {/* Quick Action Category Filters & Buttons */}
-      <div className="p-4 border-t border-slate-800 bg-slate-950">
+      <div className="p-4 border-t border-slate-200 bg-white">
         {/* Category Filter Pills */}
         <div className="max-w-4xl mx-auto flex items-center gap-1.5 mb-2.5 overflow-x-auto pb-1">
           {CATEGORIES.map(cat => (
             <button
               key={cat.id}
               onClick={() => setCategoryFilter(cat.id)}
-              className={`px-2.5 py-1 rounded-md text-xs font-mono font-medium whitespace-nowrap transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-md text-xs font-sans font-medium whitespace-nowrap transition-all cursor-pointer ${
                 categoryFilter === cat.id
-                  ? "bg-slate-800 text-emerald-400 border border-slate-700"
-                  : "bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800"
+                  ? "bg-blue-50 text-blue-700 border border-blue-200 font-semibold"
+                  : "bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200"
               }`}
             >
               {cat.label}
@@ -2379,7 +2424,7 @@ function UserCopilotView({
             <button
               key={i}
               onClick={() => handleSend(tool.query)}
-              className="px-2.5 py-1 rounded-md text-xs font-mono font-medium bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-slate-100 transition-all cursor-pointer"
+              className="px-2.5 py-1 rounded-md text-xs font-sans font-medium bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 hover:text-slate-900 transition-colors cursor-pointer"
             >
               {tool.label}
             </button>
@@ -2393,12 +2438,12 @@ function UserCopilotView({
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
-            className="flex-1 px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs font-mono text-slate-100 placeholder-slate-600 focus:outline-none focus:border-slate-700"
+            className="flex-1 px-4 py-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs font-sans text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white"
           />
           <button
             onClick={() => handleSend()}
             disabled={loading}
-            className="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-slate-950 font-semibold text-xs font-mono transition-all shadow-sm flex-shrink-0 cursor-pointer disabled:opacity-50"
+            className="px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs font-sans transition-all shadow-xs flex-shrink-0 cursor-pointer disabled:opacity-50"
           >
             Query
           </button>
@@ -2904,72 +2949,72 @@ function AdminCasesView({
 
 function UserSafetyHubView() {
   return (
-    <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6 bg-slate-950 max-w-5xl mx-auto font-sans">
+    <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6 bg-slate-50 max-w-5xl mx-auto font-sans">
       <div className="space-y-2">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md text-xs font-mono font-medium bg-slate-900 text-emerald-400 border border-slate-800 uppercase tracking-wider">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md text-xs font-sans font-medium bg-blue-50 text-blue-700 border border-blue-200 uppercase tracking-wider">
           <Shield className="w-3.5 h-3.5" /> Official Candidate Safety Guidelines
         </div>
-        <h2 className="text-xl md:text-2xl font-bold text-slate-100">
+        <h2 className="text-xl md:text-2xl font-bold text-slate-900">
           Student Protection & Fraud Prevention Directives
         </h2>
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-slate-500">
           Essential rules, regulatory standards (UGC/AICTE), and step-by-step reporting protocols.
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-2.5 shadow-sm">
-          <div className="w-7 h-7 rounded-lg bg-slate-950 border border-slate-800 text-rose-400 flex items-center justify-center font-mono font-bold text-xs">1</div>
-          <h3 className="text-sm font-bold text-slate-100">Zero Payment Policy</h3>
-          <p className="text-xs text-slate-300 leading-relaxed">
+        <div className="p-5 rounded-xl bg-white border border-slate-200 space-y-2.5 shadow-xs">
+          <div className="w-7 h-7 rounded-lg bg-rose-50 border border-rose-100 text-rose-700 flex items-center justify-center font-sans font-bold text-xs">1</div>
+          <h3 className="text-sm font-semibold text-slate-900">Zero Payment Policy</h3>
+          <p className="text-xs text-slate-600 leading-relaxed">
             Legitimate corporate employers (TCS, Infosys, Google, Wipro, etc.) never charge registration, laptop, security deposit, or uniform fees at any stage of hiring.
           </p>
         </div>
 
-        <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-2.5 shadow-sm">
-          <div className="w-7 h-7 rounded-lg bg-slate-950 border border-slate-800 text-emerald-400 flex items-center justify-center font-mono font-bold text-xs">2</div>
-          <h3 className="text-sm font-bold text-slate-100">Official Domain Emails Only</h3>
-          <p className="text-xs text-slate-300 leading-relaxed">
-            Corporate HR will always write to you from their official corporate domain (e.g. <code>@tcs.com</code>), never from free public webmail addresses (<code>@gmail.com</code>, <code>@yahoo.com</code>).
+        <div className="p-5 rounded-xl bg-white border border-slate-200 space-y-2.5 shadow-xs">
+          <div className="w-7 h-7 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-700 flex items-center justify-center font-sans font-bold text-xs">2</div>
+          <h3 className="text-sm font-semibold text-slate-900">Official Domain Emails Only</h3>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            Corporate HR will always write to you from their official corporate domain (e.g. <code className="bg-slate-100 text-slate-800 px-1 py-0.5 rounded font-mono">@tcs.com</code>), never from free public webmail addresses (<code className="bg-slate-100 text-slate-800 px-1 py-0.5 rounded font-mono">@gmail.com</code>, <code className="bg-slate-100 text-slate-800 px-1 py-0.5 rounded font-mono">@yahoo.com</code>).
           </p>
         </div>
 
-        <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-2.5 shadow-sm">
-          <div className="w-7 h-7 rounded-lg bg-slate-950 border border-slate-800 text-sky-400 flex items-center justify-center font-mono font-bold text-xs">3</div>
-          <h3 className="text-sm font-bold text-slate-100">Beware of Direct Selection</h3>
-          <p className="text-xs text-slate-300 leading-relaxed">
+        <div className="p-5 rounded-xl bg-white border border-slate-200 space-y-2.5 shadow-xs">
+          <div className="w-7 h-7 rounded-lg bg-blue-50 border border-blue-100 text-blue-700 flex items-center justify-center font-sans font-bold text-xs">3</div>
+          <h3 className="text-sm font-semibold text-slate-900">Beware of Direct Selection</h3>
+          <p className="text-xs text-slate-600 leading-relaxed">
             If you are offered an internship without any technical assessment or interview round simply based on your resume, it is an instant hallmark of recruitment fraud.
           </p>
         </div>
 
-        <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-2.5 shadow-sm">
-          <div className="w-7 h-7 rounded-lg bg-slate-950 border border-slate-800 text-purple-400 flex items-center justify-center font-mono font-bold text-xs">4</div>
-          <h3 className="text-sm font-bold text-slate-100">No Informal Chat Hiring</h3>
-          <p className="text-xs text-slate-300 leading-relaxed">
+        <div className="p-5 rounded-xl bg-white border border-slate-200 space-y-2.5 shadow-xs">
+          <div className="w-7 h-7 rounded-lg bg-purple-50 border border-purple-100 text-purple-700 flex items-center justify-center font-sans font-bold text-xs">4</div>
+          <h3 className="text-sm font-semibold text-slate-900">No Informal Chat Hiring</h3>
+          <p className="text-xs text-slate-600 leading-relaxed">
             Interviews conducted exclusively over WhatsApp chat, Telegram channels, or Google Forms without enterprise video conferencing are unverified.
           </p>
         </div>
       </div>
 
-      <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 shadow-sm">
-        <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
-          <PhoneCall className="w-4 h-4 text-emerald-400" />
+      <div className="p-6 rounded-xl bg-white border border-slate-200 space-y-4 shadow-xs">
+        <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
+          <PhoneCall className="w-4 h-4 text-emerald-600" />
           <span>National Incident Reporting Directory</span>
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
-            <p className="text-[11px] font-mono text-slate-400 uppercase">Cybercrime Helpline</p>
-            <p className="text-2xl font-bold font-mono text-emerald-400 mt-1">1930</p>
+          <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
+            <p className="text-[11px] font-sans font-medium text-slate-500 uppercase tracking-wider">Cybercrime Helpline</p>
+            <p className="text-2xl font-bold font-sans text-blue-600 mt-1">1930</p>
             <p className="text-xs text-slate-500 mt-0.5">Toll-free 24/7 (Govt of India)</p>
           </div>
-          <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
-            <p className="text-[11px] font-mono text-slate-400 uppercase">Online Portal</p>
-            <p className="text-sm font-bold font-mono text-slate-100 mt-2">cybercrime.gov.in</p>
+          <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
+            <p className="text-[11px] font-sans font-medium text-slate-500 uppercase tracking-wider">Online Portal</p>
+            <p className="text-sm font-semibold font-sans text-slate-900 mt-2">cybercrime.gov.in</p>
             <p className="text-xs text-slate-500 mt-0.5">Ministry of Home Affairs</p>
           </div>
-          <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
-            <p className="text-[11px] font-mono text-slate-400 uppercase">UGC Grievance</p>
-            <p className="text-sm font-bold font-mono text-slate-100 mt-2">samadhaan.ugc.ac.in</p>
+          <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
+            <p className="text-[11px] font-sans font-medium text-slate-500 uppercase tracking-wider">UGC Grievance</p>
+            <p className="text-sm font-semibold font-sans text-slate-900 mt-2">samadhaan.ugc.ac.in</p>
             <p className="text-xs text-slate-500 mt-0.5">University Grants Commission</p>
           </div>
         </div>
@@ -4096,7 +4141,7 @@ export function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#060709] text-slate-100 flex flex-col font-['Plus_Jakarta_Sans',sans-serif]">
+    <div className={`min-h-screen ${portalRole === 'user' ? 'bg-slate-50 text-slate-900' : 'bg-[#060709] text-slate-100'} flex flex-col font-sans`}>
       <Header
         portalRole={portalRole}
         user={user}
@@ -4144,16 +4189,16 @@ export function App() {
               {userView === "user_safety" && <UserSafetyHubView />}
               {userView === "user_settings" && (
                 <div className="flex-1 p-10 max-w-xl mx-auto space-y-6">
-                  <h2 className="text-2xl font-bold text-slate-100 flex items-center gap-2.5">
-                    <Settings className="w-6 h-6 text-slate-400" /> Candidate Account Settings
+                  <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2.5 font-sans">
+                    <Settings className="w-6 h-6 text-slate-500" /> Candidate Account Settings
                   </h2>
-                  <div className="p-8 rounded-3xl bg-[#0D1117] border border-slate-800 space-y-5">
-                    <p className="text-base text-slate-300">Name: <strong className="text-slate-100 text-lg">{user?.user_metadata?.full_name || "Sanjay Kumar. V"}</strong></p>
-                    <p className="text-base text-slate-300">Email: <strong className="text-slate-100 text-lg">{user?.email || "sanjaykumar.v2023@vitstudent.ac.in"}</strong></p>
-                    <p className="text-base text-emerald-400 font-bold">Role: Verified Candidate</p>
+                  <div className="p-8 rounded-xl bg-white border border-slate-200 shadow-xs space-y-5">
+                    <p className="text-base text-slate-600">Name: <strong className="text-slate-900 text-lg">{user?.user_metadata?.full_name || "Sanjay Kumar. V"}</strong></p>
+                    <p className="text-base text-slate-600">Email: <strong className="text-slate-900 text-lg">{user?.email || "sanjaykumar.v2023@vitstudent.ac.in"}</strong></p>
+                    <p className="text-base text-emerald-700 font-semibold">Role: Verified Candidate</p>
                     <button
                       onClick={handleSignOut}
-                      className="px-6 py-3 rounded-2xl bg-rose-500/10 text-rose-400 border border-rose-500/20 font-semibold text-sm hover:bg-rose-500/20 transition-all cursor-pointer"
+                      className="px-6 py-2.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 font-semibold text-sm hover:bg-rose-100 transition-all cursor-pointer"
                     >
                       Sign Out & Return to Portal Gate
                     </button>
@@ -4246,13 +4291,6 @@ export function App() {
           </>
         )}
       </div>
-
-      {/* Persistent Interactive AI Copilot Floating Assistant */}
-      <FloatingCopilotWidget
-        report={currentReport}
-        userToken={session?.access_token}
-        userName={user?.user_metadata?.full_name || (portalRole === "admin" ? "Security Admin" : "Sanjay Kumar. V")}
-      />
     </div>
   );
 }

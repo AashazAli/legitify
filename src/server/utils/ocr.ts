@@ -44,10 +44,13 @@ export async function analyzeDocumentDeepForensics(
   const visualForensics: VisualForensicsData = {
     signature_detected: false,
     signature_type: "ABSENT",
+    signatory_state: "NO_SIGNATURE_DETECTED",
     official_seal_detected: false,
     letterhead_logo_detected: false,
     font_consistency_score: 95,
     formatting_anomalies: [],
+    visual_regions: [],
+    evidence_ids: [],
   };
 
   const detectedEmails: string[] = [];
@@ -144,10 +147,31 @@ Return JSON format:
   // Text-based fallback analysis
   if (rawText) {
     const lower = rawText.toLowerCase();
-    if (!visualForensics.signature_detected && (lower.includes("authorized signatory") || lower.includes("sincerely") || lower.includes("hr manager") || lower.includes("director"))) {
+    const hasDigitalSig = /(?:digitally\s+signed|docusign|adobe\s+sign|signature\s+valid|esign|e-sign|cryptographic)/i.test(rawText);
+    const hasSignatory = lower.includes("authorized signatory") || lower.includes("sincerely") || lower.includes("hr manager") || lower.includes("director") || lower.includes("talent acquisition");
+
+    if (!visualForensics.signature_detected && (hasDigitalSig || hasSignatory)) {
       visualForensics.signature_detected = true;
-      visualForensics.signature_type = "PRINTED_NAME";
+      visualForensics.signature_type = hasDigitalSig ? "CRYPTOGRAPHIC_SIGNATURE" : "PRINTED_SIGNATURE";
+      visualForensics.signatory_state = "SIGNATORY_OBSERVED";
     }
+
+    if (!visualForensics.signatory_name || !detectedSignatory) {
+      const sigPattern = /(?:digitally\s+signed\s+by[:\s]*|signed\s+by[:\s]*|sd\/-?\s*|yours\s+(?:sincerely|faithfully|truly)[,\s]*\n*|authorized\s+signatory[,\s]*\n*)([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i;
+      const sigMatch = rawText.match(sigPattern);
+      if (sigMatch && sigMatch[1] && !/(?:limited|ltd|pvt|private|corporation|technologies|solutions)/i.test(sigMatch[1])) {
+        visualForensics.signatory_name = sigMatch[1].trim();
+        detectedSignatory = sigMatch[1].trim();
+      }
+    }
+
+    if (!visualForensics.signatory_title) {
+      const titleMatch = rawText.match(/(?:director|vice\s+president|head\s+of\s+hr|hr\s+manager|talent\s+acquisition\s+lead|authorized\s+signatory)/i);
+      if (titleMatch) {
+        visualForensics.signatory_title = titleMatch[0].trim();
+      }
+    }
+
     if (!visualForensics.official_seal_detected && (lower.includes("seal") || lower.includes("stamp") || lower.includes("certified"))) {
       visualForensics.official_seal_detected = true;
     }

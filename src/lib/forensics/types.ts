@@ -148,6 +148,9 @@ export interface DocumentStructureResult {
   hasAuthorizedSignatoryBlock: boolean;
   signatoryTitle?: string;
   signatoryName?: string;
+  signatureType?: string;
+  signatureDetected?: boolean;
+  identityState?: string;
   hasAcceptanceProcedure: boolean;
   passedChecksCount: number;
   totalChecksCount: number;

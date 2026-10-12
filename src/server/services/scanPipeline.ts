@@ -671,7 +671,7 @@ export async function runScanPipeline(params: ExecuteScanParams): Promise<Legiti
       ml_probability: mlPrediction.ml_probability,
       prediction: mlPrediction.prediction,
       algorithm: mlPrediction.algorithm,
-      topFeatures: mlPrediction.top_features,
+      topFeatures: mlPrediction.topFeatures || (mlPrediction as any).top_features,
     },
     externalEvidence: evidence.map(e => ({
       source: e.source_name || e.category || 'External',
@@ -773,7 +773,7 @@ export async function runScanPipeline(params: ExecuteScanParams): Promise<Legiti
     ...legitifyScore,
     trust_score: finalFusion.finalTrustScore,
     confidence_score: finalFusion.finalEvidenceConfidence,
-    risk_level: (finalFusion.finalRiskLevel === 'INSUFFICIENT EVIDENCE' || finalFusion.finalRiskLevel === 'INSUFFICIENT EVIDENCE / REVIEW' ? 'MODERATE' : finalFusion.finalRiskLevel) as any,
+    risk_level: ((finalFusion.finalRiskLevel as any) === 'INSUFFICIENT EVIDENCE' || (finalFusion.finalRiskLevel as any) === 'INSUFFICIENT EVIDENCE / REVIEW' ? 'MODERATE' : finalFusion.finalRiskLevel) as any,
     verdict: (finalFusion.finalVerdict === 'INSUFFICIENT EVIDENCE / REVIEW' ? 'INSUFFICIENT_EVIDENCE' : finalFusion.finalVerdict) as any,
     hard_caps_applied: [
       ...legitifyScore.hard_caps_applied,

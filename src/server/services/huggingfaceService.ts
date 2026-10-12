@@ -138,7 +138,7 @@ export async function extractTextWithPszemrajPdfOcr(
     // 1. Upload the PDF file to Gradio 5 space
     const formData = new FormData();
     const cleanFilename = filename.toLowerCase().endsWith('.pdf') ? filename : `${filename}.pdf`;
-    const file = new File([pdfBuffer], cleanFilename, { type: 'application/pdf' });
+    const file = new File([new Uint8Array(pdfBuffer)], cleanFilename, { type: 'application/pdf' });
     formData.append('files', file);
 
     const uploadRes = await fetch(`${PDF_OCR_BASE_URL}/gradio_api/upload`, {
@@ -268,7 +268,7 @@ export async function generateColPaliQueries(
   try {
     const ext = mimeType.includes('jpeg') || mimeType.includes('jpg') ? 'jpg' : 'png';
     const formData = new FormData();
-    const file = new File([imageBuffer], `page_1.${ext}`, { type: mimeType });
+    const file = new File([new Uint8Array(imageBuffer)], `page_1.${ext}`, { type: mimeType });
     formData.append('files', file);
 
     // 1. Upload page image
