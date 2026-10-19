@@ -67,7 +67,16 @@ export function evaluateRules(ctx: RuleEngineContext): {
   // ----------------------------------------------------------------------------
   const hasThreatFee = ctx.threatData?.matches?.some(i => i.threat_type === 'FEE_FRAUD') ||
     (ctx.threatData as any)?.indicators?.some((i: any) => i.threat_type === 'FEE_FRAUD');
-  if (ctx.documentData?.has_fee_demand || hasThreatFee) {
+  const hasFeeDemand = Boolean(
+    ctx.documentData?.has_fee_demand ||
+    (ctx.documentData?.fee_details && ctx.documentData.fee_details.length > 0) ||
+    (ctx.documentData?.requested_fees && ctx.documentData.requested_fees.length > 0) ||
+    hasThreatFee ||
+    ctx.evidence.some(e => e.evidence_type === 'UPFRONT_FEE_DEMAND' || e.evidence_type === 'FEE_FRAUD')
+  );
+
+  if (hasFeeDemand) {
+    const feeDetail = ctx.documentData?.fee_details?.[0];
     const feeInfo = ctx.documentData?.requested_fees?.[0];
     const r002: RuleEvaluation = {
       rule_id: "R002",
@@ -82,13 +91,17 @@ export function evaluateRules(ctx: RuleEngineContext): {
     rules.push(r002);
     totalImpact += r002.score_impact;
 
+    const snippet = feeDetail
+      ? `Category: ${feeDetail.category || 'Fee'} | Amount: ${feeDetail.amount || 'Specified'} | Recipient: ${feeDetail.recipient || 'Specified'} | Refund: ${feeDetail.is_refundable ? 'Refundable (' + feeDetail.refund_terms + ')' : 'Non-refundable'} | Quote: "${feeDetail.exact_quote}"`
+      : (feeInfo ? `Reason: ${feeInfo.reason || 'Deposit'} | Amount: ${feeInfo.amount || 'Specified'} | Channel: ${feeInfo.channel || 'Direct'}` : 'Upfront fee language detected in offer text');
+
     generatedEvidence.push({
       category: "OFFER",
       evidence_type_category: "CONTRADICTORY_EVIDENCE",
       evidence_type: "UPFRONT_FEE_DEMAND",
       source_name: "Rule Engine (R002)",
       title: "Mandatory Upfront Fee Demand Detected",
-      snippet: feeInfo ? `Reason: ${feeInfo.reason || 'Deposit'} | Amount: ${feeInfo.amount || 'Specified'} | Channel: ${feeInfo.channel || 'Direct'}` : 'Upfront fee language detected in offer text',
+      snippet,
       evidence_text: "Clear violation of legitimate internship practices requiring upfront financial payment from candidate.",
       evidence_strength: "VERY_STRONG",
       status: "NEGATIVE",

@@ -15,6 +15,7 @@ import { getActiveAIProvider } from './services/aiProvider';
 import { createShareToken, getReportByShareToken } from './services/reportService';
 import { supabaseAdmin } from '../lib/supabase/server';
 import { logAuditEvent } from './services/auditService';
+import { isFilenameOrPlaceholder } from './utils/normalizer';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -689,19 +690,16 @@ app.post(['/api/scans', '/api/scan', '/scans', '/scan'], upload.single('file'), 
       else entityType = 'job_offer'; // ultimate safe default
     }
 
-    // Infer entity value from file name or pasted text title
-    const entityValue = (
-      rawBody.entity_value ||
-      rawBody.entityValue ||
-      filename?.replace(/\.[^.]+$/, '') ||
-      rawBody.context_text?.slice(0, 60)?.trim() ||
-      'Uploaded Document'
-    ).slice(0, 150); // cap length
+    // Extract entity value without defaulting to filename
+    let entityValue = (rawBody.entity_value || rawBody.entityValue || '').trim();
+    if (isFilenameOrPlaceholder(entityValue)) {
+      entityValue = '';
+    }
 
     const contextText = rawBody.context_text || rawBody.contextText || '';
     const userId = rawBody.user_id || rawBody.userId || '00000000-0000-0000-0000-000000000000';
 
-    if (!entityValue || entityValue.length < 1) {
+    if (!entityValue && !fileBuffer && !contextText) {
       return res.status(400).json({ success: false, error: 'Please provide a company name, text content, or upload a document to scan.' });
     }
 

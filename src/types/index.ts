@@ -428,13 +428,33 @@ export interface LegitifyReport {
     visual_forensics?: VisualForensicsData;
     filename?: string;
     mime_type?: string;
+    detected_company_name?: string;
+    detected_signatory?: string;
+    detected_domain?: string;
+    detected_email?: string;
     extracted_entities?: Record<string, any>;
-    suspicious_patterns_detected?: string[];
     requested_fees?: {
       amount?: string;
       reason?: string;
       channel?: string;
     }[];
+    fee_details?: {
+      category: string;
+      amount?: string;
+      recipient?: string;
+      channel?: string;
+      is_refundable?: boolean;
+      refund_terms?: string;
+      deadline?: string;
+      exact_quote: string;
+      why_it_matters: string;
+      confidence: number;
+    }[];
+    candidate_compensation?: {
+      type: 'STIPEND' | 'SALARY' | 'CTC' | 'REIMBURSEMENT';
+      amount?: string;
+      raw_quote?: string;
+    };
   };
   threat_intelligence: {
     matched_iocs_count: number;
@@ -543,6 +563,29 @@ export interface LegitifyReport {
   red_flags?: any[];
   hard_caps_applied?: string[];
   extracted_claims?: any[];
+  assessments?: AssessmentItem[];
+  overall_risk_score?: number;
+  external_research?: any;
+}
+
+export type AssessmentRiskBand = 'LOW_RISK' | 'MINOR_IRREGULARITIES' | 'MODERATE_RISK' | 'HIGH_RISK' | 'CRITICAL_RISK' | 'INSUFFICIENT_EVIDENCE';
+
+export interface AssessmentItem {
+  id: string;
+  name: string;
+  risk_score: number; // 0 - 100 (higher = greater concern)
+  risk_band: AssessmentRiskBand;
+  risk_band_label: string;
+  evidence_found: string;
+  why_it_matters: string;
+  evidence_strength: 'High' | 'Moderate' | 'Contextual' | 'STRONG' | 'WEAK' | 'INSUFFICIENT' | 'CONTRADICTORY';
+  recommended_next_step: string;
+  insufficient_evidence?: boolean;
+  exact_quote?: string;
+  amount?: string;
+  recipient?: string;
+  confidence_level?: number;
+  limitations?: string;
 }
 
 export interface ExtractedOfferParts {

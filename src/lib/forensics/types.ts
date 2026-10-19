@@ -168,7 +168,7 @@ export interface DimensionBreakdownItem {
 }
 
 export interface DocumentSemanticsResult {
-  detectedCompany: string;
+  detectedCompany?: string;
   detectedEmails: string[];
   recruiterEmail?: string;
   isFreeWebmail: boolean;
@@ -218,6 +218,8 @@ export interface ForensicScoreResult {
   structureAnalysis?: DocumentStructureResult;
   docAuthScore?: number;
   hardCapsApplied?: Array<{ limit: number; reason: string }>;
+  riskScore?: number;          // 0 - 100 (Higher = greater risk/concern)
+  assessments?: any[];         // Structured assessments with 0-100 risk score each
 }
 
 export interface CompleteForensicReport {

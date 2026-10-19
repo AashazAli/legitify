@@ -35,8 +35,9 @@ import { evaluateLegitimacyPatterns, isRecognizedStaffingPartner } from './legit
 import { getActiveAIProvider } from './aiProvider';
 import { compileFullReport, persistReport } from './reportService';
 import { runWebIntelligence } from './webIntelligenceService';
+import { executeExternalResearch } from './externalResearchService';
 import { detectEvidenceConflicts, formatContradictionsForReport } from './conflictService';
-import { normalizeCompanyName, normalizeDomain, extractEmailDomain } from '../utils/normalizer';
+import { normalizeCompanyName, normalizeDomain, extractEmailDomain, isFilenameOrPlaceholder } from '../utils/normalizer';
 import { indexDocumentChunks, indexExternalEvidence, retrieveDualRAG, retrieveRAGKnowledge } from './ragService';
 import { chunkDocument } from './chunkingService';
 import { buildClaimLedger } from './claimLedger';
@@ -133,7 +134,8 @@ export async function runScanPipeline(params: ExecuteScanParams): Promise<Legiti
   // Step 2: Document Extraction & Text Signal Extraction
   const docStart = Date.now();
   let docResult: DocumentExtractionResult | undefined;
-  const combinedTextCorpus = [contextText, entityValue].filter(Boolean).join('\n').trim();
+  const cleanEntityValue = isFilenameOrPlaceholder(entityValue) ? '' : entityValue;
+  const combinedTextCorpus = [contextText, cleanEntityValue].filter(Boolean).join('\n').trim();
 
   if (fileBuffer && filename && mimeType) {
     docResult = await processDocument(fileBuffer, filename, mimeType);
@@ -152,7 +154,7 @@ export async function runScanPipeline(params: ExecuteScanParams): Promise<Legiti
       { textLength: docResult.extracted_text?.length || 0 }
     );
   } else {
-    const textBuffer = Buffer.from(combinedTextCorpus || entityValue, 'utf-8');
+    const textBuffer = Buffer.from(combinedTextCorpus || cleanEntityValue || 'Pasted Text Analysis', 'utf-8');
     docResult = await processDocument(textBuffer, 'pasted_text.txt', 'text/plain');
     recordTrace(
       'Document Decomposition & OCR',
@@ -188,7 +190,7 @@ export async function runScanPipeline(params: ExecuteScanParams): Promise<Legiti
     recordTrace('Visual Forensics', 'SKIP', visualStart, 'Pasted text input (no visual file buffer)');
   }
 
-  const fullTextToAnalyze = [contextText, docResult?.extracted_text, entityValue].filter(Boolean).join('\n').trim();
+  const fullTextToAnalyze = [contextText, docResult?.extracted_text, cleanEntityValue].filter(Boolean).join('\n').trim();
 
   // Stage 02 & 03: Semantic Document Chunking & Structured Claim Ledger
   const chunks = chunkDocument(fullTextToAnalyze, scanId);
@@ -257,7 +259,7 @@ export async function runScanPipeline(params: ExecuteScanParams): Promise<Legiti
   let targetCin = docResult?.detected_cin || claimLedger.normalizedEntities.cins[0] || '';
 
   if (entityType === 'company') {
-    targetCompany = normalizeCompanyName(entityValue);
+    targetCompany = !isFilenameOrPlaceholder(entityValue) ? normalizeCompanyName(entityValue) : '';
   } else if (entityType === 'domain' || entityType === 'website') {
     targetDomain = normalizeDomain(entityValue);
   } else if (entityType === 'recruiter') {
@@ -265,12 +267,17 @@ export async function runScanPipeline(params: ExecuteScanParams): Promise<Legiti
     targetDomain = extractEmailDomain(targetEmail);
   } else {
     // Detect entities from document / claims / OCR
-    if (claimLedger.normalizedEntities.organizations.length > 0) {
-      targetCompany = claimLedger.normalizedEntities.organizations[0];
-    } else if (docResult?.detected_company_name) {
+    const validClaimOrg = claimLedger.normalizedEntities.organizations.find(o => !isFilenameOrPlaceholder(o));
+    if (validClaimOrg) {
+      targetCompany = validClaimOrg;
+    } else if (docResult?.detected_company_name && !isFilenameOrPlaceholder(docResult.detected_company_name)) {
       targetCompany = normalizeCompanyName(docResult.detected_company_name);
-    } else if (entityValue && !entityValue.includes('.') && entityValue.length >= 2 && !entityValue.toLowerCase().includes('offer letter')) {
-      targetCompany = normalizeCompanyName(entityValue);
+    } else if (cleanEntityValue && !cleanEntityValue.includes('.') && cleanEntityValue.length >= 2 && !cleanEntityValue.toLowerCase().includes('offer letter') && !isFilenameOrPlaceholder(cleanEntityValue)) {
+      targetCompany = normalizeCompanyName(cleanEntityValue);
+    }
+
+    if (isFilenameOrPlaceholder(targetCompany)) {
+      targetCompany = '';
     }
 
     if (claimLedger.normalizedEntities.domains.length > 0) {
@@ -325,7 +332,7 @@ export async function runScanPipeline(params: ExecuteScanParams): Promise<Legiti
   });
 
   // Step 5: Concurrent Multi-Source Evidence Lookups
-  const [compResult, mcaResult, domResult, threatResult, communityResult, webResult, publicExpResult] = await Promise.all([
+  const [compResult, mcaResult, domResult, threatResult, communityResult, webResult, publicExpResult, externalResearchResult] = await Promise.all([
     targetCompany ? lookupCompany(targetCompany, targetDomain, targetCin).catch(() => null) : Promise.resolve(null),
     targetCompany ? verifyCompanyRegistry(targetCompany, targetCin).catch(() => null) : Promise.resolve(null),
     targetDomain ? analyzeDomain(targetDomain).catch(() => null) : Promise.resolve(null),
@@ -340,6 +347,14 @@ export async function runScanPipeline(params: ExecuteScanParams): Promise<Legiti
       upiId: claimLedger.normalizedEntities.upiIds[0],
       role: (claimLedger.normalizedEntities as any).jobRoles?.[0],
       customClaimQueries: claimInvestigationQueue.allQueries,
+    }).catch(() => null),
+    executeExternalResearch({
+      companyName: targetCompany,
+      domain: targetDomain,
+      recruiterEmail: targetEmail,
+      recruiterName: (claimLedger.normalizedEntities as any).signatories?.[0]?.name,
+      documentText: fullTextToAnalyze,
+      cin: targetCin,
     }).catch(() => null),
   ]);
 
@@ -371,6 +386,10 @@ export async function runScanPipeline(params: ExecuteScanParams): Promise<Legiti
 
   if (webResult && webResult.evidence) {
     evidence.push(...webResult.evidence);
+  }
+
+  if (externalResearchResult && externalResearchResult.evidence) {
+    evidence.push(...externalResearchResult.evidence);
   }
 
   if (publicExpResult && publicExpResult.sources && publicExpResult.sources.length > 0) {
@@ -787,9 +806,13 @@ export async function runScanPipeline(params: ExecuteScanParams): Promise<Legiti
   };
 
   // Stage 19: 26-Section Hierarchy Report Compilation & Persistence
+  const resolvedEntityName = !isFilenameOrPlaceholder(entityValue)
+    ? entityValue
+    : (targetCompany || (docResult?.detected_company_name && !isFilenameOrPlaceholder(docResult.detected_company_name) ? docResult.detected_company_name : undefined) || 'Organization Not Confidently Identified');
+
   const aiProvider = await getActiveAIProvider();
   const aiSynthesis = await aiProvider.generateSynthesis({
-    entityName: entityValue,
+    entityName: resolvedEntityName,
     entityType,
     trustScore: scoreResult.trust_score,
     confidence: scoreResult.confidence_score,
@@ -825,7 +848,7 @@ export async function runScanPipeline(params: ExecuteScanParams): Promise<Legiti
 
   const finalReport = compileFullReport({
     scanId,
-    entityName: entityValue,
+    entityName: resolvedEntityName,
     entityType,
     scoreResult,
     completeness,
@@ -854,6 +877,7 @@ export async function runScanPipeline(params: ExecuteScanParams): Promise<Legiti
     dualRAGCitations,
     signatoryForensics,
     pipelineTrace,
+    externalResearch: externalResearchResult || undefined,
   });
 
   // Stage 18: REPORT ASSERTION GUARD

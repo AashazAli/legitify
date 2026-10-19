@@ -25,6 +25,7 @@ import { ThreatData } from './threatService';
 import { AISynthesisOutput } from './aiProvider';
 import { supabaseAdmin } from '../../lib/supabase/server';
 import { WebIntelligenceResult } from './webIntelligenceService';
+import { isFilenameOrPlaceholder } from '../utils/normalizer';
 
 export interface CompileReportParams {
   scanId: string;
@@ -57,6 +58,7 @@ export interface CompileReportParams {
   dualRAGCitations?: DualRAGCitations;
   signatoryForensics?: LegitifyReport['signatory_forensics'];
   pipelineTrace?: LegitifyReport['pipeline_trace'];
+  externalResearch?: any;
 }
 
 export function compileFullReport(params: CompileReportParams): LegitifyReport {
@@ -79,6 +81,10 @@ export function compileFullReport(params: CompileReportParams): LegitifyReport {
     contradictions,
     evidence,
   } = params;
+
+  const cleanEntityName = !isFilenameOrPlaceholder(entityName)
+    ? entityName
+    : (companyData?.legal_name || (documentData?.detected_company_name && !isFilenameOrPlaceholder(documentData.detected_company_name) ? documentData.detected_company_name : undefined) || 'Organization Not Confidently Identified');
 
   const consistencyAnalysis: LegitifyReport['consistency_analysis'] = [];
 
@@ -175,14 +181,22 @@ export function compileFullReport(params: CompileReportParams): LegitifyReport {
     document_analysis: documentData ? {
       filename: documentData.filename,
       mime_type: documentData.mime_type,
+      detected_company_name: documentData.detected_company_name,
+      detected_signatory: documentData.detected_signatory,
+      detected_domain: documentData.detected_domain,
+      detected_email: documentData.detected_email,
       extracted_entities: {
         detected_company: documentData.detected_company_name,
+        detected_signatory: documentData.detected_signatory,
         detected_stipend: documentData.detected_stipend,
         detected_dates: documentData.detected_dates,
         suspicious_pressure_phrases: (documentData as any).suspicious_pressure_phrases || [],
       },
       suspicious_patterns_detected: (documentData as any).suspicious_pressure_phrases || [],
       requested_fees: (documentData as any).detected_fees || [],
+      fee_details: documentData.fee_details || [],
+      candidate_compensation: documentData.candidate_compensation || [],
+      has_fee_demand: documentData.has_fee_demand,
     } : undefined,
     threat_intelligence: {
       matched_iocs_count: threatData?.count || 0,
@@ -214,7 +228,7 @@ export function compileFullReport(params: CompileReportParams): LegitifyReport {
     consistency_analysis: consistencyAnalysis,
     entity_graph: entityGraph,
     timeline: [
-      { time: new Date().toLocaleTimeString(), event: "Scan Initiated", detail: `Target: ${entityName} · Type: ${entityType}`, status: "ok" },
+      { time: new Date().toLocaleTimeString(), event: "Scan Initiated", detail: `Target: ${cleanEntityName} · Type: ${entityType}`, status: "ok" },
       { time: new Date().toLocaleTimeString(), event: "Evidence Extraction", detail: `Extracted features across ${evidence.length} collected items`, status: "ok" },
       { time: new Date().toLocaleTimeString(), event: "Web & Registry Corroboration", detail: `Correlated ${webIntelligence?.total_sources_evaluated || 0} public web sources`, status: "ok" },
       { time: new Date().toLocaleTimeString(), event: "Rule & ML Execution", detail: `Evaluated ${scoreResult.rules_triggered.length} rules · ML Class: ${mlPrediction.predicted_class}`, status: "ok" },
@@ -232,7 +246,7 @@ export function compileFullReport(params: CompileReportParams): LegitifyReport {
     limitations: aiSynthesis.limitations,
     disclaimer: "LEGITIFY provides an automated evidence-based risk analysis to support applicant decision-making. It is not a legal determination, guarantee of employment legitimacy, or definitive proof of fraudulent intent.",
     // --- InternShield & Extended Visual Dossier Parity ---
-    company_name: entityName,
+    company_name: cleanEntityName,
     confidence_score: scoreResult.confidence_score,
     input_type: (documentData?.filename?.toLowerCase().endsWith('.pdf') ? 'pdf' : (entityType || 'text')).toUpperCase(),
     dimension_scores: {
@@ -293,6 +307,36 @@ export function compileFullReport(params: CompileReportParams): LegitifyReport {
       scoreResult.rules_triggered.some(r => r.rule_id === 'R001' || r.name?.toLowerCase().includes('fee') || r.description?.toLowerCase().includes('fee') || r.explanation?.toLowerCase().includes('fee')) ||
       scoreResult.hard_caps_applied.some(c => c.toLowerCase().includes('fee') || c.toLowerCase().includes('payment'))
     ),
+    overall_risk_score: scoreResult.overall_risk_score ?? Math.max(1, Math.min(99, 100 - scoreResult.trust_score)),
+    assessments: (() => {
+      const isFee = Boolean(
+        documentData?.has_fee_demand ||
+        (params.fraudPatterns as any)?.hasPaymentDemand ||
+        (params as any).hasPaymentDemand ||
+        scoreResult.rules_triggered.some(r => r.rule_id === 'R001' || r.name?.toLowerCase().includes('fee') || r.description?.toLowerCase().includes('fee') || r.explanation?.toLowerCase().includes('fee')) ||
+        scoreResult.hard_caps_applied.some(c => c.toLowerCase().includes('fee') || c.toLowerCase().includes('payment'))
+      );
+      const list = scoreResult.assessments || [];
+      if (!isFee) return list;
+      return list.map(a => {
+        if (a.id === 'financial_safety') {
+          const feeDetail = (documentData?.fee_details || [])[0];
+          return {
+            ...a,
+            risk_score: Math.max(a.risk_score || 0, 96),
+            risk_band: 'CRITICAL_RISK' as const,
+            risk_band_label: 'Critical Fraud Risk',
+            evidence_found: feeDetail
+              ? `Mandatory candidate payment detected: ${feeDetail.category || 'Fee'}${feeDetail.amount ? ' of ' + feeDetail.amount : ''}${feeDetail.recipient ? ' payable to ' + feeDetail.recipient : ''}. Exact quote: "${feeDetail.exact_quote || ''}"`
+              : 'Explicit candidate fee, caution deposit, or monetary demand detected in document.',
+            why_it_matters: 'Legitimate employers never demand candidate registration fees, training charges, or caution deposits. Upfront payment demands are an immediate scam indicator.',
+            recommended_next_step: 'NEVER transfer funds, UPI payments, or bank deposits. Genuine employers never charge candidates. Report immediately to 1930 Cybercrime Helpline.',
+          };
+        }
+        return a;
+      });
+    })(),
+    external_research: params.externalResearch,
     evidence: params.evidence || [],
     extracted_claims: (params.documentData as any)?.extracted_claims || [],
   } as any;

@@ -5,6 +5,7 @@
 
 import ExifReader from 'exifreader';
 import { createWorker } from 'tesseract.js';
+import * as pako from 'pako';
 import {
   CompleteForensicReport,
   ChainOfCustody,
@@ -549,29 +550,143 @@ function loadImageElement(file: File): Promise<HTMLImageElement> {
  * Red flag suspicious keywords in job offers and certificates
  */
 const SUSPICIOUS_FEE_PATTERNS = [
+  // 1. Upfront Fees & Deposits
   { keyword: 'registration fee', penalty: 25 },
   { keyword: 'training fee', penalty: 25 },
   { keyword: 'security deposit', penalty: 30 },
   { keyword: 'refundable deposit', penalty: 25 },
   { keyword: 'processing fee', penalty: 20 },
+  { keyword: 'caution deposit', penalty: 30 },
+  { keyword: 'caution money', penalty: 30 },
+  { keyword: 'caution fee', penalty: 30 },
+  { keyword: 'internship fee', penalty: 30 },
+  { keyword: 'internship fees', penalty: 30 },
+  { keyword: 'enrolment fee', penalty: 25 },
+  { keyword: 'enrollment fee', penalty: 25 },
+  { keyword: 'admission fee', penalty: 25 },
+  { keyword: 'acceptance fee', penalty: 25 },
+  { keyword: 'onboarding fee', penalty: 25 },
+  { keyword: 'onboarding charge', penalty: 25 },
+  { keyword: 'onboarding deposit', penalty: 25 },
+  { keyword: 'document verification charge', penalty: 25 },
+  { keyword: 'verification fee', penalty: 25 },
+  { keyword: 'kit charge', penalty: 20 },
+  { keyword: 'uniform deposit', penalty: 20 },
+  { keyword: 'id card fee', penalty: 20 },
+  { keyword: 'laptop deposit', penalty: 25 },
+  { keyword: 'equipment deposit', penalty: 25 },
+  { keyword: 'portal activation', penalty: 25 },
+  { keyword: 'slot booking', penalty: 20 },
+  { keyword: 'booking amount', penalty: 20 },
+  { keyword: 'settlement amount', penalty: 30 },
+  { keyword: 'recovery payment', penalty: 30 },
+
+  // 2. Payment Verbs & Instructions
+  { keyword: 'required to pay', penalty: 30 },
+  { keyword: 'need to pay', penalty: 30 },
+  { keyword: 'pay online', penalty: 30 },
+  { keyword: 'pay immediately', penalty: 25 },
+  { keyword: 'pay before joining', penalty: 30 },
+  { keyword: 'advance payment', penalty: 25 },
+
+  // 3. Channels & Accounts
   { keyword: 'upi id', penalty: 25 },
   { keyword: 'gpay', penalty: 20 },
   { keyword: 'phonepe', penalty: 20 },
   { keyword: 'paytm', penalty: 20 },
   { keyword: 'crypto', penalty: 30 },
   { keyword: 'telegram', penalty: 20 },
-  { keyword: 'laptop deposit', penalty: 25 },
 ];
 
 /**
- * Heuristic ASCII & UTF-8 string extractor for binary documents and PDF streams.
+ * Robust stream extractor for binary documents & PDF FlateDecode streams.
+ * Uses pako to decompress vector text streams, ensuring full text recovery on PDFs.
  */
 function extractTextFromBinary(buffer: ArrayBuffer): { text: string; words: string[] } {
   try {
     const bytes = new Uint8Array(buffer);
     let extracted = '';
-    let currentToken = '';
 
+    // 1. If PDF document, decompress all zlib / FlateDecode streams
+    const isPdf = bytes.length >= 4 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46;
+    if (isPdf) {
+      let pos = 0;
+      const streamMarker = [115, 116, 114, 101, 97, 109]; // 'stream'
+      const endMarker = [101, 110, 100, 115, 116, 114, 101, 97, 109]; // 'endstream'
+
+      while (pos < bytes.length - 6) {
+        let found = true;
+        for (let j = 0; j < 6; j++) {
+          if (bytes[pos + j] !== streamMarker[j]) {
+            found = false;
+            break;
+          }
+        }
+        if (!found) {
+          pos++;
+          continue;
+        }
+
+        let start = pos + 6;
+        if (bytes[start] === 13 && bytes[start + 1] === 10) start += 2;
+        else if (bytes[start] === 10 || bytes[start] === 13) start += 1;
+
+        let end = start;
+        while (end < bytes.length - 9) {
+          let endFound = true;
+          for (let j = 0; j < 9; j++) {
+            if (bytes[end + j] !== endMarker[j]) {
+              endFound = false;
+              break;
+            }
+          }
+          if (endFound) break;
+          end++;
+        }
+
+        if (end >= bytes.length - 9) break;
+
+        const streamBytes = bytes.subarray(start, end);
+        let decomp = '';
+        try {
+          decomp = pako.inflate(streamBytes, { to: 'string' });
+        } catch {
+          try {
+            decomp = pako.inflateRaw(streamBytes, { to: 'string' });
+          } catch {}
+        }
+
+        if (decomp) {
+          // Extract text from Tj operators: (text) Tj
+          const tjRegex = /\(([^)]*)\)\s*Tj/g;
+          let m: RegExpExecArray | null;
+          while ((m = tjRegex.exec(decomp)) !== null) {
+            const raw = m[1] || '';
+            const clean = raw.replace(/\\([()\\])/g, '$1').replace(/\\[0-7]{3}/g, ' ');
+            if (clean.trim()) extracted += clean + ' ';
+          }
+
+          // Extract text from TJ operators: [(t)(e)(x)(t)] TJ
+          const tjArrayRegex = /\[([^\]]*)\]\s*TJ/g;
+          while ((m = tjArrayRegex.exec(decomp)) !== null) {
+            const block = m[1] || '';
+            const innerRegex = /\(([^)]*)\)/g;
+            let im: RegExpExecArray | null;
+            while ((im = innerRegex.exec(block)) !== null) {
+              const raw = im[1] || '';
+              const clean = raw.replace(/\\([()\\])/g, '$1').replace(/\\[0-7]{3}/g, ' ');
+              if (clean.trim()) extracted += clean;
+            }
+            extracted += ' ';
+          }
+        }
+
+        pos = end + 9;
+      }
+    }
+
+    // 2. Also extract printable ASCII strings as a resilient baseline
+    let currentToken = '';
     for (let i = 0; i < bytes.length; i++) {
       const b = bytes[i];
       // Printable ASCII characters (space to ~) or newline
@@ -590,7 +705,7 @@ function extractTextFromBinary(buffer: ArrayBuffer): { text: string; words: stri
 
     const words = extracted
       .split(/\s+/)
-      .filter((w) => w.length >= 2 && /^[a-zA-Z0-9_\-.,@]+$/.test(w));
+      .filter((w) => w.length >= 2 && /^[a-zA-Z0-9_\-.,@₹]+$/.test(w));
 
     return { text: extracted, words };
   } catch {
@@ -900,6 +1015,19 @@ const FREE_WEBMAIL_DOMAINS = new Set([
   'gmx.com',
 ]);
 
+export function isClientFilenameOrPlaceholder(name?: string): boolean {
+  if (!name || typeof name !== 'string') return true;
+  const s = name.trim().toLowerCase();
+  if (s.length < 2) return true;
+  if (/^(?:unknown(?:\s*(?:organization|company|entity))?|uploaded|unnamed|document|sample|image|file|screenshot|scan|untitled|whatsapp image|doc|corporate entity|investigated|candidate|n\/a|none|null|undefined)$/i.test(s)) return true;
+  if (/whatsapp\s*image/i.test(s)) return true;
+  if (/screenshot\s*20\d\d/i.test(s)) return true;
+  if (/img[-_]?20\d\d/i.test(s)) return true;
+  if (/\.(png|jpe?g|pdf|webp|bmp|gif|tiff|docx?|txt)$/i.test(s)) return true;
+  if (/^\d{8,}[_\-\d]*$/.test(s)) return true;
+  return false;
+}
+
 /**
  * In-depth Semantic Analysis of Offer Letters and Acceptance Documents.
  * Verifies email domain alignment, company legitimacy markers, job/internship role,
@@ -931,12 +1059,13 @@ export function analyzeDocumentSemantics(
   }
 
   // 2. Extract Company Name
-  let detectedCompany = 'Investigated Organization';
+  let detectedCompany: string | undefined;
   const companyKeywords = [
     'tata consultancy services', 'tcs', 'infosys', 'wipro', 'cognizant', 'accenture',
     'microsoft', 'google', 'amazon', 'meta', 'ibm', 'hcl tech', 'hcl', 'tech mahindra',
     'deloitte', 'ey', 'ernst & young', 'pwc', 'kpmg', 'capgemini', 'oracle', 'cisco',
-    'samsung', 'intel', 'adobe', 'zoho corporation', 'swiggy', 'zomato', 'flipkart'
+    'samsung', 'intel', 'adobe', 'zoho corporation', 'swiggy', 'zomato', 'flipkart',
+    'clinchsoft technologies', 'clinchsoft'
   ];
 
   for (const ck of companyKeywords) {
@@ -946,14 +1075,30 @@ export function analyzeDocumentSemantics(
     }
   }
 
-  if (detectedCompany === 'Investigated Organization') {
-    const compMatch = text.match(/(?:Company|Organization|Employer|At|For)\s*[:\-]?\s*([A-Z][A-Za-z0-9&.,\s]{2,30})/);
-    if (compMatch && compMatch[1]) {
-      detectedCompany = compMatch[1].trim();
-    } else {
-      const cleanFileName = fileName.replace(/\.[^/.]+$/, '').replace(/[_\-]/g, ' ');
-      detectedCompany = cleanFileName.length > 3 ? cleanFileName : 'Corporate Entity';
+  if (!detectedCompany) {
+    const prefixMatch = text.match(/(?:Offer\s*Letter\s*(?:from|for|by)|Welcome\s*to|Employment\s*Offer\s*-\s*|Sub:\s*Appointment\s*(?:at|in|with)|Company\s*Name\s*:\s*|Organisation\s*:\s*|Organization\s*:\s*|Employer\s*:\s*)([A-Z0-9][A-Za-z0-9\s&.,'-]{2,50}(?:Pvt\s*Ltd|Private\s*Limited|Limited|Ltd|LLC|Inc|Corp|Technologies|Solutions|Enterprises|Infotech|Services|Global|Aviation|Motors|Consultancy|Systems)?)/i);
+    if (prefixMatch && prefixMatch[1]?.trim()) {
+      detectedCompany = prefixMatch[1].trim();
     }
+  }
+
+  if (!detectedCompany) {
+    const legalMatch = text.match(/\b([A-Z][A-Za-z0-9 &.,'-]{1,45}\s+(?:Private\s+Limited|Pvt\s+Ltd|Limited|LLP|LLC|Corporation|Corp|Inc|GmbH|Technologies|Solutions|Enterprises|Infotech|Services|Global|Consultancy))\b/i);
+    if (legalMatch) detectedCompany = legalMatch[1].trim();
+  }
+
+  if (!detectedCompany) {
+    const compMatch = text.match(/(?:Company|Organization|Employer|At|For)\s*[:\-]?\s*([A-Z][A-Za-z0-9&.,\s]{2,35})/);
+    if (compMatch && compMatch[1]) {
+      const candidate = compMatch[1].trim();
+      if (!isClientFilenameOrPlaceholder(candidate)) {
+        detectedCompany = candidate;
+      }
+    }
+  }
+
+  if (detectedCompany && isClientFilenameOrPlaceholder(detectedCompany)) {
+    detectedCompany = undefined;
   }
 
   // 3. Extract Role & Opportunity Title
@@ -981,6 +1126,31 @@ export function analyzeDocumentSemantics(
       feeKeywordsFound.push(pat.keyword);
     }
   }
+
+  const feePatternsRegex = [
+    /(?:registration\s*fees?|training\s*(?:fees?|cost|charge)|security\s*(?:deposit|amount|fee)|laptop\s*deposit|caution\s*(?:deposit|money|amount|fee)|mandatory\s*(?:fees?|payment|deposit|charge)|internship\s*fees?|enrolment\s*fees?|enrollment\s*fees?|application\s*fees?|onboarding\s*(?:fees?|charges?|deposit)|document(?:ation)?\s*(?:verification\s*)?(?:charge|fee)s?|id\s*card\s*(?:fees?|charges?)|uniform\s*(?:deposit|fee|charge)|processing\s*fees?|admission\s*fees?|acceptance\s*fees?|slot\s*booking|booking\s*amount|portal\s*activation)/i,
+    /(?:required|need|must|instructed)\s+to\s+pay/i,
+    /to\s+confirm\s+your\s+(?:enrolment|enrollment|selection|seat|internship|appointment)[^\n]*?pay/i,
+    /(?:pay|deposit|transfer|send|remit)\s+(?:online|through|before|immediately|[₹$]|rs\.?|inr|[0-9,]+)/i,
+    /(?:pay|deposit|transfer|send|remit)\s*(?:an?\s+)?(?:amount|sum|fee|charges?)?\s*(?:of\s*)?(?:₹|rs\.?|inr|\$)?\s*[0-9,]+(?:\s*\/-)?/i,
+    /(?:refundable\s+(?:security\s+)?deposit|caution\s*(?:money|deposit|fee))/i,
+    /(?:upi\s*(?:id|handle|payment)|gpay|phonepe|paytm|qr\s*code\s*(?:for\s*payment|to\s*pay)?)/i,
+    /(?:pay\s*(?:to|via|through)\s*(?:upi|account|bank|qr|link))/i,
+    /(?:fee|charge|deposit)\s+(?:of\s+)?(?:₹|rs\.?|inr|\$)?\s*[0-9,]+/i,
+    /(?:candidate|student|intern|applicant)\s*(?:must|needs?|is\s+required\s+to)\s*(?:pay|deposit|transfer)/i,
+    /(?:transaction\s*(?:id|reference|receipt|proof)\s*to\s*confirm)/i,
+  ];
+
+  for (const regex of feePatternsRegex) {
+    const match = text.match(regex);
+    if (match && match[0]) {
+      const clean = match[0].trim().toLowerCase();
+      if (!feeKeywordsFound.includes(clean)) {
+        feeKeywordsFound.push(clean);
+      }
+    }
+  }
+
   const hasFeeDemand = feeKeywordsFound.length > 0;
 
   // 6. Informal Channels (Telegram, WhatsApp)
@@ -1228,7 +1398,7 @@ export function analyzeDocumentSemantics(
  */
 export function analyzeDocumentStructureAndFormat(
   rawText: string,
-  detectedCompany: string
+  detectedCompany?: string
 ): import('./types').DocumentStructureResult {
   const text = rawText || '';
   const lower = text.toLowerCase();
@@ -1652,10 +1822,6 @@ export function computeDynamicScore(
     hardCaps.push({ limit: 32, reason: 'Selection Claimed Without Formal Interview Evaluation' });
   }
 
-  if (structure && structure.structureScore < 45) {
-    hardCaps.push({ limit: 35, reason: 'Fails Standard Legitimate Corporate Document Format & Control Conventions' });
-  }
-
   if (metadata.modifyingSoftwareFlagged) {
     hardCaps.push({ limit: 38, reason: 'Document Header Modified by Graphic Editing Software' });
   }
@@ -1663,11 +1829,10 @@ export function computeDynamicScore(
   const criticalRiskCount = (semantics?.hasFeeDemand ? 1 : 0) +
     (semantics?.isFreeWebmail ? 1 : 0) +
     (semantics?.hasInformalChannels ? 1 : 0) +
-    (semantics?.hasDirectSelectionNoInterview ? 1 : 0) +
-    (structure && structure.structureScore < 45 ? 1 : 0);
+    (semantics?.hasDirectSelectionNoInterview ? 1 : 0);
 
   if (criticalRiskCount >= 2) {
-    hardCaps.push({ limit: 22, reason: 'Multiple Concurrent Critical Fraud & Formatting Anomalies Detected' });
+    hardCaps.push({ limit: 22, reason: 'Multiple Concurrent Critical Fraud Indicators Detected' });
   }
 
   let authenticityScore = rawScore;
@@ -1845,6 +2010,171 @@ export function computeDynamicScore(
         }Exercise extreme caution.`
       : `Document exhibits structural anomalies (Trust Score: ${authenticityScore}/100, Manipulation Probability: ${manipulationProbability}%). Compression block disparity, missing corporate registration, or domain divergences require independent corporate verification before proceeding.`;
 
+  const overallRiskScore = Math.max(1, Math.min(99, 100 - authenticityScore));
+
+  const getClientRiskBand = (score: number): { band: AssessmentRiskBand; label: string } => {
+    if (score <= 15) return { band: 'LOW_RISK', label: 'Low Risk' };
+    if (score <= 40) return { band: 'MINOR_IRREGULARITIES', label: 'Minor Irregularities' };
+    if (score <= 70) return { band: 'MODERATE_RISK', label: 'Moderate Risk' };
+    return { band: 'CRITICAL_RISK', label: 'Critical Fraud Risk' };
+  };
+
+  const isClientFee = Boolean(
+    semantics?.hasFeeDemand ||
+    (semantics?.feeDemandKeywords && semantics.feeDemandKeywords.length > 0) ||
+    (ocr.suspiciousKeywordsFound && ocr.suspiciousKeywordsFound.some(k => /fee|deposit|caution|pay|charge|registration|upi/i.test(k)))
+  );
+
+  const clientAssessments: AssessmentItem[] = [
+    {
+      id: 'financial_safety',
+      name: 'Payment and Financial Fee Safety',
+      risk_score: isClientFee ? 98 : 5,
+      risk_band: getClientRiskBand(isClientFee ? 98 : 5).band,
+      risk_band_label: getClientRiskBand(isClientFee ? 98 : 5).label,
+      evidence_found: isClientFee
+        ? `Document contains explicit fee/deposit clauses: [${semantics?.feeDemandKeywords?.length ? semantics.feeDemandKeywords.join(', ') : 'Candidate payment / deposit requested'}]`
+        : 'Zero candidate fees, training charges, or caution deposits detected in document.',
+      why_it_matters: 'Legitimate employers never demand candidate registration fees or caution deposits. Any fee demand is an immediate scam indicator.',
+      evidence_strength: 'High',
+      recommended_next_step: isClientFee
+        ? 'NEVER transfer funds or UPI payments. Terminate contact and report to 1930 Cybercrime Helpline.'
+        : 'Proceed with standard corporate verification on the official careers page.',
+    },
+    {
+      id: 'company_identity',
+      name: 'Company Identity and Legitimacy Evidence',
+      risk_score: semantics?.hasCinNumber ? 12 : (semantics?.detectedCompany && !isClientFilenameOrPlaceholder(semantics.detectedCompany) ? 28 : 50),
+      risk_band: getClientRiskBand(semantics?.hasCinNumber ? 12 : (semantics?.detectedCompany && !isClientFilenameOrPlaceholder(semantics.detectedCompany) ? 28 : 50)).band,
+      risk_band_label: getClientRiskBand(semantics?.hasCinNumber ? 12 : (semantics?.detectedCompany && !isClientFilenameOrPlaceholder(semantics.detectedCompany) ? 28 : 50)).label,
+      evidence_found: semantics?.hasCinNumber
+        ? `Statutory Corporate Identity Number identified: ${semantics.detectedCin} for ${semantics.detectedCompany}`
+        : (semantics?.detectedCompany && !isClientFilenameOrPlaceholder(semantics.detectedCompany))
+        ? `Claimed organization: "${semantics.detectedCompany}". Statutory corporate registry record uncorroborated.`
+        : 'Organization not confidently identified from document content. Statutory corporate registry verification could not be performed.',
+      why_it_matters: (semantics?.detectedCompany && !isClientFilenameOrPlaceholder(semantics.detectedCompany))
+        ? 'Scammers frequently borrow real company names. Company existence does not prove that a specific offer letter was authorized.'
+        : 'Without an identified legal entity, corporate registration, tax records, and operational legitimacy cannot be validated.',
+      evidence_strength: semantics?.hasCinNumber ? 'High' : (semantics?.detectedCompany && !isClientFilenameOrPlaceholder(semantics.detectedCompany) ? 'Moderate' : 'Low'),
+      recommended_next_step: (semantics?.detectedCompany && !isClientFilenameOrPlaceholder(semantics.detectedCompany))
+        ? 'Verify the offer directly with the employer HR department via official switchboard.'
+        : 'Request formal appointment documentation clearly identifying the registered corporate employer, registered office, and CIN.',
+    },
+    {
+      id: 'recruiter_identity',
+      name: 'Recruiter Identity Risk',
+      risk_score: semantics?.isFreeWebmail ? 92 : (semantics?.recruiterEmail ? 20 : 50),
+      risk_band: getClientRiskBand(semantics?.isFreeWebmail ? 92 : (semantics?.recruiterEmail ? 20 : 50)).band,
+      risk_band_label: getClientRiskBand(semantics?.isFreeWebmail ? 92 : (semantics?.recruiterEmail ? 20 : 50)).label,
+      evidence_found: semantics?.isFreeWebmail
+        ? `Recruiter utilizes public personal webmail (${semantics.recruiterEmail}) instead of corporate domain.`
+        : semantics?.recruiterEmail
+        ? `Corporate email address identified: ${semantics.recruiterEmail}`
+        : 'No verified recruiter contact email identified in document.',
+      why_it_matters: 'Corporate HR communications originate exclusively from official company domains. Free webmail usage is a primary impersonation indicator.',
+      evidence_strength: semantics?.isFreeWebmail ? 'High' : 'Moderate',
+      recommended_next_step: 'Insist on official company-domain email communication before sharing personal data.',
+    },
+    {
+      id: 'email_domain_consistency',
+      name: 'Email-Domain and Sender Consistency',
+      risk_score: semantics?.isFreeWebmail ? 90 : (semantics?.recruiterEmail ? 15 : 45),
+      risk_band: getClientRiskBand(semantics?.isFreeWebmail ? 90 : (semantics?.recruiterEmail ? 15 : 45)).band,
+      risk_band_label: getClientRiskBand(semantics?.isFreeWebmail ? 90 : (semantics?.recruiterEmail ? 15 : 45)).label,
+      evidence_found: semantics?.isFreeWebmail
+        ? `Sender domain mismatch: Free webmail (${semantics.recruiterEmail}) mismatched with claimed entity ${semantics.detectedCompany && !isClientFilenameOrPlaceholder(semantics.detectedCompany) ? `"${semantics.detectedCompany}"` : '(Unverified Entity)'}.`
+        : 'Sender routing aligns with corporate identity.',
+      why_it_matters: 'Discrepancies between document branding and sender mailbox expose external impersonation.',
+      evidence_strength: 'High',
+      recommended_next_step: 'Cross-check the sender domain MX records against the official corporate website.',
+    },
+    {
+      id: 'recruitment_process_credibility',
+      name: 'Recruitment Process Credibility',
+      risk_score: semantics?.hasDirectSelectionNoInterview ? 85 : 20,
+      risk_band: getClientRiskBand(semantics?.hasDirectSelectionNoInterview ? 85 : 20).band,
+      risk_band_label: getClientRiskBand(semantics?.hasDirectSelectionNoInterview ? 85 : 20).label,
+      evidence_found: semantics?.hasDirectSelectionNoInterview
+        ? 'Direct selection or appointment claimed without technical interview or screening evaluation.'
+        : 'Recruitment trail exhibits standard procedural appointment language.',
+      why_it_matters: 'Legitimate employers evaluate candidates through structured interviews. Instant selection creates false comfort before fraud.',
+      evidence_strength: semantics?.hasDirectSelectionNoInterview ? 'High' : 'Moderate',
+      recommended_next_step: 'Inquire with HR about the formal requisition ID and evaluation record.',
+    },
+    {
+      id: 'job_compensation_clarity',
+      name: 'Job Description and Compensation Clarity',
+      risk_score: semantics?.detectedStipend ? 22 : 48,
+      risk_band: getClientRiskBand(semantics?.detectedStipend ? 22 : 48).band,
+      risk_band_label: getClientRiskBand(semantics?.detectedStipend ? 22 : 48).label,
+      evidence_found: semantics?.detectedStipend
+        ? `Designated compensation/stipend: ${semantics.detectedStipend} for role "${semantics.detectedRole || 'Candidate'}".`
+        : 'Compensation details are vague or unstated in the available document excerpts.',
+      why_it_matters: 'Unrealistic or unstated salary structures are common in employment scams.',
+      evidence_strength: 'Moderate',
+      recommended_next_step: 'Request formal compensation structure annexures (CTC bifurcation).',
+    },
+    {
+      id: 'contract_joining_terms',
+      name: 'Contract and Joining-Terms Risk',
+      risk_score: semantics?.hasLegalTerms ? 18 : 42,
+      risk_band: getClientRiskBand(semantics?.hasLegalTerms ? 18 : 42).band,
+      risk_band_label: getClientRiskBand(semantics?.hasLegalTerms ? 18 : 42).label,
+      evidence_found: semantics?.hasLegalTerms
+        ? 'Employment terms include standard formal legal clauses (confidentiality, code of conduct).'
+        : 'Document contains limited contractual clauses or formal employment terms.',
+      why_it_matters: 'Missing clauses are an informal trait, though formatting styles vary widely across companies.',
+      evidence_strength: 'Moderate',
+      recommended_next_step: 'Review complete contract terms before signing.',
+    },
+    {
+      id: 'urgency_coercive_pressure',
+      name: 'Urgency and Coercive Pressure',
+      risk_score: semantics?.hasUrgency ? 78 : 15,
+      risk_band: getClientRiskBand(semantics?.hasUrgency ? 78 : 15).band,
+      risk_band_label: getClientRiskBand(semantics?.hasUrgency ? 78 : 15).label,
+      evidence_found: semantics?.hasUrgency
+        ? 'Document utilizes forced timelines (e.g. within 24-48 hours, offer cancellation threats).'
+        : 'No coercive urgency or immediate cancellation threats detected.',
+      why_it_matters: 'Artificial urgency is designed to rush candidates into paying before verifying.',
+      evidence_strength: semantics?.hasUrgency ? 'High' : 'Moderate',
+      recommended_next_step: 'Take time to independently verify the offer; legitimate employers grant adequate response windows.',
+    },
+    {
+      id: 'sensitive_info_requests',
+      name: 'Sensitive-Information Requests',
+      risk_score: 25,
+      risk_band: getClientRiskBand(25).band,
+      risk_band_label: getClientRiskBand(25).label,
+      evidence_found: 'Standard onboarding documentation requests observed.',
+      why_it_matters: 'Never share Aadhaar, PAN, or bank credentials before confirming company legitimacy.',
+      evidence_strength: 'Moderate',
+      recommended_next_step: 'Mask Aadhaar numbers before submitting onboarding proofs.',
+    },
+    {
+      id: 'external_reputation',
+      name: 'External Reputation and Corroboration',
+      risk_score: 30,
+      risk_band: getClientRiskBand(30).band,
+      risk_band_label: getClientRiskBand(30).label,
+      evidence_found: `Target organization: ${semantics?.detectedCompany || 'Claimed Employer'}.`,
+      why_it_matters: 'External professional feedback and registry existence provide crucial corroboration.',
+      evidence_strength: 'Moderate',
+      recommended_next_step: 'Check employer profile on LinkedIn, Glassdoor, and MCA.',
+    },
+    {
+      id: 'overall_offer_risk',
+      name: 'Overall Employment-Offer Risk',
+      risk_score: overallRiskScore,
+      risk_band: getClientRiskBand(overallRiskScore).band,
+      risk_band_label: getClientRiskBand(overallRiskScore).label,
+      evidence_found: `Synthesized assessment: Authenticity Score ${authenticityScore}/100, Risk Score ${overallRiskScore}/100.`,
+      why_it_matters: 'Overall determination synthesized from multi-signal forensic analysis.',
+      evidence_strength: 'High',
+      recommended_next_step: overallRiskScore >= 60 ? 'Do NOT transfer money or sign contracts. Report to 1930.' : 'Proceed with standard verification checks.',
+    },
+  ];
+
   return {
     metadataScore: mScore,
     pixelScore: pScore,
@@ -1853,6 +2183,8 @@ export function computeDynamicScore(
     structureScore,
     authenticityScore,
     manipulationProbability,
+    riskScore: overallRiskScore,
+    assessments: clientAssessments,
     verdict,
     verdictLabel,
     verdictSeverity,

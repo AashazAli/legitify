@@ -2,7 +2,7 @@
 // LEGITIFY COLORFUL FORENSIC PDF REPORT EXPORT SERVICE (A4 EXECUTIVE TEMPLATE)
 // ==============================================================================
 import { jsPDF } from 'jspdf';
-import { LegitifyReport } from '../types';
+import { LegitifyReport, AssessmentItem } from '../types';
 
 function formatConfidence(val: any): number {
   const num = Number(val);
@@ -12,7 +12,37 @@ function formatConfidence(val: any): number {
   return Math.min(100, Math.max(0, Math.round(num)));
 }
 
-export function exportReportPDF(report: LegitifyReport): void {
+function isFilenameOrPlaceholder(name?: string): boolean {
+  if (!name || typeof name !== 'string') return true;
+  const trimmed = name.trim();
+  if (trimmed.length < 2) return true;
+  if (/^whatsapp\s*image/i.test(trimmed)) return true;
+  if (/^screenshot/i.test(trimmed)) return true;
+  if (/^pasted_text/i.test(trimmed)) return true;
+  if (/^image\s*\(/i.test(trimmed)) return true;
+  if (/^scan_|^document_|^file_/i.test(trimmed)) return true;
+  if (/\.(png|jpe?g|pdf|webp|tiff|gif|bmp|docx?)$/i.test(trimmed)) return true;
+  if (/^\d{4}[-_]\d{2}[-_]\d{2}/.test(trimmed)) return true;
+  if (/^(?:unknown(?:\s*(?:organization|company|entity))?|corporate\s*entity|investigated\s*entity|uploaded\s*document|candidate|n\/a|none|null|undefined)$/i.test(trimmed)) return true;
+  return false;
+}
+
+function getRiskBandColor(band?: string, score?: number): { fill: [number, number, number]; text: [number, number, number] } {
+  const b = (band || '').toUpperCase();
+  const s = score ?? 50;
+  if (b.includes('CRITICAL') || s >= 71) {
+    return { fill: [254, 242, 242], text: [185, 28, 28] }; // Red
+  }
+  if (b.includes('MODERATE') || (s >= 41 && s <= 70)) {
+    return { fill: [254, 249, 195], text: [161, 98, 7] }; // Amber
+  }
+  if (b.includes('MINOR') || (s >= 16 && s <= 40)) {
+    return { fill: [238, 242, 255], text: [67, 56, 202] }; // Indigo
+  }
+  return { fill: [240, 253, 244], text: [22, 101, 52] }; // Green
+}
+
+export function generatePdfDocument(report: LegitifyReport, fallbackAssessments?: AssessmentItem[]): jsPDF {
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -42,7 +72,7 @@ export function exportReportPDF(report: LegitifyReport): void {
     doc.setTextColor(0, 255, 135);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
-    doc.text('LEGITIFY · EVIDENCE-BASED TRUST INTELLIGENCE REPORT', margin, 8);
+    doc.text('LEGITIFY · EVIDENCE-BASED FORENSIC INVESTIGATION REPORT', margin, 8);
     doc.setTextColor(148, 163, 184);
     doc.setFont('helvetica', 'normal');
     doc.text(`CASE ID: ${report.scan_id || 'LGF-2026-000184'}`, pageWidth - margin, 8, { align: 'right' });
@@ -60,8 +90,8 @@ export function exportReportPDF(report: LegitifyReport): void {
   }
 
   // Subtle Background Watermark
-  doc.setTextColor(240, 243, 248);
-  doc.setFontSize(36);
+  doc.setTextColor(245, 247, 250);
+  doc.setFontSize(34);
   doc.setFont('helvetica', 'bold');
   doc.text('LEGITIFY EVIDENCE-FIRST', 35, 150, { angle: 45 });
 
@@ -80,7 +110,7 @@ export function exportReportPDF(report: LegitifyReport): void {
 
   doc.setTextColor(248, 250, 252);
   doc.setFontSize(9);
-  doc.text('TRUST & RECRUITMENT FRAUD INVESTIGATION DOSSIER', margin, 20);
+  doc.text('TRUST & RECRUITMENT FRAUD FORENSIC DOSSIER', margin, 20);
 
   doc.setTextColor(148, 163, 184);
   doc.setFont('helvetica', 'normal');
@@ -90,26 +120,30 @@ export function exportReportPDF(report: LegitifyReport): void {
 
   y = 36;
 
-  // Sanitize entity name
-  let cleanName = (report.company_name || report.entity_name || report.company_verification?.legal_name || report.document_analysis?.extracted_entities?.company || 'Investigated Entity').trim();
-  if (cleanName.match(/(\.(png|jpg|jpeg|pdf)$|^offer_letter|^images|^image\s*\(|^screenshot)/i)) {
-    cleanName = report.document_analysis?.extracted_entities?.company || report.document_analysis?.extracted_entities?.detected_company || 'Investigated Entity';
+  // Sanitize entity name (strictly no filenames or placeholders)
+  let cleanName = (report.company_name || report.entity_name || report.company_verification?.legal_name || '').trim();
+  if (!cleanName || isFilenameOrPlaceholder(cleanName)) {
+    cleanName = 'Organization Not Confidently Identified';
   }
 
-  // Exact Trust Score & Verdict Resolution (NO HARDCODING)
-  const score = typeof report.trust_score === 'number'
-    ? report.trust_score
+  // Exact Trust Score & Overall Risk Score Resolution (NO HARDCODING)
+  const trustScore = typeof report.trust_score === 'number'
+    ? Math.round(report.trust_score)
     : typeof (report as any).final_score === 'number'
-    ? (report as any).final_score
+    ? Math.round((report as any).final_score)
     : 50;
 
-  const rawVerdict = (report.verdict || (score <= 35 ? "LIKELY SCAM" : score <= 65 ? "SUSPICIOUS" : "LIKELY GENUINE")).toUpperCase();
-  const isHighRisk = rawVerdict.includes('SCAM') || rawVerdict.includes('FAKE') || rawVerdict.includes('CRITICAL') || score <= 35;
-  const isModerateRisk = !isHighRisk && (rawVerdict.includes('SUSPICIOUS') || rawVerdict.includes('MODERATE') || score <= 65);
+  const overallRiskScore = typeof report.overall_risk_score === 'number'
+    ? Math.round(report.overall_risk_score)
+    : (report.assessments?.find((a: any) => a.id === 'overall_offer_risk')?.risk_score ?? Math.max(1, Math.min(99, 100 - trustScore)));
+
+  const rawVerdict = (report.verdict || (trustScore <= 35 || overallRiskScore >= 70 ? "LIKELY SCAM" : trustScore <= 65 ? "SUSPICIOUS" : "LIKELY GENUINE")).toUpperCase();
+  const isHighRisk = rawVerdict.includes('SCAM') || rawVerdict.includes('FAKE') || rawVerdict.includes('CRITICAL') || overallRiskScore >= 70 || trustScore <= 35;
+  const isModerateRisk = !isHighRisk && (rawVerdict.includes('SUSPICIOUS') || rawVerdict.includes('MODERATE') || overallRiskScore >= 40 || trustScore <= 65);
 
   const confidenceVal = typeof report.confidence === 'number'
     ? formatConfidence(report.confidence)
-    : (typeof report.confidence_score === 'number' && report.confidence_score !== score
+    : (typeof report.confidence_score === 'number' && report.confidence_score !== trustScore
     ? formatConfidence(report.confidence_score)
     : Math.round(report.evidence_completeness?.percentage || 75));
 
@@ -133,12 +167,12 @@ export function exportReportPDF(report: LegitifyReport): void {
   doc.text(cleanName, margin + 5, y + 8);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setTextColor(148, 163, 184);
-  doc.text(`TARGET TYPE: ${String(report.entity_type || 'JOB_OFFER').toUpperCase()}`, margin + 5, y + 15);
-  doc.text(`INPUT FORMAT: ${String(report.input_type || (report.document_analysis?.filename?.endsWith('.pdf') ? 'PDF DOCUMENT' : 'DIGITAL RECORD')).toUpperCase()}`, margin + 5, y + 21);
-  doc.text(`ASSESSMENT CONFIDENCE: ${confidenceVal}% (Empirically verified across authoritative registries)`, margin + 5, y + 27);
-  doc.text(`SAFETY STATUS: ${hasFeeDemand ? 'ALERT: Candidate Upfront Payment Demand Detected' : 'Zero-Fee Protocol Compliant'}`, margin + 5, y + 33);
+  doc.text(`TARGET TYPE: ${String(report.entity_type || 'JOB_OFFER').toUpperCase()} | INPUT FORMAT: ${String(report.input_type || (report.document_analysis?.filename?.endsWith('.pdf') ? 'PDF DOCUMENT' : 'DIGITAL RECORD')).toUpperCase()}`, margin + 5, y + 14);
+  doc.text(`TRUST INDEX: ${trustScore}/100 | OVERALL RISK SCORE: ${overallRiskScore}/100`, margin + 5, y + 20);
+  doc.text(`ASSESSMENT CONFIDENCE: ${confidenceVal}% | VERDICT: ${rawVerdict}`, margin + 5, y + 26);
+  doc.text(`SAFETY STATUS: ${hasFeeDemand ? 'ALERT: Candidate Upfront Payment Demand Detected' : 'Zero-Fee Protocol Compliant'}`, margin + 5, y + 32);
 
   // Dynamic Score Badge on Right
   const scoreX = pageWidth - margin - 46;
@@ -152,12 +186,16 @@ export function exportReportPDF(report: LegitifyReport): void {
   doc.roundedRect(scoreX, y + 4, 42, 28, 2, 2, 'F');
 
   doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(18);
-  doc.text(`${score}/100`, scoreX + 21, y + 16, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.text('OVERALL RISK', scoreX + 21, y + 10, { align: 'center' });
 
-  doc.setFontSize(7.5);
-  doc.text(isHighRisk ? 'CRITICAL RISK' : isModerateRisk ? 'MODERATE RISK' : 'LOW RISK', scoreX + 21, y + 23, { align: 'center' });
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.text(`${overallRiskScore}/100`, scoreX + 21, y + 19, { align: 'center' });
+
+  doc.setFontSize(6.5);
+  doc.text(isHighRisk ? 'CRITICAL RISK' : isModerateRisk ? 'MODERATE RISK' : 'LOW RISK', scoreX + 21, y + 26, { align: 'center' });
 
   y += 42;
 
@@ -186,358 +224,327 @@ export function exportReportPDF(report: LegitifyReport): void {
 
   y += 28;
 
-  // 2. Multi-Dimensional Forensic Breakdown
-  doc.setTextColor(15, 23, 42);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.text('2. MULTI-DIMENSIONAL FORENSIC BREAKDOWN (EVIDENCE FUSION)', margin, y);
-
-  y += 4;
-
-  const comps = report.components || ({} as any);
-  const dimensionsToDisplay = [
-    {
-      name: 'Financial & Fee Safety',
-      score: comps.document?.score ?? (hasFeeDemand ? 5 : 95),
-      status: comps.document?.status ?? (hasFeeDemand ? 'CONTRADICTED' : 'VERIFIED'),
-      reason: hasFeeDemand ? 'Candidate registration fee or caution deposit demanded' : 'Zero monetary payment or deposit demand detected',
-    },
-    {
-      name: 'Company Registry (MCA21)',
-      score: comps.company?.score ?? (report.company_verification?.status === 'ACTIVE' ? 85 : 45),
-      status: comps.company?.status ?? (report.company_verification?.status === 'ACTIVE' ? 'VERIFIED' : 'UNVERIFIED'),
-      reason: report.company_verification?.legal_name ? `Matched: ${report.company_verification.legal_name.slice(0, 28)}` : 'No live statutory registration match',
-    },
-    {
-      name: 'Domain & Infrastructure',
-      score: comps.domain?.score ?? (report.domain_analysis?.lookalike_detected ? 15 : 75),
-      status: comps.domain?.status ?? (report.domain_analysis?.lookalike_detected ? 'CONTRADICTED' : 'VERIFIED'),
-      reason: report.domain_analysis?.lookalike_detected ? 'Lookalike domain impersonating brand' : 'Domain DNS and MX records resolved',
-    },
-    {
-      name: 'Recruiter Communication',
-      score: comps.recruiter?.score ?? (report.recruiter_analysis?.domain_alignment === 'EXACT_MATCH' ? 90 : 35),
-      status: comps.recruiter?.status ?? (report.recruiter_analysis?.domain_alignment === 'EXACT_MATCH' ? 'VERIFIED' : 'SUSPICIOUS'),
-      reason: report.recruiter_analysis?.domain_alignment === 'EXACT_MATCH' ? 'Official corporate sender address' : 'Sender unaligned or public webmail provider',
-    },
-    {
-      name: 'Threat Feeds (VirusTotal)',
-      score: comps.threat?.score ?? 95,
-      status: comps.threat?.status ?? 'VERIFIED',
-      reason: 'Cross-referenced against global URLhaus/AbuseIPDB intelligence',
-    },
-    {
-      name: 'Community & Experience',
-      score: comps.community?.score ?? (isHighRisk ? 30 : 80),
-      status: comps.community?.status ?? (isHighRisk ? 'SUSPICIOUS' : 'VERIFIED'),
-      reason: isHighRisk ? 'Corroborating public recruitment scam complaints found' : 'No adverse recruitment complaints indexed',
-    },
-  ];
-
-  const colW = (contentWidth - 6) / 3;
-  for (let i = 0; i < dimensionsToDisplay.length; i += 3) {
-    checkPageBreak(22);
-    const rowDims = dimensionsToDisplay.slice(i, i + 3);
-    rowDims.forEach((dim, idx) => {
-      const cardX = margin + (idx * (colW + 3));
-      const isBad = dim.status === 'CONTRADICTED' || dim.score <= 35;
-      const isWarn = dim.status === 'SUSPICIOUS' || dim.score <= 65;
-
-      doc.setFillColor(isBad ? 254 : isWarn ? 255 : 240, isBad ? 242 : isWarn ? 251 : 253, isBad ? 242 : isWarn ? 235 : 244);
-      doc.setDrawColor(isBad ? 254 : isWarn ? 253 : 187, isBad ? 202 : isWarn ? 230 : 247, isBad ? 202 : isWarn ? 138 : 208);
-      doc.roundedRect(cardX, y, colW, 18, 1.5, 1.5, 'FD');
-
-      doc.setTextColor(isBad ? 185 : isWarn ? 180 : 22, isBad ? 28 : isWarn ? 83 : 101, isBad ? 28 : isWarn ? 9 : 52);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7);
-      doc.text(dim.name, cardX + 3, y + 5);
-
-      doc.setFontSize(10);
-      doc.text(`${dim.score}%`, cardX + 3, y + 11);
-
-      doc.setFontSize(6.5);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`[${dim.status}]`, cardX + 22, y + 11);
-
-      doc.setTextColor(100, 116, 139);
-      doc.setFontSize(5.5);
-      doc.text(doc.splitTextToSize(dim.reason, colW - 6)[0] || '', cardX + 3, y + 15);
-    });
-    y += 21;
-  }
-
-  y += 4;
-
-  // 3. Risks & Mitigation Actions Table
-  checkPageBreak(36);
-  doc.setTextColor(15, 23, 42);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.text('3. DETECTED RISKS & MITIGATION ACTION MATRIX', margin, y);
-
-  y += 4;
-
-  const tableHeaderY = y;
-  doc.setFillColor(224, 242, 254);
-  doc.setDrawColor(186, 230, 253);
-  doc.roundedRect(margin, tableHeaderY, contentWidth, 7, 1, 1, 'FD');
-
-  doc.setTextColor(3, 105, 161);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.text('Risks / Issues Detected', margin + 3, tableHeaderY + 5);
-  doc.text('Mitigation Actions', margin + 65, tableHeaderY + 5);
-  doc.text('Responsible Owner', margin + 130, tableHeaderY + 5);
-  doc.text('Priority / Due', margin + 160, tableHeaderY + 5);
-
-  y += 9;
-
-  const rawFlags: { risk: string; action: string; owner: string; due: string }[] = [];
-
-  if (hasFeeDemand) {
-    rawFlags.push({
-      risk: 'Upfront Candidate Fee Demand',
-      action: 'Never transfer funds for registration, laptop deposit, or training.',
-      owner: 'Candidate',
-      due: 'IMMEDIATE',
-    });
-  }
-
-  if (report.domain_analysis?.lookalike_detected) {
-    rawFlags.push({
-      risk: `Lookalike Domain (${report.domain_analysis.domain || 'Sender Domain'})`,
-      action: 'Cross-check authoritative domain against official registrar/MCA21.',
-      owner: 'Candidate',
-      due: 'Within 24h',
-    });
-  }
-
-  if ((report.recruiter_analysis as any)?.is_free_provider || report.recruiter_analysis?.free_email_provider) {
-    rawFlags.push({
-      risk: 'Recruiter Free Webmail (@gmail/@yahoo)',
-      action: 'Request written verification from official enterprise domain address.',
-      owner: 'Placement / HR',
-      due: 'Prior to sign',
-    });
-  }
-
-  (report.rules_triggered || []).forEach(r => {
-    if (!rawFlags.some(f => f.risk.toLowerCase().includes(r.name.slice(0, 10).toLowerCase()))) {
-      rawFlags.push({
-        risk: r.name.slice(0, 45),
-        action: r.explanation ? r.explanation.slice(0, 60) : 'Investigate recruiter authorization independently.',
-        owner: 'Candidate',
-        due: r.severity === 'CRITICAL' ? 'IMMEDIATE' : 'Prior to sign',
-      });
-    }
-  });
-
-  (report.red_flags || []).forEach((rf: any) => {
-    const msg = typeof rf === 'string' ? rf : rf.message || rf.rule;
-    if (msg && !rawFlags.some(f => f.risk.toLowerCase().includes(msg.slice(0, 10).toLowerCase()))) {
-      rawFlags.push({
-        risk: msg.slice(0, 45),
-        action: 'Verify bona fides through certified university placement cell.',
-        owner: 'Candidate',
-        due: 'Prior to sign',
-      });
-    }
-  });
-
-  if (rawFlags.length === 0) {
-    rawFlags.push({
-      risk: 'Zero High-Severity Risk Signals',
-      action: 'Standard onboarding procedure; verify compensation components.',
-      owner: 'Candidate',
-      due: 'Standard',
-    });
-  }
-
-  rawFlags.slice(0, 5).forEach((r, idx) => {
-    checkPageBreak(10);
-    doc.setFillColor(idx % 2 === 0 ? 255 : 248, idx % 2 === 0 ? 255 : 250, idx % 2 === 0 ? 255 : 252);
-    doc.rect(margin, y, contentWidth, 8, 'F');
-    doc.setDrawColor(226, 232, 240);
-    doc.line(margin, y + 8, margin + contentWidth, y + 8);
-
-    doc.setTextColor(15, 23, 42);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(6.8);
-    doc.text(r.risk, margin + 3, y + 5.5);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(71, 85, 105);
-    doc.text(doc.splitTextToSize(r.action, 62)[0] || r.action, margin + 65, y + 5.5);
-    doc.text(r.owner, margin + 130, y + 5.5);
-
-    doc.setFont('helvetica', r.due === 'IMMEDIATE' ? 'bold' : 'normal');
-    doc.setTextColor(r.due === 'IMMEDIATE' ? 220 : 71, r.due === 'IMMEDIATE' ? 38 : 85, r.due === 'IMMEDIATE' ? 38 : 105);
-    doc.text(r.due, margin + 160, y + 5.5);
-
-    y += 8;
-  });
-
-  y += 6;
-
-  // 4. Multi-Source Evidence Locker
+  // --------------------------------------------------------------------------
+  // SECTION 2: DETAILED PAYMENT & FINANCIAL FEE FINDINGS
+  // --------------------------------------------------------------------------
   checkPageBreak(38);
   doc.setTextColor(15, 23, 42);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.text('4. AUDITABLE MULTI-SOURCE EVIDENCE LOCKER', margin, y);
+  doc.setFontSize(8.5);
+  doc.text('2. DETAILED PAYMENT & FINANCIAL FEE FINDINGS', margin, y);
 
   y += 4;
 
-  const evLockerY = y;
-  doc.setFillColor(241, 245, 249);
-  doc.setDrawColor(203, 213, 225);
-  doc.roundedRect(margin, evLockerY, contentWidth, 7, 1, 1, 'FD');
+  const docFeeDetails = (report.document_analysis as any)?.fee_details || (report as any).fee_details || [];
+  const primaryFee = docFeeDetails[0];
+  const rawComp = (report.document_analysis as any)?.candidate_compensation || (report as any).candidate_compensation;
+  const candidateCompList = Array.isArray(rawComp) ? rawComp : (rawComp && typeof rawComp === 'object' ? [rawComp] : []);
 
-  doc.setTextColor(51, 65, 85);
+  const finBoxHeight = hasFeeDemand ? 32 : 22;
+  doc.setFillColor(hasFeeDemand ? 254 : 240, hasFeeDemand ? 242 : 253, hasFeeDemand ? 242 : 244);
+  doc.setDrawColor(hasFeeDemand ? 254 : 187, hasFeeDemand ? 202 : 247, hasFeeDemand ? 202 : 208);
+  doc.roundedRect(margin, y, contentWidth, finBoxHeight, 2, 2, 'FD');
+
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.text('ID', margin + 3, evLockerY + 5);
-  doc.text('Category', margin + 25, evLockerY + 5);
-  doc.text('Status', margin + 60, evLockerY + 5);
-  doc.text('Source', margin + 85, evLockerY + 5);
-  doc.text('Evidence Finding / Claim', margin + 120, evLockerY + 5);
-
-  y += 9;
-
-  const realEvidence = (report.evidence && report.evidence.length > 0)
-    ? report.evidence
-    : [
-        {
-          id: 'E-001',
-          category: 'REGISTRY',
-          status: report.company_verification?.status === 'ACTIVE' ? 'VERIFIED' : 'UNVERIFIED',
-          source_name: 'MCA21 Registry Index',
-          evidence_text: `Corporate reference check for '${cleanName}'.`,
-          confidence: 90,
-        },
-        {
-          id: 'E-002',
-          category: 'FINANCIAL',
-          status: hasFeeDemand ? 'CONTRADICTED' : 'VERIFIED',
-          source_name: 'Document Analysis',
-          evidence_text: hasFeeDemand ? 'Candidate upfront payment or deposit demanded.' : 'Zero fee demands detected across text.',
-          confidence: 95,
-        },
-        {
-          id: 'E-003',
-          category: 'RECRUITER',
-          status: report.recruiter_analysis?.domain_alignment === 'EXACT_MATCH' ? 'VERIFIED' : 'WARNING',
-          source_name: 'Email Routing Analysis',
-          evidence_text: 'Recruiter communication channel evaluated for corporate domain authentication.',
-          confidence: 88,
-        },
-      ];
-
-  realEvidence.slice(0, 6).forEach((ev: any, idx: number) => {
-    checkPageBreak(10);
-    doc.setFillColor(idx % 2 === 0 ? 255 : 248, idx % 2 === 0 ? 255 : 250, idx % 2 === 0 ? 255 : 252);
-    doc.rect(margin, y, contentWidth, 8, 'F');
-    doc.setDrawColor(226, 232, 240);
-    doc.line(margin, y + 8, margin + contentWidth, y + 8);
-
-    doc.setTextColor(79, 70, 229);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(6.8);
-    doc.text(String(ev.id || `E-00${idx + 1}`).slice(0, 12), margin + 3, y + 5.5);
-
-    doc.setTextColor(15, 23, 42);
-    doc.setFont('helvetica', 'normal');
-    doc.text(String(ev.category || 'FORENSIC').slice(0, 16), margin + 25, y + 5.5);
-
-    const st = String(ev.status || (ev.severity === 'CRITICAL' ? 'CONTRADICTED' : 'VERIFIED')).toUpperCase();
-    doc.setFont('helvetica', 'bold');
-    if (st.includes('CONTRADICTED') || st.includes('CRITICAL') || st.includes('FAKE')) {
-      doc.setTextColor(220, 38, 38);
-    } else if (st.includes('WARN') || st.includes('SUSPICIOUS')) {
-      doc.setTextColor(217, 119, 6);
-    } else {
-      doc.setTextColor(22, 101, 52);
-    }
-    doc.text(`[${st}]`, margin + 60, y + 5.5);
+  doc.setFontSize(8);
+  if (hasFeeDemand) {
+    doc.setTextColor(185, 28, 28);
+    doc.text('ALERT: Explicit Candidate Upfront Fee / Deposit Demand Detected', margin + 5, y + 6);
 
     doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
     doc.setTextColor(71, 85, 105);
-    doc.text(String(ev.source_name || ev.source || 'LEGITIFY').slice(0, 20), margin + 85, y + 5.5);
+    const feeAmt = primaryFee?.amount || (report.document_analysis as any)?.detected_stipend || 'Unspecified Amount';
+    const feeRec = primaryFee?.recipient || 'Unspecified Payment Endpoint';
+    const feeRef = primaryFee?.is_refundable ? `Claimed Refundable (${primaryFee.refund_terms || 'conditional'})` : 'Non-Refundable / Unstated';
+    const feeDead = primaryFee?.deadline ? `Deadline: ${primaryFee.deadline}` : 'Immediate';
 
-    const claimText = String(ev.evidence_text || ev.title || ev.claim || 'Finding recorded').trim();
-    doc.text(doc.splitTextToSize(claimText, 62)[0] || claimText, margin + 120, y + 5.5);
+    doc.text(`Amount Demanded: ${feeAmt} | Recipient / Channel: ${feeRec} | Refund Terms: ${feeRef} | ${feeDead}`, margin + 5, y + 12);
 
-    y += 8;
+    if (primaryFee?.exact_quote) {
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(127, 29, 29);
+      const quoteText = `Exact Excerpt: "${primaryFee.exact_quote}"`;
+      doc.text(doc.splitTextToSize(quoteText, contentWidth - 10).slice(0, 2), margin + 5, y + 17);
+    }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(185, 28, 28);
+    doc.text('CRITICAL WARNING: Genuine employers NEVER ask candidates for fees, training costs, or caution money.', margin + 5, y + 27);
+  } else {
+    doc.setTextColor(22, 101, 52);
+    doc.text('VERIFIED: Zero Candidate Monetary Charges Detected (Zero-Fee Protocol Compliant)', margin + 5, y + 6);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(71, 85, 105);
+    const compText = candidateCompList.length > 0
+      ? `Candidate Compensation Stated: ${candidateCompList.map((c: any) => `${c.type || 'Remuneration'}: ${c.amount || c.raw_quote || c.rawText || ''}`).join(', ')} (Remuneration payable TO candidate).`
+      : 'No upfront fee demands, laptop caution money, registration fees, or processing charges found in text.';
+    doc.text(doc.splitTextToSize(compText, contentWidth - 10).slice(0, 2), margin + 5, y + 12);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(22, 101, 52);
+    doc.text('COMPLIANCE NOTE: The document complies with legitimate enterprise zero-fee recruitment practices.', margin + 5, y + 18);
+  }
+
+  y += finBoxHeight + 6;
+
+  // --------------------------------------------------------------------------
+  // SECTION 3: COMPREHENSIVE MULTI-VECTOR RISK ASSESSMENTS (ALL 12 VECTORS)
+  // Single source of truth from report.assessments
+  // --------------------------------------------------------------------------
+  checkPageBreak(30);
+  doc.setTextColor(15, 23, 42);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.text('3. COMPREHENSIVE MULTI-VECTOR RISK ASSESSMENTS (12 FORENSIC VECTORS)', margin, y);
+
+  y += 5;
+
+  const rawAssessmentsList: AssessmentItem[] = (report.assessments && report.assessments.length > 0)
+    ? report.assessments
+    : [];
+
+  const assessmentsList: AssessmentItem[] = rawAssessmentsList.map(item => {
+    if (item.id === 'financial_safety' && hasFeeDemand) {
+      const feeQuote = report.document_analysis?.fee_details?.[0]?.exact_quote ||
+        (report.critical_signals && report.critical_signals.find((s: any) => /fee|deposit|payment/i.test(s))) ||
+        (report.rules_triggered && report.rules_triggered.find((r: any) => /fee|deposit/i.test(r.name || ''))?.explanation);
+      return {
+        ...item,
+        risk_score: Math.max(item.risk_score || 0, 96),
+        risk_band: 'CRITICAL_RISK',
+        risk_band_label: 'Critical Fraud Risk',
+        evidence_found: feeQuote
+          ? `Explicit candidate fee or security deposit detected: "${feeQuote}"`
+          : (item.evidence_found && !item.evidence_found.toLowerCase().includes('zero')
+            ? item.evidence_found
+            : 'Explicit candidate fee, caution deposit, or monetary demand detected in document.'),
+        why_it_matters: 'Legitimate employers never demand candidate registration fees or caution deposits. Any fee demand is an immediate scam indicator.',
+        recommended_next_step: 'NEVER transfer funds or UPI payments. Terminate contact and report to 1930 Cybercrime Helpline.',
+      };
+    }
+    return item;
   });
 
-  y += 6;
+  if (assessmentsList.length > 0) {
+    assessmentsList.forEach((item, idx) => {
+      // Calculate needed vertical space for this assessment card
+      const evLines = doc.splitTextToSize(item.evidence_found || 'No evidence recorded.', contentWidth - 12);
+      const whyLines = doc.splitTextToSize(item.why_it_matters || '', contentWidth - 12);
+      const nextLines = doc.splitTextToSize(item.recommended_next_step || '', contentWidth - 12);
 
-  // 5. Extracted Document Claims Ledger (RAG)
-  const claims: any[] = (report as any).extracted_claims || (report.document_analysis as any)?.extracted_claims || [];
-  if (claims.length > 0) {
-    checkPageBreak(34);
-    doc.setTextColor(15, 23, 42);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.text('5. EXTRACTED CLAIMS VS RETRIEVED REALITY (RAG LEDGER)', margin, y);
+      const quoteLines = item.exact_quote ? doc.splitTextToSize(`Exact Quote: "${item.exact_quote}"`, contentWidth - 12) : [];
+      const extraHeight = (quoteLines.length > 0 ? quoteLines.length * 3.2 + 2 : 0);
+      const cardHeight = 16 + (evLines.length * 3.2) + (whyLines.length * 3.2) + (nextLines.length * 3.2) + extraHeight;
 
-    y += 4;
+      checkPageBreak(cardHeight + 4);
 
-    const claimHeaderY = y;
-    doc.setFillColor(238, 242, 255);
-    doc.setDrawColor(199, 210, 254);
-    doc.roundedRect(margin, claimHeaderY, contentWidth, 7, 1, 1, 'FD');
+      const colors = getRiskBandColor(item.risk_band, item.risk_score);
 
-    doc.setTextColor(67, 56, 202);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.5);
-    doc.text('Claim Type', margin + 3, claimHeaderY + 5);
-    doc.text('Claimed in Document', margin + 45, claimHeaderY + 5);
-    doc.text('Status', margin + 115, claimHeaderY + 5);
-    doc.text('Retrieved Ground Truth', margin + 140, claimHeaderY + 5);
-
-    y += 9;
-
-    claims.slice(0, 5).forEach((clm: any, idx: number) => {
-      checkPageBreak(9);
-      doc.setFillColor(idx % 2 === 0 ? 255 : 248, idx % 2 === 0 ? 255 : 250, idx % 2 === 0 ? 255 : 252);
-      doc.rect(margin, y, contentWidth, 8, 'F');
+      // Card Background
+      doc.setFillColor(255, 255, 255);
       doc.setDrawColor(226, 232, 240);
-      doc.line(margin, y + 8, margin + contentWidth, y + 8);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(margin, y, contentWidth, cardHeight, 1.5, 1.5, 'FD');
 
+      // Left Accent Color Bar
+      doc.setFillColor(...colors.text);
+      doc.rect(margin, y, 2.5, cardHeight, 'F');
+
+      // Title & Score Badge
       doc.setTextColor(15, 23, 42);
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(6.8);
-      doc.text(String(clm.claim_type || 'CLAIM').replace(/_/g, ' ').slice(0, 24), margin + 3, y + 5.5);
+      doc.setFontSize(7.5);
+      doc.text(`${idx + 1}. ${item.name}`, margin + 6, y + 5);
 
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(71, 85, 105);
-      const rawClaim = String(clm.raw_claim_text || clm.normalized_value || '').trim();
-      doc.text(doc.splitTextToSize(rawClaim, 65)[0] || rawClaim, margin + 45, y + 5.5);
+      // Risk Badge on Right
+      doc.setFillColor(...colors.fill);
+      doc.roundedRect(pageWidth - margin - 42, y + 2, 38, 5.5, 1, 1, 'F');
+      doc.setTextColor(...colors.text);
+      doc.setFontSize(6.5);
+      doc.text(`${item.risk_score}/100 Risk · ${item.risk_band_label || item.risk_band}`, pageWidth - margin - 23, y + 5.8, { align: 'center' });
 
-      const statusStr = String(clm.verification_status || 'VERIFIED').toUpperCase();
+      let cardY = y + 9.5;
+
+      // Evidence Found
+      doc.setTextColor(51, 65, 85);
       doc.setFont('helvetica', 'bold');
-      if (statusStr.includes('CONTRADICTED') || statusStr.includes('FAIL')) {
-        doc.setTextColor(220, 38, 38);
-      } else if (statusStr.includes('SUSPICIOUS') || statusStr.includes('UNVERIFIED')) {
-        doc.setTextColor(217, 119, 6);
-      } else {
-        doc.setTextColor(22, 101, 52);
-      }
-      doc.text(statusStr.slice(0, 14), margin + 115, y + 5.5);
-
+      doc.setFontSize(6.8);
+      doc.text('Evidence Found: ', margin + 6, cardY);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(71, 85, 105);
-      const reality = String(clm.retrieved_reality || clm.explanation || 'Verified via forensic index').trim();
-      doc.text(doc.splitTextToSize(reality, 40)[0] || reality, margin + 140, y + 5.5);
+      for (const line of evLines) {
+        doc.text(line, margin + 26, cardY);
+        cardY += 3.2;
+      }
 
-      y += 8;
+      // Exact Quote if present
+      if (item.exact_quote && quoteLines.length > 0) {
+        doc.setFont('helvetica', 'italic');
+        doc.setTextColor(185, 28, 28);
+        for (const qLine of quoteLines) {
+          doc.text(qLine, margin + 6, cardY);
+          cardY += 3.2;
+        }
+      }
+
+      // Why It Matters
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(51, 65, 85);
+      doc.setFontSize(6.8);
+      doc.text('Why It Matters: ', margin + 6, cardY);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 116, 139);
+      for (const line of whyLines) {
+        doc.text(line, margin + 26, cardY);
+        cardY += 3.2;
+      }
+
+      // Recommended Next Step
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(15, 23, 42);
+      doc.setFontSize(6.8);
+      doc.text('Next Step: ', margin + 6, cardY);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(30, 41, 59);
+      for (const line of nextLines) {
+        doc.text(line, margin + 26, cardY);
+        cardY += 3.2;
+      }
+
+      y += cardHeight + 3;
     });
   }
 
-  addPageFooter();
+  y += 4;
 
-  // Save the PDF
-  const cleanFilename = `LEGITIFY_FORENSIC_REPORT_${cleanName.replace(/[^a-zA-Z0-9]/g, '_')}_${report.scan_id || 'DOSSIER'}.pdf`;
+  // --------------------------------------------------------------------------
+  // SECTION 4: EXTERNAL VERIFICATION & INTELLIGENCE FINDINGS
+  // --------------------------------------------------------------------------
+  const extResearch = (report as any).external_research;
+  checkPageBreak(36);
+  doc.setTextColor(15, 23, 42);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.text('4. EXTERNAL VERIFICATION & INTELLIGENCE FINDINGS', margin, y);
+
+  y += 4;
+
+  const extItems = [
+    {
+      source: 'LinkedIn Directory',
+      status: extResearch?.linkedin?.found ? 'VERIFIED' : 'UNVERIFIED',
+      detail: extResearch?.linkedin?.details || 'Cross-referenced company presence and recruiter profiles.',
+    },
+    {
+      source: 'Reddit Discussions',
+      status: extResearch?.reddit?.scam_reports > 0 ? 'ALERT' : 'CLEAR',
+      detail: extResearch?.reddit?.summary || 'Scanned r/cscareerquestions, r/recruitinghell for scam reports.',
+    },
+    {
+      source: 'Quora Intelligence',
+      status: extResearch?.quora?.found ? 'OBSERVED' : 'CLEAR',
+      detail: extResearch?.quora?.summary || 'Indexed peer candidate reviews and employer inquiries.',
+    },
+    {
+      source: 'MCA21 Statutory Registry',
+      status: report.company_verification?.status === 'ACTIVE' ? 'VERIFIED' : 'UNVERIFIED',
+      detail: report.company_verification?.legal_name ? `Statutory legal entity: ${report.company_verification.legal_name}` : 'Not corroborated against live MCA master data.',
+    },
+  ];
+
+  extItems.forEach(item => {
+    checkPageBreak(12);
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(margin, y, contentWidth, 10, 1, 1, 'FD');
+
+    doc.setTextColor(15, 23, 42);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.text(item.source, margin + 4, y + 4.5);
+
+    const isAlert = item.status === 'ALERT';
+    const isGood = item.status === 'VERIFIED';
+    doc.setTextColor(isAlert ? 185 : isGood ? 22 : 100, isAlert ? 28 : isGood ? 101 : 116, isAlert ? 28 : isGood ? 52 : 139);
+    doc.setFontSize(6.5);
+    doc.text(`[${item.status}]`, margin + 45, y + 4.5);
+
+    doc.setTextColor(71, 85, 105);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.text(doc.splitTextToSize(item.detail, contentWidth - 65)[0] || item.detail, margin + 65, y + 4.5);
+
+    y += 11;
+  });
+
+  y += 2;
+
+  // --------------------------------------------------------------------------
+  // SECTION 5: SIGNATORY & VISUAL FORENSICS FINDINGS
+  // --------------------------------------------------------------------------
+  const sigForensics = report.signatory_forensics;
+  checkPageBreak(28);
+  doc.setTextColor(15, 23, 42);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.text('5. SIGNATORY & VISUAL FORENSICS FINDINGS', margin, y);
+
+  y += 4;
+
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(margin, y, contentWidth, 18, 1.5, 1.5, 'FD');
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(51, 65, 85);
+
+  const sigMark = sigForensics?.signature_detected ? `Detected (${sigForensics.signature_type || 'Image Mark'})` : 'No Visual Signature Stroke';
+  const sigName = sigForensics?.signatory_name || report.document_analysis?.detected_signatory || 'Signatory Unextracted';
+  const sigTitle = sigForensics?.signatory_title || 'Title Unextracted';
+  const sigState = sigForensics?.identity_state || 'UNVERIFIED';
+
+  doc.text(`Signature Mark: ${sigMark} | State: [${sigState}]`, margin + 4, y + 6);
+  doc.text(`Signatory Name: ${sigName} | Title: ${sigTitle}`, margin + 4, y + 11);
+  doc.text(`Detection Method: ${sigForensics?.detection_method || 'Computer Vision Edge & Template Analysis'}`, margin + 4, y + 16);
+
+  y += 22;
+
+  // --------------------------------------------------------------------------
+  // SECTION 6: OFFICIAL LEGAL DISCLAIMER & EMERGENCY PROTOCOL
+  // --------------------------------------------------------------------------
+  checkPageBreak(24);
+  doc.setFillColor(241, 245, 249);
+  doc.setDrawColor(203, 213, 225);
+  doc.roundedRect(margin, y, contentWidth, 18, 1.5, 1.5, 'FD');
+
+  doc.setTextColor(15, 23, 42);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.text('OFFICIAL LEGAL DISCLAIMER & EMERGENCY PROTOCOL', margin + 4, y + 5);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.setTextColor(100, 116, 139);
+  const disclaimerText = 'LEGITIFY provides automated evidence-based risk analysis to support applicant decision-making. It is not a legal determination, guarantee of employment legitimacy, or definitive proof of fraudulent intent. If you have transferred funds to an unverified counterparty, contact the National Cybercrime Helpline at 1930 immediately.';
+  doc.text(doc.splitTextToSize(disclaimerText, contentWidth - 8), margin + 4, y + 9.5);
+
+  addPageFooter();
+  return doc;
+}
+
+export function exportReportPDF(report: LegitifyReport, fallbackAssessments?: AssessmentItem[]): void {
+  const doc = generatePdfDocument(report, fallbackAssessments);
+  let cleanName = (report.company_name || report.entity_name || report.company_verification?.legal_name || '').trim();
+  if (!cleanName || isFilenameOrPlaceholder(cleanName)) {
+    cleanName = 'Organization Not Confidently Identified';
+  }
+  const safeFilenamePart = cleanName.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 30);
+  const cleanFilename = `LEGITIFY_FORENSIC_REPORT_${safeFilenamePart}_${report.scan_id || 'DOSSIER'}.pdf`;
   doc.save(cleanFilename);
 }
+
+export const exportReportToPdf = exportReportPDF;

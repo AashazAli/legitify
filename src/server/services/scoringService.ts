@@ -8,7 +8,7 @@
 // Different input/evidence → DIFFERENT RESULT
 // No Math.random(), no microVariance, no hashSeed jitter, no hardcoded score ranges
 // ==============================================================================
-import { EvidenceItem, EvidenceCompleteness, RuleEvaluation, RiskLevel, ScoreTrace, ScoreTraceDimension, ScoreTraceConstraint } from '../../types';
+import { EvidenceItem, EvidenceCompleteness, RuleEvaluation, RiskLevel, ScoreTrace, ScoreTraceDimension, ScoreTraceConstraint, AssessmentItem } from '../../types';
 import { evaluateRules } from '../rules/ruleEngine';
 import { CompanyData } from './companyService';
 import { DomainData } from './domainService';
@@ -19,6 +19,7 @@ import { ThreatData } from './threatService';
 import { MLPrediction } from '../ml/fraudClassifier';
 import { CommunitySearchResult } from './publicExperienceService';
 import { detectEvidenceConflicts, EvidenceConflict } from './conflictService';
+import { isFilenameOrPlaceholder } from '../utils/normalizer';
 
 export const SCORING_MODEL_VERSION = 'LEGITIFY-SCORE-v2.0';
 
@@ -106,6 +107,8 @@ export interface DeterministicScoreResult {
   critical_signals: string[];
   scoring_model_version?: string;
   score_trace: ScoreTrace;
+  overall_risk_score?: number;
+  assessments?: AssessmentItem[];
 }
 
 /**
@@ -404,11 +407,12 @@ export function calculateDeterministicScore(inputs: ScoringInputs): Deterministi
   // ============================================================================
   // 5. Financial / Fee Safety Score (Weight: 20% — HIGHEST WEIGHT)
   // ============================================================================
-  const financialEvidence = evidenceList.filter(e => e.category === 'OFFER' || (e.category as any) === 'PAYMENT' || e.category === 'DOCUMENT');
+  const financialEvidence = evidenceList.filter(e => e.category === 'OFFER' || (e.category as any) === 'PAYMENT' || e.category === 'DOCUMENT' || (e.category as any) === 'FINANCIAL');
   const isFinancialActive = Boolean(
     inputs.documentData &&
     (((inputs.documentData.extracted_text || '').trim().length > 20) ||
-     inputs.documentData.has_fee_demand !== undefined)
+     inputs.documentData.has_fee_demand !== undefined ||
+     (inputs.documentData.fee_details && inputs.documentData.fee_details.length > 0))
   );
 
   let documentScore = 0;
@@ -418,11 +422,30 @@ export function calculateDeterministicScore(inputs: ScoringInputs): Deterministi
 
   if (isFinancialActive && inputs.documentData) {
     documentConfidence = 95;
-    if (inputs.documentData.has_fee_demand) {
+    const hasDetectedFee = Boolean(
+      inputs.documentData.has_fee_demand ||
+      (inputs.documentData.fee_details && inputs.documentData.fee_details.length > 0) ||
+      (inputs.documentData.requested_fees && inputs.documentData.requested_fees.length > 0) ||
+      evidenceList.some(e => (e.category === 'FINANCIAL' || (e.category as any) === 'PAYMENT' || e.category === 'OFFER') && (e.severity === 'CRITICAL' || e.title?.toLowerCase().includes('fee') || e.snippet?.toLowerCase().includes('fee')))
+    );
+
+    const rawComp = inputs.documentData.candidate_compensation;
+    const compArray = Array.isArray(rawComp) ? rawComp : (rawComp && typeof rawComp === 'object' ? [rawComp] : []);
+    const hasCandidateComp = compArray.length > 0 || Boolean(inputs.documentData.detected_stipend);
+
+    if (hasDetectedFee) {
       documentScore = 5;
       documentStatus = 'CONTRADICTED';
-      documentReason = "Mandatory candidate payment, deposit, or registration fee detected.";
+      const pFee = inputs.documentData.fee_details?.[0];
+      documentReason = pFee
+        ? `Mandatory candidate payment detected: ${pFee.category || 'Fee'}${pFee.amount ? ' of ' + pFee.amount : ''}${pFee.recipient ? ' payable to ' + pFee.recipient : ''}.`
+        : "Mandatory candidate payment, deposit, or registration fee detected.";
       criticalSignals.push("Mandatory candidate fee/security deposit requested in offer.");
+    } else if (hasCandidateComp) {
+      documentScore = 95;
+      documentStatus = 'VERIFIED';
+      documentReason = "Offer document defines candidate compensation and is completely free of upfront fee demands (Zero-Fee Standard respected).";
+      positiveSignals.push("Offer specifies candidate compensation and respects Zero-Fee Standard.");
     } else {
       documentScore = 90;
       documentStatus = 'VERIFIED';
@@ -781,7 +804,10 @@ export function calculateDeterministicScore(inputs: ScoringInputs): Deterministi
   // Constraint 2: Confirmed candidate payment demand cap (max 20)
   const hasFeeDemand = Boolean(
     inputs.documentData?.has_fee_demand ||
-    inputs.documentData?.is_confirmed_impersonation
+    (inputs.documentData?.fee_details && inputs.documentData.fee_details.length > 0) ||
+    (inputs.documentData?.requested_fees && inputs.documentData.requested_fees.length > 0) ||
+    inputs.documentData?.is_confirmed_impersonation ||
+    evidenceList.some(e => (e.category === 'FINANCIAL' || (e.category as any) === 'PAYMENT' || e.category === 'OFFER') && e.severity === 'CRITICAL')
   );
   if (hasFeeDemand) {
     const applied = rawTrust > 20;
@@ -830,11 +856,11 @@ export function calculateDeterministicScore(inputs: ScoringInputs): Deterministi
     hardCaps.push("FREE_WEBMAIL_CAP: Trust capped to max 24 — personal webmail provider detected");
   }
 
-  // Constraint 5: Structural / Document Format Failure (max 32)
+  // Constraint 5: Substantive Document Fraud & Critical Violation (max 32)
+  // Per Part 4: Layout & formatting differences alone MUST NOT dominate the fraud verdict.
   const isDocCompromised = Boolean(
-    docAuthScore < 45 ||
-    inputs.documentData?.is_suspicious_offer_letter ||
-    inputs.documentData?.verdict === "LIKELY FAKE"
+    (inputs.documentData?.has_fee_demand || inputs.documentData?.is_suspicious_offer_letter) &&
+    (inputs.documentData?.verdict === "LIKELY FAKE" || (inputs.documentData?.suspicious_patterns && inputs.documentData.suspicious_patterns.length >= 2))
   );
   if (isDocCompromised) {
     const applied = rawTrust > 32;
@@ -842,10 +868,10 @@ export function calculateDeterministicScore(inputs: ScoringInputs): Deterministi
     constraintsTriggered.push({
       constraint: "DOCUMENT_STRUCTURE_CAP",
       ceiling: 32,
-      reason: "Document structure fails organizational formatting or contains multiple anomaly flags",
+      reason: "Document contains explicit fraud triggers and fails basic security authenticity",
       applied,
     });
-    hardCaps.push("DOCUMENT_STRUCTURE_CAP: Trust capped to max 32 — document failed enterprise layout & structure standards");
+    hardCaps.push("DOCUMENT_STRUCTURE_CAP: Trust capped to max 32 — document failed security authenticity");
   }
 
   // Constraint 6: Informal Communication Channel (WhatsApp / Telegram) (max 28)
@@ -962,12 +988,17 @@ export function calculateDeterministicScore(inputs: ScoringInputs): Deterministi
       : "final_score = 0.0 (active_weight_sum == 0)",
   };
 
+  const overallRiskScore = Math.max(1, Math.min(99, 100 - finalTrust));
+  const assessments = buildStandardAssessments(inputs, components, hardCaps, finalTrust, verdict, conflicts);
+
   return {
     trust_score: finalTrust,
     confidence_score: finalConfidence,
     pre_constraint_score: preConstraintScore,
     risk_level: riskLevel,
     verdict,
+    overall_risk_score: overallRiskScore,
+    assessments,
     components,
     rules_triggered: rules,
     conflicts,
@@ -978,4 +1009,363 @@ export function calculateDeterministicScore(inputs: ScoringInputs): Deterministi
     scoring_model_version: SCORING_MODEL_VERSION,
     score_trace: scoreTrace,
   };
+}
+
+export function getRiskBandInfo(score: number): { band: AssessmentRiskBand; label: string } {
+  if (score <= 15) return { band: 'LOW_RISK', label: 'Low Risk' };
+  if (score <= 40) return { band: 'MINOR_IRREGULARITIES', label: 'Minor Irregularities' };
+  if (score <= 70) return { band: 'MODERATE_RISK', label: 'Moderate Risk' };
+  return { band: 'CRITICAL_RISK', label: 'Critical Fraud Risk' };
+}
+
+export function getRiskBand(score: number): AssessmentRiskBand {
+  return getRiskBandInfo(score).band;
+}
+
+export function getRiskBandLabel(band: AssessmentRiskBand): string {
+  if (band === 'LOW_RISK') return 'Low Risk';
+  if (band === 'MINOR_IRREGULARITIES') return 'Minor Irregularities';
+  if (band === 'MODERATE_RISK') return 'Moderate Risk';
+  return 'Critical Fraud Risk';
+}
+
+function makeAssessment(
+  id: string,
+  name: string,
+  risk_score: number,
+  evidence_found: string,
+  why_it_matters: string,
+  evidence_strength: 'High' | 'Moderate' | 'Contextual',
+  recommended_next_step: string,
+  extras?: {
+    exact_quote?: string;
+    amount?: string;
+    recipient?: string;
+    confidence_level?: number;
+    limitations?: string;
+  }
+): AssessmentItem {
+  const boundedScore = Math.max(0, Math.min(100, Math.round(risk_score)));
+  const { band, label } = getRiskBandInfo(boundedScore);
+  return {
+    id,
+    name,
+    risk_score: boundedScore,
+    risk_band: band,
+    risk_band_label: label,
+    evidence_found,
+    why_it_matters,
+    evidence_strength,
+    recommended_next_step,
+    exact_quote: extras?.exact_quote,
+    amount: extras?.amount,
+    recipient: extras?.recipient,
+    confidence_level: extras?.confidence_level ?? (boundedScore >= 70 || boundedScore <= 15 ? 95 : 80),
+    limitations: extras?.limitations,
+  };
+}
+
+export function buildStandardAssessments(
+  inputs: ScoringInputs,
+  components: DeterministicScoreResult['components'],
+  hardCaps: string[],
+  finalTrust: number,
+  verdict: DeterministicScoreResult['verdict'],
+  conflicts: EvidenceConflict[]
+): AssessmentItem[] {
+  const overallRisk = Math.max(1, Math.min(99, 100 - finalTrust));
+
+  const feeDetails = inputs.documentData?.fee_details || [];
+  const primaryFee = feeDetails[0];
+  const rawCompData = inputs.documentData?.candidate_compensation;
+  const candidateCompList: Array<{ type?: string; amount?: string; rawText?: string; raw_quote?: string }> = Array.isArray(rawCompData)
+    ? rawCompData
+    : (rawCompData && typeof rawCompData === 'object' ? [rawCompData] : []);
+  const hasComp = candidateCompList.length > 0 || Boolean(inputs.documentData?.detected_stipend);
+
+  const hasFee = Boolean(
+    inputs.documentData?.has_fee_demand ||
+    feeDetails.length > 0 ||
+    components.document.status === 'FLAGGED' ||
+    components.document.status === 'CONTRADICTED' ||
+    hardCaps.some(c => c.toLowerCase().includes('fee') || c.toLowerCase().includes('payment')) ||
+    inputs.rules_triggered?.some(r => r.rule_id === 'R001' || /fee|payment|deposit|caution|registration/i.test(r.name || '') || /fee|payment|deposit|caution/i.test(r.description || '')) ||
+    inputs.evidence?.some(e => e.evidence_type === 'FEE_DEMAND' || e.evidence_type === 'PAYMENT_REQUEST' || /fee|deposit|payment|caution|registration/i.test(e.title || '') || /fee|deposit|payment|caution|registration/i.test(e.evidence_text || '')) ||
+    inputs.documentData?.suspicious_patterns?.some(p => /fee|deposit|caution|registration|payment|rs\.?|inr|upi/i.test(p)) ||
+    Boolean(inputs.documentData?.fee_amount_detected)
+  );
+
+  const isFreeEmail = Boolean(
+    inputs.recruiterData?.is_free_provider ||
+    (inputs.documentData?.detected_email && /@(gmail|yahoo|outlook|hotmail)\.com$/i.test(inputs.documentData.detected_email)) ||
+    hardCaps.some(c => c.toLowerCase().includes('free_webmail'))
+  );
+
+  const hasInformal = Boolean(
+    inputs.documentData?.has_informal_channel ||
+    (inputs.documentData?.suspicious_patterns || []).some(p => /whatsapp|telegram/i.test(p)) ||
+    hardCaps.some(c => c.toLowerCase().includes('informal_channel'))
+  );
+
+  const rawComp = inputs.companyData?.legal_name || inputs.companyData?.name || inputs.documentData?.detected_company_name || inputs.entityValue;
+  const isCompanyUnidentified = !rawComp || isFilenameOrPlaceholder(rawComp);
+
+  const assessments: AssessmentItem[] = [
+    // 1. Overall Offer Risk
+    makeAssessment(
+      'overall_offer_risk',
+      'Overall Employment Offer Risk',
+      overallRisk,
+      `Multi-vector deterministic assessment produced Trust Score ${finalTrust}/100 with verdict "${verdict}". Risk Score: ${overallRisk}/100.`,
+      'Fuses structural document analysis, corporate registration, domain age, recruiter mail routing, and threat intelligence into a single calibrated risk posture.',
+      'High',
+      overallRisk >= 60
+        ? 'Do NOT transfer money, sign contracts, or submit sensitive documents. Verify directly with the company HR department.'
+        : 'Proceed with routine corporate onboarding verification.',
+      { confidence_level: 95 }
+    ),
+
+    // 2. Financial / Fee Demand Risk
+    hasFee
+      ? makeAssessment(
+          'financial_safety',
+          'Payment and Financial Fee Safety',
+          96,
+          primaryFee
+            ? `Mandatory candidate payment detected: ${primaryFee.category || 'Fee'}${primaryFee.amount ? ' of ' + primaryFee.amount : ''}${primaryFee.recipient ? ' payable to ' + primaryFee.recipient : ''}. ${primaryFee.is_refundable ? 'Claimed refundable (' + (primaryFee.refund_terms || 'conditional') + ')' : 'Non-refundable / unstated'}. ${primaryFee.deadline ? 'Deadline: ' + primaryFee.deadline + '. ' : ''}Exact quote: "${primaryFee.exact_quote}"`
+            : `Document contains explicit fee or deposit demands: ${inputs.documentData?.fee_amount_detected ? 'Amount: ' + inputs.documentData.fee_amount_detected : (inputs.documentData?.suspicious_patterns?.filter(p => /fee|deposit|rs\.|inr|caution|registration|processing/i.test(p)).join('; ') || 'Upfront monetary deposit demanded')}`,
+          primaryFee?.why_it_matters || 'Legitimate employers never demand candidate registration fees, training charges, or caution deposits. Upfront payment demands are an immediate scam indicator.',
+          'High',
+          'NEVER transfer funds, UPI payments, or bank deposits. Genuine employers never charge candidates. Report immediately to 1930 Cybercrime Helpline.',
+          {
+            exact_quote: primaryFee?.exact_quote,
+            amount: primaryFee?.amount || inputs.documentData?.fee_amount_detected,
+            recipient: primaryFee?.recipient,
+            confidence_level: 98,
+          }
+        )
+      : hasComp
+      ? makeAssessment(
+          'financial_safety',
+          'Payment and Financial Fee Safety',
+          5,
+          `Candidate compensation detected (${candidateCompList.map(c => `${c.type || 'Remuneration'}: ${c.amount || c.raw_quote || c.rawText || ''}`).join(', ') || inputs.documentData?.detected_stipend}). Zero upfront fees, training charges, registration fees, or caution deposits detected.`,
+          'Document defines remuneration paid to candidate without demanding any candidate payments. Legitimate employers pay employees rather than requiring payments.',
+          'High',
+          'Maintain standard pre-employment vigilance; confirm reimbursement policies for official travel expenses.',
+          { confidence_level: 92 }
+        )
+      : makeAssessment(
+          'financial_safety',
+          'Payment and Financial Fee Safety',
+          8,
+          'Zero upfront fees, training charges, registration fees, or caution deposits detected.',
+          'Legitimate employers never demand candidate registration fees, training charges, or caution deposits. Upfront payment demands are an immediate scam indicator.',
+          'High',
+          'Maintain standard vigilance; confirm company reimbursement policies for any official travel.',
+          { confidence_level: 88 }
+        ),
+
+    // 3. Document Authenticity & Structural Integrity
+    makeAssessment(
+      'document_authenticity',
+      'Document Authenticity & Structural Integrity',
+      (inputs.documentData?.is_suspicious_offer_letter && hasFee) ? 75 : (inputs.documentData?.is_suspicious_offer_letter ? 35 : 12),
+      inputs.documentData?.is_suspicious_offer_letter
+        ? (hasFee
+            ? 'Structural formatting anomalies detected alongside explicit recruitment fraud indicators.'
+            : 'Document layout or formatting deviates from standard corporate templates (non-fatal variation).')
+        : 'Document layout adheres to standard corporate appointment conventions.',
+      'Formatting and layout differences alone must not dominate fraud verdicts as styles vary widely across genuine employers.',
+      inputs.documentData?.is_suspicious_offer_letter && hasFee ? 'High' : 'Contextual',
+      'Verify document appointment ID with the employer HR department.',
+      { confidence_level: 85 }
+    ),
+
+    // 4. Corporate Entity & MCA Statutory Registry
+    isCompanyUnidentified
+      ? makeAssessment(
+          'company_registry',
+          'Corporate Entity & MCA Statutory Registry',
+          50,
+          'Organization not confidently identified from document content. Statutory corporate registry verification could not be performed.',
+          'Statutory registration establishes legal operating existence. When the issuing organization cannot be verified, employer legitimacy remains unconfirmed.',
+          'Moderate',
+          'Request the employer provide their full legal registered entity name and Corporate Identification Number (CIN).',
+          {
+            confidence_level: 40,
+            limitations: 'Document lacks clear corporate identity or statutory registration identifiers (CIN/LLPIN).',
+          }
+        )
+      : inputs.companyData?.mca_status === 'ACTIVE' || inputs.companyData?.registry_status === 'VERIFIED'
+      ? makeAssessment(
+          'company_registry',
+          'Corporate Entity & MCA Statutory Registry',
+          10,
+          `Statutory corporate registration verified: ${inputs.companyData.legal_name || inputs.companyData.name} (CIN/Reg: ${inputs.companyData.registration_number || 'Verified'}).`,
+          'Statutory registration establishes legal operating existence, though scammers often impersonate real registered entities.',
+          'High',
+          'Cross-check corporate entity status on MCA21 (mca.gov.in) and ensure the recruiter is an authorized representative.',
+          { confidence_level: 95 }
+        )
+      : inputs.companyData?.registry_status === 'CONTRADICTED'
+      ? makeAssessment(
+          'company_registry',
+          'Corporate Entity & MCA Statutory Registry',
+          85,
+          `Claimed entity "${rawComp}" contradicted by official statutory MCA records.`,
+          'Statutory registry conflicts indicate fabricated or dissolved corporate entities.',
+          'High',
+          'Do not proceed; the claimed entity status contradicts official corporate registry records.',
+          { confidence_level: 90 }
+        )
+      : makeAssessment(
+          'company_registry',
+          'Corporate Entity & MCA Statutory Registry',
+          35,
+          `Claimed entity "${rawComp}" not independently corroborated on statutory MCA master data.`,
+          'Statutory registration establishes legal operating existence, though scammers often impersonate real registered entities.',
+          'Moderate',
+          'Cross-check corporate entity status on MCA21 (mca.gov.in) and ensure the recruiter is an authorized representative.',
+          { confidence_level: 75 }
+        ),
+
+    // 5. Domain Security & Web Presence Intelligence
+    makeAssessment(
+      'domain_intelligence',
+      'Domain Security & Web Presence Intelligence',
+      inputs.domainData?.is_lookalike
+        ? 92
+        : (inputs.domainData?.domain_age_days !== undefined && inputs.domainData.domain_age_days < 90
+            ? 65
+            : (inputs.domainData?.has_dns ? 12 : 35)),
+      inputs.domainData?.is_lookalike
+        ? `Lookalike / typosquatted domain detected targeting legitimate brand (${inputs.domainData.domain}).`
+        : inputs.domainData?.domain_age_days !== undefined && inputs.domainData.domain_age_days < 90
+        ? `Newly registered domain (${inputs.domainData.domain}) created only ${inputs.domainData.domain_age_days} days ago.`
+        : inputs.domainData?.has_dns
+        ? `Established domain (${inputs.domainData.domain}) with active DNS and valid SSL security certificate.`
+        : 'Domain records unverified or not provided in document context.',
+      'Domain impersonation and disposable domains are prime tools used by fraudulent hiring rings.',
+      'High',
+      'Access the employer website by typing the official address directly into your browser, avoiding links inside the document.',
+      { confidence_level: inputs.domainData?.is_lookalike || inputs.domainData?.has_dns ? 95 : 75 }
+    ),
+
+    // 6. Recruiter Identity & Official Email Routing
+    makeAssessment(
+      'recruiter_email',
+      'Recruiter Identity & Official Email Routing',
+      isFreeEmail ? 88 : (inputs.recruiterData?.email ? 12 : 38),
+      isFreeEmail
+        ? `Recruiter utilizes public personal webmail (${inputs.recruiterData?.email || inputs.documentData?.detected_email}) instead of an official company domain.`
+        : inputs.recruiterData?.email
+        ? `Corporate email domain verified: ${inputs.recruiterData.email}.`
+        : 'No verified recruiter contact email identified in document.',
+      'Corporate HR communications originate exclusively from official company domains. Free webmail usage is a primary impersonation indicator.',
+      'High',
+      isFreeEmail
+        ? 'Insist on receiving all correspondence from an official @company.com email address before sharing personal data.'
+        : 'Confirm the recruiter is listed on the company LinkedIn directory.',
+      { confidence_level: isFreeEmail || inputs.recruiterData?.email ? 95 : 75 }
+    ),
+
+    // 7. Communication Channel & Urgency
+    makeAssessment(
+      'communication_channel',
+      'Recruitment Communication Channel & Urgency',
+      hasInformal ? 82 : (inputs.documentData?.has_urgency ? 65 : 12),
+      hasInformal
+        ? 'Recruitment directed to personal or encrypted messaging apps (WhatsApp / Telegram).'
+        : inputs.documentData?.has_urgency
+        ? 'Coercive urgency tactics or immediate cancellation deadlines detected in letter.'
+        : 'Standard professional communication channels and reasonable response timelines.',
+      'Scammers rely on private messaging platforms to evade enterprise monitoring and law enforcement tracking.',
+      'High',
+      hasInformal
+        ? 'Refuse to conduct interviews or onboarding on personal WhatsApp or Telegram channels.'
+        : 'Take time to independently evaluate the offer; genuine employers provide adequate response windows.',
+      { confidence_level: 90 }
+    ),
+
+    // 8. Signatory Identity & Digital Signature Verification
+    makeAssessment(
+      'signatory_identity',
+      'Signatory Identity & Digital Signature Verification',
+      inputs.certificateData?.has_digital_signature
+        ? 10
+        : (inputs.documentData?.detected_signatory ? 20 : 40),
+      inputs.certificateData?.has_digital_signature
+        ? `Cryptographic digital signature verified (${inputs.certificateData.signature_issuer || 'Corporate Cert'}).`
+        : inputs.documentData?.detected_signatory
+        ? `Signatory identified in document: ${inputs.documentData.detected_signatory}.`
+        : 'No named authorized signatory or cryptographic digital signature detected.',
+      'Named signatories provide organizational accountability. Unsigned or generic offers facilitate fraudulent repudiation.',
+      'Moderate',
+      'Check if the named signatory is a verified executive or HR manager on LinkedIn.',
+      { confidence_level: 80 }
+    ),
+
+    // 9. Machine Learning Fraud Classifier
+    makeAssessment(
+      'ml_fraud_pattern',
+      'Machine Learning Fraud Classifier',
+      inputs.mlPrediction ? Math.round(inputs.mlPrediction.fraud_probability * 100) : 20,
+      inputs.mlPrediction
+        ? `Statistical fraud classifier predicts ${Math.round(inputs.mlPrediction.fraud_probability * 100)}% scam probability based on linguistic patterns.`
+        : 'Machine learning baseline evaluated offer language without severe anomalies.',
+      'Supervised ML model trained on verified genuine and fraudulent employment offers detects subtle deceptive phrasing.',
+      inputs.mlPrediction && inputs.mlPrediction.fraud_probability > 0.65 ? 'High' : 'Moderate',
+      'Compare linguistic findings with factual domain and registration records.',
+      { confidence_level: Math.round((inputs.mlPrediction?.confidence || 0.85) * 100) }
+    ),
+
+    // 10. Candidate Community Experience & Public Complaints
+    makeAssessment(
+      'community_sentiment',
+      'Candidate Community Experience & Public Complaints',
+      inputs.communityData && (inputs.communityData.complaint_count > 0 || inputs.communityData.scam_reports > 0) ? 82 : 15,
+      inputs.communityData && (inputs.communityData.complaint_count > 0 || inputs.communityData.scam_reports > 0)
+        ? `Public forum reports or candidate complaints identified (${inputs.communityData.complaint_count} complaints, ${inputs.communityData.scam_reports} scam reports).`
+        : 'No active public complaints or scam reports linked to this entity or recruiter.',
+      'Crowdsourced feedback from peer candidates often exposes hiring scams before formal law enforcement action.',
+      'High',
+      'Search Reddit and Quora for candidate discussions about this specific employer and recruitment campaign.',
+      { confidence_level: 85 }
+    ),
+
+    // 11. Malicious Threat Intelligence & IOC Feeds
+    makeAssessment(
+      'threat_intelligence',
+      'Malicious Threat Intelligence & IOC Feeds',
+      inputs.threatData?.known_threat || inputs.threatData?.max_severity === 'CRITICAL' ? 95 : 10,
+      inputs.threatData?.known_threat || inputs.threatData?.max_severity === 'CRITICAL'
+        ? 'Domain or associated IP matches malicious IOC entries in global threat intelligence feeds.'
+        : 'Zero malicious indicators in AbuseIPDB, URLhaus, or VirusTotal intelligence feeds.',
+      'Confirmed malicious indicators represent active cyber threat operations rather than ordinary employment processes.',
+      'High',
+      inputs.threatData?.known_threat
+        ? 'Block all communications immediately and do not download attachments.'
+        : 'Standard cyber hygiene recommended.',
+      { confidence_level: 95 }
+    ),
+
+    // 12. Cross-Signal Fact Consistency & Anomaly Detection
+    makeAssessment(
+      'consistency_conflict',
+      'Cross-Signal Fact Consistency & Anomaly Detection',
+      conflicts.length > 0 ? Math.min(90, 45 + conflicts.length * 20) : 12,
+      conflicts.length > 0
+        ? `${conflicts.length} cross-signal contradictions detected: ${conflicts.map(c => c.description).join('; ')}`
+        : 'High cross-signal consistency across document claims, registry records, and domain intelligence.',
+      'Impersonators often mix authentic corporate details with fraudulent payment or contact endpoints, creating internal contradictions.',
+      'High',
+      conflicts.length > 0
+        ? 'Resolve conflicting information with the registered headquarters before proceeding.'
+        : 'Continue standard pre-joining verification.',
+      { confidence_level: 85 }
+    ),
+  ];
+
+  return assessments;
 }

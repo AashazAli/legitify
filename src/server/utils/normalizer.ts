@@ -324,3 +324,24 @@ export function validateUploadFile(
     error: isValid ? undefined : `Unsupported or malformed file payload: detected as ${detectedType}`,
   };
 }
+
+/**
+ * Detects whether an entity string is actually a filename, upload label, or placeholder
+ * rather than an authentic claimed organization name.
+ * Prevents "WhatsApp Image...", "Screenshot...", "IMG_...", etc. from becoming organization identities.
+ */
+export function isFilenameOrPlaceholder(name?: string): boolean {
+  if (!name || typeof name !== 'string') return true;
+  const s = name.trim().toLowerCase();
+  if (s.length < 2) return true;
+  if (/^(?:unknown(?:\s*(?:organization|company|entity))?|uploaded\s*document|unnamed\s*document|sample\s*offer|test\s*doc|image|file|screenshot|scan|untitled|doc|n\/a|none|null|undefined)$/i.test(s)) return true;
+  if (/whatsapp\s*image/i.test(s)) return true;
+  if (/screenshot\s*20\d\d/i.test(s)) return true;
+  if (/img[-_]?20\d\d/i.test(s)) return true;
+  if (/\.(png|jpe?g|pdf|webp|bmp|gif|tiff|docx?|txt)$/i.test(s)) return true;
+  if (/^corporate\s+entity$/i.test(s) || /^investigated\s+(?:organization|entity)$/i.test(s)) return true;
+  if (/^whatsapp\s+image\s+\d{4}/i.test(s)) return true;
+  if (/^\d{8,}[_\-\d]*$/.test(s)) return true; // pure timestamp or unix epoch
+  return false;
+}
+
