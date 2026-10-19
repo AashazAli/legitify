@@ -831,9 +831,14 @@ export async function performOCRAnalysis(
     const lowerText = rawText.toLowerCase();
     const suspiciousKeywordsFound: string[] = [];
 
-    for (const pat of SUSPICIOUS_FEE_PATTERNS) {
-      if (lowerText.includes(pat.keyword)) {
-        if (!suspiciousKeywordsFound.includes(pat.keyword)) {
+    const ocrSentences = rawText.split(/(?<=[.!?\n])\s+/);
+    const isNegatedSentence = (s: string) => /(?:no\s+(?:registration|application|processing|training|onboarding|security|caution|internship)?\s*fees?|no\s+(?:security|caution)?\s*deposits?|never\s+(?:charge|collect|demand|request|ask)|do\s+not\s+(?:charge|collect|demand|request|ask)|will\s+not\s+(?:charge|collect|demand|request|ask)|shall\s+not\s+(?:charge|collect|demand|request|ask)|(?:fee|fees|deposit|payment)\s+(?:is\s+|are\s+)?not\s+required|without\s+any\s+(?:fee|charges?|deposit)|free\s+of\s+(?:any\s+)?(?:charge|cost|fee)|no\s+payment\s+is\s+required|we\s+do\s+not\s+collect|do\s+not\s+pay\s+anyone)/i.test(s);
+
+    for (const sentence of ocrSentences) {
+      if (isNegatedSentence(sentence)) continue;
+      const sLower = sentence.toLowerCase();
+      for (const pat of SUSPICIOUS_FEE_PATTERNS) {
+        if (sLower.includes(pat.keyword) && !suspiciousKeywordsFound.includes(pat.keyword)) {
           suspiciousKeywordsFound.push(pat.keyword);
         }
       }
@@ -1025,6 +1030,10 @@ export function isClientFilenameOrPlaceholder(name?: string): boolean {
   if (/img[-_]?20\d\d/i.test(s)) return true;
   if (/\.(png|jpe?g|pdf|webp|bmp|gif|tiff|docx?|txt)$/i.test(s)) return true;
   if (/^\d{8,}[_\-\d]*$/.test(s)) return true;
+  if (/^\(?\s*(?:first|second|third|fourth|fist|last|initial)\s+(?:section|ection|part|page|clause|annexure)\s*\)?$/i.test(s)) return true;
+  if (/^\(?\s*(?:section|part|clause|annexure|page|table)\s*[\d\w.:\-_]*\s*\)?$/i.test(s)) return true;
+  if (/^(?:terms\s*(?:and|&)\s*conditions|confidential|private\s*(?:and|&)\s*confidential|candidate\s*copy|overview|introduction)$/i.test(s)) return true;
+  if (!/[a-zA-Z]/.test(s)) return true;
   return false;
 }
 
@@ -1119,14 +1128,7 @@ export function analyzeDocumentSemantics(
     detectedStipend = stipendMatch[1].trim();
   }
 
-  // 5. Fee / Monetary Demand Detection
-  const feeKeywordsFound: string[] = [];
-  for (const pat of SUSPICIOUS_FEE_PATTERNS) {
-    if (lower.includes(pat.keyword) && !feeKeywordsFound.includes(pat.keyword)) {
-      feeKeywordsFound.push(pat.keyword);
-    }
-  }
-
+  // 5. Fee / Monetary Demand Detection (Negation-Aware)
   const feePatternsRegex = [
     /(?:registration\s*fees?|training\s*(?:fees?|cost|charge)|security\s*(?:deposit|amount|fee)|laptop\s*deposit|caution\s*(?:deposit|money|amount|fee)|mandatory\s*(?:fees?|payment|deposit|charge)|internship\s*fees?|enrolment\s*fees?|enrollment\s*fees?|application\s*fees?|onboarding\s*(?:fees?|charges?|deposit)|document(?:ation)?\s*(?:verification\s*)?(?:charge|fee)s?|id\s*card\s*(?:fees?|charges?)|uniform\s*(?:deposit|fee|charge)|processing\s*fees?|admission\s*fees?|acceptance\s*fees?|slot\s*booking|booking\s*amount|portal\s*activation)/i,
     /(?:required|need|must|instructed)\s+to\s+pay/i,
@@ -1141,12 +1143,27 @@ export function analyzeDocumentSemantics(
     /(?:transaction\s*(?:id|reference|receipt|proof)\s*to\s*confirm)/i,
   ];
 
-  for (const regex of feePatternsRegex) {
-    const match = text.match(regex);
-    if (match && match[0]) {
-      const clean = match[0].trim().toLowerCase();
-      if (!feeKeywordsFound.includes(clean)) {
-        feeKeywordsFound.push(clean);
+  const semSentences = text.split(/(?<=[.!?\n])\s+/);
+  const isSemNegated = (s: string) => /(?:no\s+(?:registration|application|processing|training|onboarding|security|caution|internship)?\s*fees?|no\s+(?:security|caution)?\s*deposits?|never\s+(?:charge|collect|demand|request|ask)|do\s+not\s+(?:charge|collect|demand|request|ask)|will\s+not\s+(?:charge|collect|demand|request|ask)|shall\s+not\s+(?:charge|collect|demand|request|ask)|(?:fee|fees|deposit|payment)\s+(?:is\s+|are\s+)?not\s+required|without\s+any\s+(?:fee|charges?|deposit)|free\s+of\s+(?:any\s+)?(?:charge|cost|fee)|no\s+payment\s+is\s+required|we\s+do\s+not\s+collect|do\s+not\s+pay\s+anyone)/i.test(s);
+
+  const feeKeywordsFound: string[] = [];
+  for (const sentence of semSentences) {
+    if (isSemNegated(sentence)) continue;
+    const sentLower = sentence.toLowerCase();
+
+    for (const pat of SUSPICIOUS_FEE_PATTERNS) {
+      if (sentLower.includes(pat.keyword) && !feeKeywordsFound.includes(pat.keyword)) {
+        feeKeywordsFound.push(pat.keyword);
+      }
+    }
+
+    for (const regex of feePatternsRegex) {
+      const match = sentence.match(regex);
+      if (match && match[0]) {
+        const clean = match[0].trim().toLowerCase();
+        if (!feeKeywordsFound.includes(clean)) {
+          feeKeywordsFound.push(clean);
+        }
       }
     }
   }

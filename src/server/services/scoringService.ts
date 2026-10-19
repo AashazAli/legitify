@@ -802,12 +802,17 @@ export function calculateDeterministicScore(inputs: ScoringInputs): Deterministi
   }
 
   // Constraint 2: Confirmed candidate payment demand cap (max 20)
-  const hasFeeDemand = Boolean(
+  const scoringPaymentCase = inputs.documentData?.payment_case;
+  const isExplicitOrConditionalFeeDemand = scoringPaymentCase === 'EXPLICIT_DEMAND' || scoringPaymentCase === 'CONDITIONAL_DEMAND';
+  const isPolicyOrWarningCase = scoringPaymentCase === 'POLICY_MENTION_WITHOUT_DEMAND' || scoringPaymentCase === 'WARNING_AGAINST_PAYMENT' || scoringPaymentCase === 'NO_PAYMENT_EVIDENCE';
+
+  const hasFeeDemand = !isPolicyOrWarningCase && Boolean(
+    isExplicitOrConditionalFeeDemand ||
     inputs.documentData?.has_fee_demand ||
     (inputs.documentData?.fee_details && inputs.documentData.fee_details.length > 0) ||
     (inputs.documentData?.requested_fees && inputs.documentData.requested_fees.length > 0) ||
-    inputs.documentData?.is_confirmed_impersonation ||
-    evidenceList.some(e => (e.category === 'FINANCIAL' || (e.category as any) === 'PAYMENT' || e.category === 'OFFER') && e.severity === 'CRITICAL')
+    inputs.rules_triggered?.some(r => r.rule_id === 'R002' && (r as any).triggered !== false) ||
+    evidenceList.some(e => (e.category === 'FINANCIAL' || (e.category as any) === 'PAYMENT') && e.evidence_type === 'FEE_DEMAND' && e.severity === 'CRITICAL')
   );
   if (hasFeeDemand) {
     const applied = rawTrust > 20;
@@ -1083,15 +1088,16 @@ export function buildStandardAssessments(
     : (rawCompData && typeof rawCompData === 'object' ? [rawCompData] : []);
   const hasComp = candidateCompList.length > 0 || Boolean(inputs.documentData?.detected_stipend);
 
-  const hasFee = Boolean(
+  const docPaymentCase = inputs.documentData?.payment_case;
+  const isExplicitOrConditional = docPaymentCase === 'EXPLICIT_DEMAND' || docPaymentCase === 'CONDITIONAL_DEMAND';
+  const isPolicyOrNegated = docPaymentCase === 'POLICY_MENTION_WITHOUT_DEMAND' || docPaymentCase === 'WARNING_AGAINST_PAYMENT' || docPaymentCase === 'NO_PAYMENT_EVIDENCE';
+
+  const hasFee = !isPolicyOrNegated && Boolean(
+    isExplicitOrConditional ||
     inputs.documentData?.has_fee_demand ||
     feeDetails.length > 0 ||
-    components.document.status === 'FLAGGED' ||
-    components.document.status === 'CONTRADICTED' ||
-    hardCaps.some(c => c.toLowerCase().includes('fee') || c.toLowerCase().includes('payment')) ||
-    inputs.rules_triggered?.some(r => r.rule_id === 'R001' || /fee|payment|deposit|caution|registration/i.test(r.name || '') || /fee|payment|deposit|caution/i.test(r.description || '')) ||
-    inputs.evidence?.some(e => e.evidence_type === 'FEE_DEMAND' || e.evidence_type === 'PAYMENT_REQUEST' || /fee|deposit|payment|caution|registration/i.test(e.title || '') || /fee|deposit|payment|caution|registration/i.test(e.evidence_text || '')) ||
-    inputs.documentData?.suspicious_patterns?.some(p => /fee|deposit|caution|registration|payment|rs\.?|inr|upi/i.test(p)) ||
+    inputs.rules_triggered?.some(r => r.rule_id === 'R002' && (r as any).triggered !== false) ||
+    inputs.evidence?.some(e => (e.evidence_type === 'FEE_DEMAND' || e.evidence_type === 'PAYMENT_REQUEST') && e.severity === 'CRITICAL') ||
     Boolean(inputs.documentData?.fee_amount_detected)
   );
 
@@ -1110,6 +1116,100 @@ export function buildStandardAssessments(
   const rawComp = inputs.companyData?.legal_name || inputs.companyData?.name || inputs.documentData?.detected_company_name || inputs.entityValue;
   const isCompanyUnidentified = !rawComp || isFilenameOrPlaceholder(rawComp);
 
+  let financialAssessment: AssessmentItem;
+  if (docPaymentCase === 'EXPLICIT_DEMAND' || hasFee) {
+    financialAssessment = makeAssessment(
+      'financial_safety',
+      'Payment and Financial Fee Safety',
+      96,
+      primaryFee
+        ? `Mandatory candidate payment detected: ${primaryFee.category || 'Fee'}${primaryFee.amount ? ' of ' + primaryFee.amount : ''}${primaryFee.recipient ? ' payable to ' + primaryFee.recipient : ''}. ${primaryFee.is_refundable ? 'Claimed refundable (' + (primaryFee.refund_terms || 'conditional') + '). ' : ''}${primaryFee.deadline ? 'Deadline: ' + primaryFee.deadline + '. ' : ''}Exact quote: "${primaryFee.exact_quote}"`
+        : `Document contains explicit candidate fee or monetary deposit demand: ${inputs.documentData?.fee_amount_detected ? 'Amount: ' + inputs.documentData.fee_amount_detected : (inputs.documentData?.suspicious_patterns?.filter(p => /fee|deposit|rs\.|inr|caution|registration|processing/i.test(p)).join('; ') || 'Upfront monetary deposit demanded')}.`,
+      primaryFee?.why_it_matters || 'Legitimate employers never demand candidate registration fees, training charges, or caution deposits. Upfront payment demands are an immediate scam indicator.',
+      'High',
+      'NEVER transfer funds, UPI payments, or bank deposits. Genuine employers never charge candidates. Report immediately to 1930 Cybercrime Helpline.',
+      {
+        exact_quote: primaryFee?.exact_quote,
+        amount: primaryFee?.amount || inputs.documentData?.fee_amount_detected,
+        recipient: primaryFee?.recipient,
+        confidence_level: 98,
+      }
+    );
+  } else if (docPaymentCase === 'CONDITIONAL_DEMAND') {
+    financialAssessment = makeAssessment(
+      'financial_safety',
+      'Payment and Financial Fee Safety',
+      85,
+      primaryFee
+        ? `Conditional candidate payment/deposit detected: ${primaryFee.category || 'Fee'}${primaryFee.amount ? ' of ' + primaryFee.amount : ''}. Claimed refundable (${primaryFee.refund_terms || 'conditional'}). Exact quote: "${primaryFee.exact_quote}"`
+        : (inputs.documentData?.payment_explanation || 'Document requires candidate payment or caution deposit subject to future refund or milestones.'),
+      'Advance-fee fraud schemes frequently promise refunds upon completion to lower candidate skepticism. Legitimate corporate employers do not collect refundable caution deposits.',
+      'High',
+      'Do NOT transfer any money or deposits under any conditions or refund promises.',
+      {
+        exact_quote: primaryFee?.exact_quote,
+        amount: primaryFee?.amount || inputs.documentData?.fee_amount_detected,
+        recipient: primaryFee?.recipient,
+        confidence_level: 95,
+      }
+    );
+  } else if (docPaymentCase === 'POLICY_MENTION_WITHOUT_DEMAND') {
+    financialAssessment = makeAssessment(
+      'financial_safety',
+      'Payment and Financial Fee Safety',
+      10,
+      inputs.documentData?.payment_explanation || 'Document outlines organizational financial policies, reimbursements, or standard tax/benefit deductions. Zero candidate fees or upfront deposits demanded.',
+      'Mention of corporate expense or benefits policies without candidate payment requirements is normal corporate practice.',
+      'High',
+      'Review standard corporate benefits and expense reimbursement documentation during routine onboarding.',
+      { confidence_level: 92 }
+    );
+  } else if (docPaymentCase === 'WARNING_AGAINST_PAYMENT') {
+    financialAssessment = makeAssessment(
+      'financial_safety',
+      'Payment and Financial Fee Safety',
+      3,
+      inputs.documentData?.payment_explanation || 'Document contains explicit anti-fraud caution warning candidates that recruitment is free and to never pay any unauthorized parties.',
+      'Legitimate employers often include anti-scam advisories to protect job seekers from impersonators.',
+      'High',
+      'Follow employer safety advice and communicate solely through verified official company channels.',
+      { confidence_level: 95 }
+    );
+  } else if (docPaymentCase === 'AMBIGUOUS_EVIDENCE') {
+    financialAssessment = makeAssessment(
+      'financial_safety',
+      'Payment and Financial Fee Safety',
+      45,
+      inputs.documentData?.payment_explanation || 'Document mentions ambiguous financial terminology or fee references without a confirmed demand on the candidate.',
+      'Ambiguous financial clauses should be verified to confirm no unauthorized intake fees are disguised.',
+      'Moderate',
+      'Contact the employer HR directly through official phone/email channels to confirm no candidate charges apply.',
+      { confidence_level: 70 }
+    );
+  } else if (hasComp) {
+    financialAssessment = makeAssessment(
+      'financial_safety',
+      'Payment and Financial Fee Safety',
+      5,
+      `Candidate compensation detected (${candidateCompList.map(c => `${c.type || 'Remuneration'}: ${c.amount || c.raw_quote || c.rawText || ''}`).join(', ') || inputs.documentData?.detected_stipend}). Zero upfront fees, training charges, registration fees, or caution deposits detected.`,
+      'Document defines remuneration paid to candidate without demanding any candidate payments. Legitimate employers pay employees rather than requiring payments.',
+      'High',
+      'Maintain standard pre-employment vigilance; confirm reimbursement policies for official travel expenses.',
+      { confidence_level: 92 }
+    );
+  } else {
+    financialAssessment = makeAssessment(
+      'financial_safety',
+      'Payment and Financial Fee Safety',
+      8,
+      'Zero upfront fees, training charges, registration fees, or caution deposits detected in document.',
+      'Legitimate employers never demand candidate registration fees, training charges, or caution deposits. Upfront payment demands are an immediate scam indicator.',
+      'High',
+      'Maintain standard vigilance; confirm company reimbursement policies for any official travel.',
+      { confidence_level: 88 }
+    );
+  }
+
   const assessments: AssessmentItem[] = [
     // 1. Overall Offer Risk
     makeAssessment(
@@ -1126,60 +1226,19 @@ export function buildStandardAssessments(
     ),
 
     // 2. Financial / Fee Demand Risk
-    hasFee
-      ? makeAssessment(
-          'financial_safety',
-          'Payment and Financial Fee Safety',
-          96,
-          primaryFee
-            ? `Mandatory candidate payment detected: ${primaryFee.category || 'Fee'}${primaryFee.amount ? ' of ' + primaryFee.amount : ''}${primaryFee.recipient ? ' payable to ' + primaryFee.recipient : ''}. ${primaryFee.is_refundable ? 'Claimed refundable (' + (primaryFee.refund_terms || 'conditional') + ')' : 'Non-refundable / unstated'}. ${primaryFee.deadline ? 'Deadline: ' + primaryFee.deadline + '. ' : ''}Exact quote: "${primaryFee.exact_quote}"`
-            : `Document contains explicit fee or deposit demands: ${inputs.documentData?.fee_amount_detected ? 'Amount: ' + inputs.documentData.fee_amount_detected : (inputs.documentData?.suspicious_patterns?.filter(p => /fee|deposit|rs\.|inr|caution|registration|processing/i.test(p)).join('; ') || 'Upfront monetary deposit demanded')}`,
-          primaryFee?.why_it_matters || 'Legitimate employers never demand candidate registration fees, training charges, or caution deposits. Upfront payment demands are an immediate scam indicator.',
-          'High',
-          'NEVER transfer funds, UPI payments, or bank deposits. Genuine employers never charge candidates. Report immediately to 1930 Cybercrime Helpline.',
-          {
-            exact_quote: primaryFee?.exact_quote,
-            amount: primaryFee?.amount || inputs.documentData?.fee_amount_detected,
-            recipient: primaryFee?.recipient,
-            confidence_level: 98,
-          }
-        )
-      : hasComp
-      ? makeAssessment(
-          'financial_safety',
-          'Payment and Financial Fee Safety',
-          5,
-          `Candidate compensation detected (${candidateCompList.map(c => `${c.type || 'Remuneration'}: ${c.amount || c.raw_quote || c.rawText || ''}`).join(', ') || inputs.documentData?.detected_stipend}). Zero upfront fees, training charges, registration fees, or caution deposits detected.`,
-          'Document defines remuneration paid to candidate without demanding any candidate payments. Legitimate employers pay employees rather than requiring payments.',
-          'High',
-          'Maintain standard pre-employment vigilance; confirm reimbursement policies for official travel expenses.',
-          { confidence_level: 92 }
-        )
-      : makeAssessment(
-          'financial_safety',
-          'Payment and Financial Fee Safety',
-          8,
-          'Zero upfront fees, training charges, registration fees, or caution deposits detected.',
-          'Legitimate employers never demand candidate registration fees, training charges, or caution deposits. Upfront payment demands are an immediate scam indicator.',
-          'High',
-          'Maintain standard vigilance; confirm company reimbursement policies for any official travel.',
-          { confidence_level: 88 }
-        ),
+    financialAssessment,
 
     // 3. Document Authenticity & Structural Integrity
     makeAssessment(
       'document_authenticity',
       'Document Authenticity & Structural Integrity',
-      (inputs.documentData?.is_suspicious_offer_letter && hasFee) ? 75 : (inputs.documentData?.is_suspicious_offer_letter ? 35 : 12),
+      inputs.documentData?.is_suspicious_offer_letter ? 45 : 12,
       inputs.documentData?.is_suspicious_offer_letter
-        ? (hasFee
-            ? 'Structural formatting anomalies detected alongside explicit recruitment fraud indicators.'
-            : 'Document layout or formatting deviates from standard corporate templates (non-fatal variation).')
+        ? 'Document layout or formatting deviates from standard corporate templates (non-fatal variation).'
         : 'Document layout adheres to standard corporate appointment conventions.',
       'Formatting and layout differences alone must not dominate fraud verdicts as styles vary widely across genuine employers.',
-      inputs.documentData?.is_suspicious_offer_letter && hasFee ? 'High' : 'Contextual',
+      inputs.documentData?.is_suspicious_offer_letter ? 'Moderate' : 'Low',
       'Verify document appointment ID with the employer HR department.',
-      { confidence_level: 85 }
     ),
 
     // 4. Corporate Entity & MCA Statutory Registry
@@ -1307,18 +1366,36 @@ export function buildStandardAssessments(
     ),
 
     // 9. Machine Learning Fraud Classifier
-    makeAssessment(
-      'ml_fraud_pattern',
-      'Machine Learning Fraud Classifier',
-      inputs.mlPrediction ? Math.round(inputs.mlPrediction.fraud_probability * 100) : 20,
-      inputs.mlPrediction
-        ? `Statistical fraud classifier predicts ${Math.round(inputs.mlPrediction.fraud_probability * 100)}% scam probability based on linguistic patterns.`
-        : 'Machine learning baseline evaluated offer language without severe anomalies.',
-      'Supervised ML model trained on verified genuine and fraudulent employment offers detects subtle deceptive phrasing.',
-      inputs.mlPrediction && inputs.mlPrediction.fraud_probability > 0.65 ? 'High' : 'Moderate',
-      'Compare linguistic findings with factual domain and registration records.',
-      { confidence_level: Math.round((inputs.mlPrediction?.confidence || 0.85) * 100) }
-    ),
+    (() => {
+      const ml = inputs.mlPrediction;
+      const isUnavailable = !ml || ml.prediction === 'ML_UNAVAILABLE' || ml.model_loaded === false || Boolean(ml.error);
+      const rawProb = ml?.fraudProbability ?? ml?.ml_probability ?? (ml?.ml_probability_percent !== undefined ? ml.ml_probability_percent / 100 : undefined);
+
+      if (isUnavailable || rawProb === undefined || isNaN(rawProb)) {
+        return makeAssessment(
+          'ml_fraud_pattern',
+          'Machine Learning Fraud Classifier',
+          null as any,
+          'Machine learning classifier inference could not be completed for this document format.',
+          'Supervised ML model trained on verified genuine and fraudulent employment offers detects subtle deceptive phrasing.',
+          'Contextual',
+          'Rely on deterministic forensic checks and statutory verification while ML service is offline.',
+          { confidence_level: 0 }
+        );
+      }
+
+      const riskScore = Math.max(0, Math.min(100, Math.round(rawProb * 100)));
+      return makeAssessment(
+        'ml_fraud_pattern',
+        'Machine Learning Fraud Classifier',
+        riskScore,
+        `Statistical fraud classifier predicts ${riskScore}% scam probability based on linguistic patterns.`,
+        'Supervised ML model trained on verified genuine and fraudulent employment offers detects subtle deceptive phrasing.',
+        riskScore >= 65 ? 'High' : (riskScore >= 35 ? 'Moderate' : 'Low'),
+        'Compare linguistic findings with factual domain and registration records.',
+        { confidence_level: Math.round((ml?.confidence ?? 0.85) * 100) }
+      );
+    })(),
 
     // 10. Candidate Community Experience & Public Complaints
     makeAssessment(

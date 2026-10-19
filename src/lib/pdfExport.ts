@@ -24,6 +24,9 @@ function isFilenameOrPlaceholder(name?: string): boolean {
   if (/\.(png|jpe?g|pdf|webp|tiff|gif|bmp|docx?)$/i.test(trimmed)) return true;
   if (/^\d{4}[-_]\d{2}[-_]\d{2}/.test(trimmed)) return true;
   if (/^(?:unknown(?:\s*(?:organization|company|entity))?|corporate\s*entity|investigated\s*entity|uploaded\s*document|candidate|n\/a|none|null|undefined)$/i.test(trimmed)) return true;
+  if (/^\(?\s*(?:first|second|third|fourth|fist|last|initial)\s+(?:section|ection|part|page|clause|annexure)\s*\)?$/i.test(trimmed)) return true;
+  if (/^\(?\s*(?:section|part|clause|annexure|page|table)\s*[\d\w.:\-_]*\s*\)?$/i.test(trimmed)) return true;
+  if (!/[a-zA-Z]/.test(trimmed)) return true;
   return false;
 }
 
@@ -147,12 +150,16 @@ export function generatePdfDocument(report: LegitifyReport, fallbackAssessments?
     ? formatConfidence(report.confidence_score)
     : Math.round(report.evidence_completeness?.percentage || 75));
 
-  const hasFeeDemand = Boolean(
+  const isServerPaymentNegative = report.payment_case === 'POLICY_MENTION_WITHOUT_DEMAND' ||
+    report.payment_case === 'WARNING_AGAINST_PAYMENT' ||
+    report.payment_case === 'NO_PAYMENT_EVIDENCE';
+
+  const hasFeeDemand = !isServerPaymentNegative && Boolean(
     report.has_fee_demand ||
     (report as any).hasPaymentDemand ||
-    report.rules_triggered?.some(r => r.rule_id === 'R001' || r.rule_id === 'R002' || r.name?.toLowerCase().includes('fee')) ||
+    report.rules_triggered?.some(r => r.rule_id === 'R002' && (r as any).triggered !== false) ||
     report.red_flags?.some((f: any) => typeof f === 'string' ? f.toLowerCase().includes('money') || f.toLowerCase().includes('fee') || f.toLowerCase().includes('payment') : f.message?.toLowerCase().includes('money') || f.message?.toLowerCase().includes('fee') || f.message?.toLowerCase().includes('payment')) ||
-    report.hard_caps_applied?.some(c => c.toLowerCase().includes('fee') || c.toLowerCase().includes('payment'))
+    report.hard_caps_applied?.some(c => c.toLowerCase().includes('payment_request_cap'))
   );
 
   // Two-Column Dossier Card
@@ -174,7 +181,7 @@ export function generatePdfDocument(report: LegitifyReport, fallbackAssessments?
   doc.text(`ASSESSMENT CONFIDENCE: ${confidenceVal}% | VERDICT: ${rawVerdict}`, margin + 5, y + 26);
   doc.text(`SAFETY STATUS: ${hasFeeDemand ? 'ALERT: Candidate Upfront Payment Demand Detected' : 'Zero-Fee Protocol Compliant'}`, margin + 5, y + 32);
 
-  // Dynamic Score Badge on Right
+  // Dynamic Score Badge on Right — Displays Canonical Website Score (Trust Index)
   const scoreX = pageWidth - margin - 46;
   if (isHighRisk) {
     doc.setFillColor(239, 68, 68); // Red
@@ -188,14 +195,14 @@ export function generatePdfDocument(report: LegitifyReport, fallbackAssessments?
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
-  doc.text('OVERALL RISK', scoreX + 21, y + 10, { align: 'center' });
+  doc.text('TRUST INDEX', scoreX + 21, y + 10, { align: 'center' });
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
-  doc.text(`${overallRiskScore}/100`, scoreX + 21, y + 19, { align: 'center' });
+  doc.text(`${trustScore}/100`, scoreX + 21, y + 19, { align: 'center' });
 
   doc.setFontSize(6.5);
-  doc.text(isHighRisk ? 'CRITICAL RISK' : isModerateRisk ? 'MODERATE RISK' : 'LOW RISK', scoreX + 21, y + 26, { align: 'center' });
+  doc.text(rawVerdict.slice(0, 16), scoreX + 21, y + 26, { align: 'center' });
 
   y += 42;
 
@@ -307,20 +314,18 @@ export function generatePdfDocument(report: LegitifyReport, fallbackAssessments?
     : [];
 
   const assessmentsList: AssessmentItem[] = rawAssessmentsList.map(item => {
-    if (item.id === 'financial_safety' && hasFeeDemand) {
+    if (item.id === 'financial_safety' && hasFeeDemand && (item.risk_score || 0) < 70 && !isServerPaymentNegative) {
       const feeQuote = report.document_analysis?.fee_details?.[0]?.exact_quote ||
         (report.critical_signals && report.critical_signals.find((s: any) => /fee|deposit|payment/i.test(s))) ||
         (report.rules_triggered && report.rules_triggered.find((r: any) => /fee|deposit/i.test(r.name || ''))?.explanation);
       return {
         ...item,
-        risk_score: Math.max(item.risk_score || 0, 96),
+        risk_score: 96,
         risk_band: 'CRITICAL_RISK',
         risk_band_label: 'Critical Fraud Risk',
         evidence_found: feeQuote
           ? `Explicit candidate fee or security deposit detected: "${feeQuote}"`
-          : (item.evidence_found && !item.evidence_found.toLowerCase().includes('zero')
-            ? item.evidence_found
-            : 'Explicit candidate fee, caution deposit, or monetary demand detected in document.'),
+          : 'Explicit candidate fee, caution deposit, or monetary demand detected in document.',
         why_it_matters: 'Legitimate employers never demand candidate registration fees or caution deposits. Any fee demand is an immediate scam indicator.',
         recommended_next_step: 'NEVER transfer funds or UPI payments. Terminate contact and report to 1930 Cybercrime Helpline.',
       };
@@ -364,7 +369,10 @@ export function generatePdfDocument(report: LegitifyReport, fallbackAssessments?
       doc.roundedRect(pageWidth - margin - 42, y + 2, 38, 5.5, 1, 1, 'F');
       doc.setTextColor(...colors.text);
       doc.setFontSize(6.5);
-      doc.text(`${item.risk_score}/100 Risk · ${item.risk_band_label || item.risk_band}`, pageWidth - margin - 23, y + 5.8, { align: 'center' });
+      const scoreBadgeText = item.risk_score !== null && item.risk_score !== undefined
+        ? `${item.risk_score}/100 Risk · ${item.risk_band_label || item.risk_band}`
+        : 'Classifier Result Unavailable';
+      doc.text(scoreBadgeText, pageWidth - margin - 23, y + 5.8, { align: 'center' });
 
       let cardY = y + 9.5;
 

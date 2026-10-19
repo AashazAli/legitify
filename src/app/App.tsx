@@ -785,11 +785,14 @@ function UserScanView({
 
       if (fReport) {
         // Bi-directional forensic reconciliation
-        const clientFee = Boolean(fReport.semantics?.hasFeeDemand);
+        const isServerPaymentNegative = finalReport.payment_case === 'POLICY_MENTION_WITHOUT_DEMAND' ||
+          finalReport.payment_case === 'WARNING_AGAINST_PAYMENT' ||
+          finalReport.payment_case === 'NO_PAYMENT_EVIDENCE';
+        const clientFee = !isServerPaymentNegative && Boolean(fReport.semantics?.hasFeeDemand);
         const serverFee = Boolean(finalReport.has_fee_demand);
-        const feeDetected = clientFee || serverFee;
+        const feeDetected = !isServerPaymentNegative && (serverFee || (clientFee && fReport.scoring.authenticityScore <= 35));
 
-        // If either detected a fee, enforce fee safety cap!
+        // If genuine fee demand detected, enforce fee safety cap!
         if (feeDetected) {
           finalReport.has_fee_demand = true;
           finalReport.trust_score = Math.min(finalReport.trust_score !== undefined ? finalReport.trust_score : 20, fReport.scoring.authenticityScore, 24);
@@ -818,8 +821,8 @@ function UserScanView({
         if (!finalReport.assessments || finalReport.assessments.length === 0) {
           finalReport.assessments = fReport.scoring.assessments || [];
         }
-        if (feeDetected && finalReport.assessments && finalReport.assessments.length > 0) {
-          finalReport.assessments = finalReport.assessments.map((a: any) => {
+        if (feeDetected && (!finalReport.assessments || !finalReport.assessments.some((a: any) => a.id === 'financial_safety' && a.risk_score >= 70))) {
+          finalReport.assessments = (finalReport.assessments || []).map((a: any) => {
             if (a.id === 'financial_safety') {
               const feeText = fReport.semantics?.feeDemandKeywords?.length
                 ? `Document contains explicit fee/deposit clauses: [${fReport.semantics.feeDemandKeywords.join(', ')}]`
@@ -1073,14 +1076,16 @@ function UserReportView({
   const scanId = report.scan_id || `LGF-2026-${Date.now().toString().slice(-6)}`;
   const inputType = String(report.input_type || (report.document_analysis?.filename?.endsWith('.pdf') ? "PDF" : "IMAGE")).toUpperCase();
 
-  const hasFeeDemand = Boolean(
-    fSemantics?.hasFeeDemand ||
+  const isServerPaymentNegative = report.payment_case === 'POLICY_MENTION_WITHOUT_DEMAND' ||
+    report.payment_case === 'WARNING_AGAINST_PAYMENT' ||
+    report.payment_case === 'NO_PAYMENT_EVIDENCE';
+
+  const hasFeeDemand = !isServerPaymentNegative && Boolean(
     report.has_fee_demand ||
     (report as any).hasPaymentDemand ||
-    ((report.assessments || []).find((a: any) => a.id === 'financial_safety')?.risk_score || 0) >= 70 ||
     report.document_analysis?.extracted_entities?.payment_demands?.length ||
-    report.rules_triggered?.some(r => (r.rule_id === 'R001' || r.name?.toLowerCase().includes('fee') || r.description?.toLowerCase().includes('fee')) && (r as any).triggered !== false) ||
-    report.hard_caps_applied?.some(c => c.toLowerCase().includes('fee') || c.toLowerCase().includes('payment'))
+    report.rules_triggered?.some(r => r.rule_id === 'R002' && (r as any).triggered !== false) ||
+    report.hard_caps_applied?.some(c => c.toLowerCase().includes('payment_request_cap'))
   );
 
   const theme = getVerdictTheme(report.verdict, trustScore, hasFeeDemand);
@@ -1236,25 +1241,21 @@ function UserReportView({
       ];
 
   const displayAssessments: import('../types').AssessmentItem[] = rawAssessmentsList.map(item => {
-    if (item.id === 'financial_safety') {
-      if (hasFeeDemand) {
-        const feeQuote = report.document_analysis?.fee_details?.[0]?.exact_quote ||
-          (report.critical_signals && report.critical_signals.find((s: any) => /fee|deposit|payment/i.test(s))) ||
-          fSemantics?.feeDemandKeywords?.join(', ');
-        return {
-          ...item,
-          risk_score: Math.max(item.risk_score || 0, 96),
-          risk_band: 'CRITICAL_RISK',
-          risk_band_label: 'Critical Fraud Risk',
-          evidence_found: feeQuote
-            ? `Explicit candidate fee or security deposit detected: "${feeQuote}"`
-            : (item.evidence_found && !item.evidence_found.toLowerCase().includes('zero')
-              ? item.evidence_found
-              : 'Explicit candidate fee, caution deposit, or monetary demand detected in document.'),
-          why_it_matters: 'Legitimate employers never demand candidate registration fees or caution deposits. Any fee demand is an immediate scam indicator.',
-          recommended_next_step: 'NEVER transfer funds or UPI payments. Terminate contact and report to 1930 Cybercrime Helpline.',
-        };
-      }
+    if (item.id === 'financial_safety' && hasFeeDemand && (item.risk_score || 0) < 70 && !isServerPaymentNegative) {
+      const feeQuote = report.document_analysis?.fee_details?.[0]?.exact_quote ||
+        (report.critical_signals && report.critical_signals.find((s: any) => /fee|deposit|payment/i.test(s))) ||
+        fSemantics?.feeDemandKeywords?.join(', ');
+      return {
+        ...item,
+        risk_score: 96,
+        risk_band: 'CRITICAL_RISK',
+        risk_band_label: 'Critical Fraud Risk',
+        evidence_found: feeQuote
+          ? `Explicit candidate fee or security deposit detected: "${feeQuote}"`
+          : 'Explicit candidate fee, caution deposit, or monetary demand detected in document.',
+        why_it_matters: 'Legitimate employers never demand candidate registration fees or caution deposits. Any fee demand is an immediate scam indicator.',
+        recommended_next_step: 'NEVER transfer funds or UPI payments. Terminate contact and report to 1930 Cybercrime Helpline.',
+      };
     }
     return item;
   });
@@ -1528,11 +1529,14 @@ function UserReportView({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {displayAssessments.map((item, idx) => {
-                const isCrit = item.risk_band === 'CRITICAL_RISK' || item.risk_score >= 71;
-                const isMod = item.risk_band === 'MODERATE_RISK' || (item.risk_score >= 41 && item.risk_score <= 70);
-                const isMinor = item.risk_band === 'MINOR_IRREGULARITIES' || (item.risk_score >= 16 && item.risk_score <= 40);
+                const isAvailable = item.risk_score !== null && item.risk_score !== undefined;
+                const isCrit = isAvailable && (item.risk_band === 'CRITICAL_RISK' || item.risk_score >= 71);
+                const isMod = isAvailable && (item.risk_band === 'MODERATE_RISK' || (item.risk_score >= 41 && item.risk_score <= 70));
+                const isMinor = isAvailable && (item.risk_band === 'MINOR_IRREGULARITIES' || (item.risk_score >= 16 && item.risk_score <= 40));
 
-                const badgeBg = isCrit
+                const badgeBg = !isAvailable
+                  ? 'bg-slate-50 text-slate-600 border-slate-200'
+                  : isCrit
                   ? 'bg-rose-50 text-rose-700 border-rose-200'
                   : isMod
                   ? 'bg-amber-50 text-amber-700 border-amber-200'
@@ -1550,7 +1554,9 @@ function UserReportView({
                   <div
                     key={item.id || idx}
                     className={`p-4 rounded-xl border space-y-3 transition-all ${
-                      isCrit
+                      !isAvailable
+                        ? 'bg-slate-50/50 border-slate-200'
+                        : isCrit
                         ? 'bg-rose-50/40 border-rose-200'
                         : isMod
                         ? 'bg-amber-50/40 border-amber-200'
@@ -1561,14 +1567,18 @@ function UserReportView({
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <h4 className="text-sm font-bold text-slate-900 tracking-tight">
-                          {item.name} — <span className={isCrit ? 'text-rose-600 font-extrabold' : isMod ? 'text-amber-600 font-bold' : 'text-slate-800 font-bold'}>{item.risk_score}/100 Risk</span>
+                          {item.name} — {isAvailable ? (
+                            <span className={isCrit ? 'text-rose-600 font-extrabold' : isMod ? 'text-amber-600 font-bold' : 'text-slate-800 font-bold'}>{item.risk_score}/100 Risk</span>
+                          ) : (
+                            <span className="text-slate-500 font-semibold text-xs">Classifier Result Unavailable</span>
+                          )}
                         </h4>
                         <div className="flex items-center gap-2 mt-1">
                           <span className={`px-2 py-0.5 rounded text-[11px] font-semibold border ${badgeBg}`}>
-                            Risk Band: {item.risk_band_label || (isCrit ? 'Critical Fraud Risk' : isMod ? 'Moderate Risk' : isMinor ? 'Minor Irregularities' : 'Low Risk')}
+                            Risk Band: {isAvailable ? (item.risk_band_label || (isCrit ? 'Critical Fraud Risk' : isMod ? 'Moderate Risk' : isMinor ? 'Minor Irregularities' : 'Low Risk')) : 'Unavailable'}
                           </span>
                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${strengthBg}`}>
-                            Strength: {item.evidence_strength}
+                            Strength: {isAvailable ? item.evidence_strength : 'N/A'}
                           </span>
                         </div>
                       </div>
@@ -2707,6 +2717,45 @@ function UserCopilotView({
           `* **Key Legal Principle:** Statutory incorporation proves that a company exists, but does not prove this specific recruiter or document is authorized.\n` +
           `  👉 [Verify Company on MCA21 Portal](https://www.mca.gov.in/content/mca/global/en/mca/fo-library/company-master-data.html)`;
       }
+      // Internship vs Job Offer
+      else if (qLower.includes("internship or job") || qLower.includes("job or internship") || qLower.includes("is it an internship") || qLower.includes("is this an internship") || qLower.includes("is it a job") || qLower.includes("is this a job") || qLower.includes("type of offer") || qLower.includes("employment type")) {
+        const isInternship = /internship|intern\b|trainee|apprenticeship|summer intern/i.test(rawDocText);
+        const isFullTime = /full-time|full time|permanent|regular employment|annual ctc|probation/i.test(rawDocText);
+        const role = fSemantics?.detectedRole || "Offered Position";
+        const stipend = fSemantics?.detectedStipend || "Not specified";
+        if (isInternship && !isFullTime) {
+          dynamicAnswer = `Based on the document text, this is an **internship offer** (Role: **${role}**, Stipend: **${stipend}**).\n\n` +
+            `* **Engagement:** Internship / Trainee\n` +
+            `* **Organization:** **${comp}**\n` +
+            (hasFeeDemand ? `\n> **Caution:** Mandatory fee demands or caution deposits detected, which indicates recruitment fraud.` : `\nStandard onboarding terms apply.`);
+        } else if (isFullTime && !isInternship) {
+          dynamicAnswer = `Based on the document text, this is a **regular / full-time employment job offer** (Role: **${role}**, Remuneration: **${stipend}**).\n\n` +
+            `* **Engagement:** Full-Time Employment\n` +
+            `* **Organization:** **${comp}**`;
+        } else {
+          dynamicAnswer = `The document designates the position as **${role}** (Stipend: **${stipend}**).\n\n` +
+            `* **Organization:** **${comp}**\n` +
+            `* If full-time conversion terms or probation details are not specified, confirm directly with the employer HR department.`;
+        }
+      }
+      // Role & Designation
+      else if ((qLower.includes("role") || qLower.includes("designation") || qLower.includes("position") || qLower.includes("job title")) && (qLower.includes("what") || qLower.includes("which") || qLower.includes("my"))) {
+        const role = fSemantics?.detectedRole || "Offered Position";
+        dynamicAnswer = `The position offered in this document is **${role}** at **${comp}**.\n\n` +
+          `* **Role Title:** ${role}\n` +
+          `* **Organization:** ${comp}\n` +
+          `* **Stipend / CTC:** ${fSemantics?.detectedStipend || "Not specified in document"}\n\n` +
+          `You can verify this job opening on the official careers page of ${comp}.`;
+      }
+      // Joining Date & Location
+      else if (qLower.includes("joining date") || qLower.includes("start date") || qLower.includes("when do i join") || qLower.includes("when do i start") || (qLower.includes("location") && !qLower.includes("registered"))) {
+        const dateMatch = rawDocText.match(/(?:joining\s*date|date\s*of\s*joining|start\s*date|commencing\s*(?:on|from)|effective\s*from)\s*[:\-]?\s*([A-Za-z0-9,\s/\-]{6,30})/i)?.[1]?.trim();
+        const locMatch = rawDocText.match(/(?:location|place\s*of\s*posting|office|base\s*location)\s*[:\-]?\s*([A-Za-z0-9,\s/\-]{3,40})/i)?.[1]?.trim();
+        dynamicAnswer = `Here are the operational details extracted from the document:\n\n` +
+          `* **Joining / Start Date:** ${dateMatch || "Not explicitly specified in the document text"}\n` +
+          `* **Location / Mode:** ${locMatch || (rawDocText.toLowerCase().includes("remote") ? "Remote / Work from home indicated" : "Not specified in document")}\n` +
+          `* **Issuing Organization:** ${comp}`;
+      }
       // Working Hours & Shift Timings
       else if (qLower.includes("hour") || qLower.includes("timing") || qLower.includes("schedule") || qLower.includes("shift") || qLower.includes("attendance")) {
         const matches = findDocSentences(["hour", "timing", "schedule", "shift", "am", "pm", "monday", "friday", "working day"]);
@@ -2779,21 +2828,20 @@ function UserCopilotView({
         const matched = findDocSentences(queryKeywords);
 
         if (matched.length > 0) {
-          dynamicAnswer = `### Document Investigation Findings for "${q}"\n\n` +
-            `**1. Relevant Excerpts from Uploaded Document:**\n` +
-            matched.map(s => `* *"${s.trim()}"*`).join('\n\n') + '\n\n' +
-            `**2. Forensic Context:**\n` +
-            `* Target Organization: **${comp}** · Trust Score: **${trustScore}/100**\n` +
-            `* Cross-verify these specific terms with the company's official corporate HR portal.`;
+          dynamicAnswer = `Based on the document text, here is what is stated regarding your question:\n\n` +
+            `> "${matched[0].trim()}"\n\n` +
+            (matched.length > 1 ? `**Additional mentions in document:**\n${matched.slice(1).map(s => `* "${s.trim()}"`).join('\n')}\n\n` : '') +
+            `* **Organization:** **${comp}** (Trust Score: **${trustScore}/100**)\n` +
+            `* **Financial Safety:** ${hasFeeDemand ? 'Caution: Candidate fee/deposit clauses detected.' : 'No candidate fee demands detected.'}\n\n` +
+            `You can verify this specific clause directly with the HR department at ${comp}.`;
         } else {
-          dynamicAnswer = `### Forensic Assessment for "${q}"\n\n` +
-            `**Target Organization:** **${comp}** · Trust Score: **${trustScore}/100** (${isHighRisk ? 'Critical Risk / Anomalies Detected' : 'Verified Profile'})\n\n` +
-            `* Regarding your inquiry: the uploaded document was inspected for terms matching your query.\n` +
-            `* **Primary Findings:**\n` +
-            `  - Financial Safety: ${hasFeeDemand ? '[CRITICAL] Upfront fee or deposit demand detected.' : '[VERIFIED] No candidate fees detected.'}\n` +
-            `  - Sender Security: ${fSemantics?.isFreeWebmail ? '[FLAGGED] Recruiter uses personal Gmail/webmail.' : 'Domain aligned correspondence.'}\n` +
-            `  - Document Layout: ${fStructure ? `${fStructure.passedChecksCount}/${fStructure.totalChecksCount} structural conventions verified.` : 'Evaluated against corporate standards.'}\n\n` +
-            `> **Guidance:** A legitimate corporate offer always has a verifiable Requisition ID on the employer's official website. Never transfer funds or share unmasked Aadhaar documents.`;
+          dynamicAnswer = `Regarding your question about **"${q}"**, the uploaded document does not contain an explicit clause directly addressing this.\n\n` +
+            `**Summary from Available Document Details:**\n` +
+            `* **Organization:** **${comp}** (Trust Score: **${trustScore}/100**)\n` +
+            `* **Role:** ${fSemantics?.detectedRole || 'Not specified in letter'}\n` +
+            `* **Financial Safety:** ${hasFeeDemand ? 'Critical Risk: Fee/deposit demands detected.' : 'Low Risk: No upfront candidate fees detected.'}\n` +
+            `* **Sender:** ${fSemantics?.isFreeWebmail ? 'Personal Webmail (@gmail.com)' : 'Corporate Domain Aligned'}\n\n` +
+            `For terms not covered in this letter, genuine employers provide an employee handbook or comprehensive agreement upon request.`;
         }
       }
 

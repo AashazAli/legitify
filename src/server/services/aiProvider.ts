@@ -396,6 +396,87 @@ ${matchedAssessment.recommended_next_step}`;
   }
 
   // ==========================================================================
+  // INTENT 0.4: Employment Type — Internship vs Full-Time Job Offer
+  // ==========================================================================
+  if (
+    q.includes('internship or job') ||
+    q.includes('job or internship') ||
+    q.includes('internship or full') ||
+    q.includes('job offer or internship') ||
+    q.includes('is it an internship') ||
+    q.includes('is this an internship') ||
+    q.includes('is it a job') ||
+    q.includes('is this a job') ||
+    q.includes('type of offer') ||
+    q.includes('employment type') ||
+    q.includes('what kind of offer') ||
+    q.includes('position type')
+  ) {
+    const isInternship = /internship|intern\b|trainee|apprenticeship|summer intern/i.test(docText);
+    const isFullTime = /full-time|full time|permanent|regular employment|annual ctc|probation period/i.test(docText);
+    const durationMatch = docText.match(/(?:duration|tenure|period)\s*[:\-]?\s*([0-9]+\s*(?:months?|weeks?|days?))/i) ||
+      docText.match(/([0-9]+\s*(?:months?|weeks?)\s*(?:internship|training|period))/i);
+    const duration = durationMatch ? durationMatch[1] : undefined;
+
+    let directAnswer = '';
+    if (isInternship && !isFullTime) {
+      directAnswer = `Based on the document text, this is an **internship offer** (Role: **${detectedRole}**${duration ? `, duration: **${duration}**` : ''}${primaryStipend ? `, stipend: **${primaryStipend}**` : ''}).`;
+    } else if (isFullTime && !isInternship) {
+      directAnswer = `Based on the document text, this is a **regular/full-time employment job offer** (Role: **${detectedRole}**${primaryStipend ? `, compensation: **${primaryStipend}**` : ''}).`;
+    } else if (isInternship && isFullTime) {
+      directAnswer = `This document appears to be an **internship with potential full-time conversion** or probation-to-employment offer (Role: **${detectedRole}**${duration ? `, initial duration: **${duration}**` : ''}${primaryStipend ? `, remuneration: **${primaryStipend}**` : ''}).`;
+    } else {
+      directAnswer = `The document designates the position as **${detectedRole}**${primaryStipend ? ` with remuneration of **${primaryStipend}**` : ''}. Standard corporate contracts typically specify whether the engagement is an internship, probationary period, or permanent employment.`;
+    }
+
+    const relevantSentences = findMatchingDocSentences(['intern', 'internship', 'full-time', 'probation', 'stipend', 'salary', 'duration', 'months']);
+
+    return `${directAnswer}
+
+**Document Evidence Summary:**
+* **Designated Role:** ${detectedRole}
+* **Engagement Type:** ${isInternship ? 'Internship / Training' : (isFullTime ? 'Full-Time Employment' : 'Not explicitly specified')}
+* **Documented Compensation:** ${primaryStipend || 'Unstated / Disclosed separately'}
+${duration ? `* **Specified Duration:** ${duration}\n` : ''}${relevantSentences.length > 0 ? `\n**Key Excerpt from Document:**\n* "${relevantSentences[0].trim()}"\n` : ''}
+${hasFee ? '\n> **Warning:** Although this document presents as an offer, it contains candidate fee demands or deposit requests, which are characteristic of recruitment scams.' : ''}`;
+  }
+
+  // ==========================================================================
+  // INTENT 0.5: Role, Designation, and Position Inquiries
+  // ==========================================================================
+  if (
+    (q.includes('role') || q.includes('designation') || q.includes('position') || q.includes('job title') || q.includes('what job') || q.includes('profile')) &&
+    (q.includes('what') || q.includes('which') || q.includes('my') || q.includes('offered') || q.includes('tell me') || q.includes('explain'))
+  ) {
+    const roleMatches = findMatchingDocSentences(['role', 'position', 'designation', 'appointed as', 'joining as', 'hired as', 'intern as']);
+    return `The role offered in this document is **${detectedRole}** at **${companyName}**.
+
+**Role Details Extracted:**
+* **Designation:** ${detectedRole}
+* **Issuing Organization:** ${companyName}
+* **Remuneration / Stipend:** ${primaryStipend || 'Not explicitly detailed in document'}
+${roleMatches.length > 0 ? `* **Document Reference:** "${roleMatches[0].trim()}"\n` : ''}
+You can cross-check this role requisition directly on the official careers page of ${companyName}.`;
+  }
+
+  // ==========================================================================
+  // INTENT 0.6: Joining Date, Duration, and Location
+  // ==========================================================================
+  if (q.includes('joining date') || q.includes('start date') || q.includes('when do i join') || q.includes('when do i start') || (q.includes('location') && !q.includes('registered')) || q.includes('where is the office') || q.includes('where is office')) {
+    const dateMatches = findMatchingDocSentences(['joining', 'commence', 'start date', 'effective date', 'reporting date', 'location', 'office', 'remote', 'work from home', 'duration', 'tenure', 'months', 'weeks']);
+    const dateExtraction = docText.match(/(?:joining\s*date|date\s*of\s*joining|start\s*date|commencing\s*(?:on|from)|effective\s*from)\s*[:\-]?\s*([A-Za-z0-9,\s/\-]{6,30})/i)?.[1]?.trim();
+    const locExtraction = docText.match(/(?:location|place\s*of\s*posting|office|base\s*location)\s*[:\-]?\s*([A-Za-z0-9,\s/\-]{3,40})/i)?.[1]?.trim();
+
+    return `Here are the operational details extracted from the document:
+
+* **Joining / Start Date:** ${dateExtraction || 'Not explicitly specified in the document text.'}
+* **Work Location / Mode:** ${locExtraction || (docTextLower.includes('remote') || docTextLower.includes('work from home') ? 'Remote / Work from home indicated' : 'Not explicitly specified')}
+* **Target Organization:** ${companyName}
+${dateMatches.length > 0 ? `\n**Relevant Document Excerpt:**\n* "${dateMatches[0].trim()}"\n` : ''}
+If dates or locations are missing from an official offer, genuine HR departments typically provide them in a formal annexure.`;
+  }
+
+  // ==========================================================================
   // INTENT 1: Working Hours, Schedule, Shifts, Timings, Work Days
   // ==========================================================================
   if (q.includes('hour') || q.includes('timing') || q.includes('schedule') || q.includes('shift') || q.includes('time') || q.includes('attendance') || q.includes('work day')) {
@@ -601,24 +682,20 @@ Formal verification inquiries to dispatch to the recruiting entity:
 
   // ==========================================================================
   // INTENT 9: DYNAMIC SENTENCE-LEVEL SEMANTIC RETRIEVAL OVER DOCUMENT TEXT
-  // For ANY arbitrary question, extracts exact matching sentences from text!
   // ==========================================================================
-  const queryTerms = q.split(/\s+/).filter(w => w.length > 2 && !['what', 'when', 'where', 'which', 'who', 'whom', 'whose', 'why', 'how', 'the', 'this', 'that', 'with', 'from', 'about', 'does', 'have', 'tell', 'give', 'show'].includes(w));
+  const queryTerms = q.split(/\s+/).filter(w => w.length > 2 && !['what', 'when', 'where', 'which', 'who', 'whom', 'whose', 'why', 'how', 'the', 'this', 'that', 'with', 'from', 'about', 'does', 'have', 'tell', 'give', 'show', 'please', 'can', 'you', 'is', 'are', 'was', 'were'].includes(w));
   const matchedSentences = findMatchingDocSentences(queryTerms);
 
   if (matchedSentences.length > 0) {
-    return `### Investigation Findings: "${question}"
+    const primarySentence = matchedSentences[0].trim();
+    return `Based on the document text, here is what is stated regarding your question:
 
-**1. Relevant Excerpts from Uploaded Document:**
-${matchedSentences.map(s => `* *"${s.trim()}"*`).join('\n\n')}
+> "${primarySentence}"
 
-**2. Contextual Forensic Analysis:**
-* **Target Entity:** **${companyName}** · Trust Score: **${score}/100**
-* The clause(s) extracted above directly relate to your question.
-* ${hasFee ? '[RISK] Regardless of specific clauses, this letter contains candidate fee requirements which violate standard employment ethics.' : 'Standard review advised.'}
+${matchedSentences.length > 1 ? `**Additional relevant clauses in document:**\n${matchedSentences.slice(1).map(s => `* "${s.trim()}"`).join('\n')}\n\n` : ''}* **Target Organization:** ${companyName} (Trust Score: ${score}/100)
+* **Financial Safety:** ${hasFee ? 'Caution: Candidate fee/deposit clauses detected in document.' : 'No candidate fee demands detected.'}
 
-**3. Next Step:**
-Compare these terms with the verified company guidelines on their official corporate website (\`/careers\`).`;
+You can cross-verify this specific clause directly with the HR department at ${companyName}.`;
   }
 
   // ==========================================================================
@@ -634,23 +711,16 @@ Compare these terms with the verified company guidelines on their official corpo
     ? `recruiter communication originates from a personal webmail address (${recruiterEmail || 'webmail'}) rather than an authenticated corporate domain`
     : `recruiter email domain aligns with the corporate organization`;
 
-  return `### Forensic Consultation: ${compRef}
+  return `Regarding your question about **"${question}"**, the uploaded document does not contain an explicit clause directly addressing this.
 
-Regarding your inquiry: *"**${question}**"*
-
-**Forensic Overview:**
-* **Target Entity:** **${companyName}**
-* **Evaluated Status:** ${isHighRisk ? '**Critical Risk / Potential Scam Indicator**' : '**Standard Corporate Profile**'}
+**Summary from Available Document Details:**
+* **Issuing Organization:** ${compRef}
+* **Offered Position:** ${detectedRole}
+* **Documented Compensation:** ${primaryStipend || 'Unstated in document text'}
 * **Financial Safety:** The document ${feeStatusText}.
 * **Recruiter Channel:** The ${recruiterStatusText}.
-${primaryStipend ? `* **Stipend Mentioned:** ${primaryStipend}` : ''}
-${referenceNumber ? `* **Document Reference ID:** ${referenceNumber}` : ''}
-
-**Direct Guidance on Your Question:**
-I reviewed the document text for clauses relating to your question. If your question references specific onboarding policies, roles, or conditions not explicitly detailed here, note that authentic corporate contracts typically provide comprehensive terms of employment.
-
-**Recommended Next Step:**
-Verify the offer directly with official Human Resources via the company's verified switchboard or official careers page (\`/careers\`).`;
+${referenceNumber ? `* **Document Reference ID:** ${referenceNumber}\n` : ''}
+If you need details on specific terms not covered in this letter, genuine employers provide a full employment agreement or employee handbook upon formal request.`;
 }
 
 // ----------------------------------------------------------------------------
@@ -839,7 +909,7 @@ OPERATIONAL DIRECTIVES:
 1. Tone: Maintain a professional, objective, enterprise security posture. Absolutely NO emojis anywhere in your response.
 2. The investigated target organization is "${compName}". NEVER refer to the company as "images", "screenshot", or raw filenames.
 3. Evaluated Authenticity & Trust Score: ${score}/100.
-4. You must answer the user's SPECIFIC question directly and conversationally based ONLY on verified evidence. If the user asks a follow-up question or references prior context, use the conversation history to answer naturally. Do NOT dump the full report or output a repeating 'Forensic Intelligence Briefing' template.
+4. Answer the user's SPECIFIC question DIRECTLY and CONVERSATIONALLY in your very first sentence based on verified document evidence. For example, if asked 'Is it an internship or job offer?', immediately state whether the document defines an internship or full-time employment, followed by duration and role details. Do NOT begin with rigid template headers (e.g. '### Investigation Findings' or '### Contextual Forensic Analysis'). Answer naturally and concisely as an expert forensic advisor.
 5. Ground your explanation in the following verified Multi-Vector Assessments, Evidence Locker records, and Dual RAG citations:
 ${assessmentsContext}
 ${paymentContext}

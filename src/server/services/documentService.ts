@@ -73,6 +73,8 @@ export interface DocumentExtractionResult {
   has_generic_greeting?: boolean;
   requested_fees?: { amount?: string; reason?: string; channel?: string }[];
   fee_details?: DetailedPaymentEvidence[];
+  payment_case?: 'EXPLICIT_DEMAND' | 'CONDITIONAL_DEMAND' | 'POLICY_MENTION_WITHOUT_DEMAND' | 'WARNING_AGAINST_PAYMENT' | 'NO_PAYMENT_EVIDENCE' | 'AMBIGUOUS_EVIDENCE';
+  payment_explanation?: string;
   candidate_compensation?: {
     type: 'STIPEND' | 'SALARY' | 'CTC' | 'REIMBURSEMENT';
     amount?: string;
@@ -364,11 +366,36 @@ export function extractDocumentSignals(
     }
   }
 
+  // Pattern E: Recruiter corporate email domain inference (e.g. hr@infosys.com -> Infosys)
+  if (!detectedCompanyName && emails.length > 0) {
+    for (const em of emails) {
+      const domain = em.split('@')[1]?.toLowerCase();
+      if (domain && !domain.includes('gmail.') && !domain.includes('yahoo.') && !domain.includes('outlook.') && !domain.includes('hotmail.')) {
+        const domainBase = domain.split('.')[0];
+        if (domainBase && domainBase.length >= 3 && !/^(mail|webmail|email|admin|careers|jobs)$/i.test(domainBase)) {
+          const docRegex = new RegExp(`\\b${domainBase}\\b`, 'i');
+          const docMatch = text.match(docRegex);
+          if (docMatch) {
+            detectedCompanyName = domainBase.charAt(0).toUpperCase() + domainBase.slice(1);
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // Pattern F: Strict letterhead candidate on top lines (must look like a genuine corporate entity)
   if (!detectedCompanyName) {
-    // Check first 3 lines of text
-    const firstLines = text.split('\n').map(l => l.trim()).filter(Boolean).slice(0, 3);
+    const firstLines = text.split('\n').map(l => l.trim()).filter(Boolean).slice(0, 5);
     for (const l of firstLines) {
-      if (l.length >= 4 && l.length <= 45 && !/(offer|internship|appointment|letter|date|dear|sub)/i.test(l)) {
+      if (
+        l.length >= 4 &&
+        l.length <= 55 &&
+        !isFilenameOrPlaceholder(l) &&
+        !/(?:offer|internship|appointment|letter|date|dear|sub|ref|subject|page|candidate|confidential|copy|regards|section)/i.test(l) &&
+        /^[A-Z0-9][A-Za-z0-9\s&.,'-]+$/.test(l) &&
+        /[a-zA-Z]/.test(l)
+      ) {
         detectedCompanyName = l;
         break;
       }
@@ -632,6 +659,47 @@ export function extractDocumentSignals(
     });
   }
 
+  // Classify payment context into explicit nuanced categories
+  let paymentCase: 'EXPLICIT_DEMAND' | 'CONDITIONAL_DEMAND' | 'POLICY_MENTION_WITHOUT_DEMAND' | 'WARNING_AGAINST_PAYMENT' | 'NO_PAYMENT_EVIDENCE' | 'AMBIGUOUS_EVIDENCE' = 'NO_PAYMENT_EVIDENCE';
+  let paymentExplanation = '';
+
+  const hasWarningAgainstPayment = docSentences.some(s =>
+    /(?:beware\s+of\s+fraud|never\s+(?:charge|collect|ask\s+for|demand)\s+(?:money|fees?|deposits?)|we\s+(?:do\s+not|never)\s+(?:charge|collect|demand|ask\s+for)\s+(?:any\s+)?(?:fees?|money|charges?|deposits?)|recruitment\s+is\s+free\s+of\s+(?:any\s+)?(?:cost|charge|fees?)|do\s+not\s+pay\s+(?:any\s+)?(?:money|fees?|charges?)|company\s+does\s+not\s+(?:charge|collect|demand))/i.test(s)
+  );
+
+  const hasFinancialPolicyMention = docSentences.some(s =>
+    !isFeeSentence(s) && /(?:reimbursement\s+policy|travel\s+(?:allowance|expenses?)|medical\s+insurance|provident\s+fund|pf\s+deduction|tax\s+deducted\s+at\s+source|tds|corporate\s+credit\s+card|relocation\s+(?:allowance|expenses?)|gratuity|company\s+will\s+reimburse)/i.test(s)
+  );
+
+  const hasAmbiguousFeeMention = docSentences.some(s =>
+    !isFeeSentence(s) && !isNegatedSentence(s) && /(?:payment\s+terms|deposit\s+terms|financial\s+clause|transaction\s+details)/i.test(s)
+  );
+
+  if (isFeeDemand) {
+    if (isRefundable || /conditional|subject\s+to/i.test(refundTerms || '')) {
+      paymentCase = 'CONDITIONAL_DEMAND';
+      paymentExplanation = `Document contains conditional candidate payment/deposit request: ${refundTerms || 'Refund claimed upon tenure or milestones'}.`;
+    } else {
+      paymentCase = 'EXPLICIT_DEMAND';
+      paymentExplanation = `Explicit candidate monetary payment or deposit requested in offer letter: "${feeQuote || detectedFeeAmount || 'Mandatory fee demand'}".`;
+    }
+  } else if (hasWarningAgainstPayment || (hasFeeNegation && !candidateCompensation)) {
+    paymentCase = 'WARNING_AGAINST_PAYMENT';
+    paymentExplanation = 'Document explicitly warns applicants against paying recruitment fees and affirms that legitimate hiring is free of cost.';
+  } else if (hasFinancialPolicyMention) {
+    paymentCase = 'POLICY_MENTION_WITHOUT_DEMAND';
+    paymentExplanation = 'Document outlines general organizational financial or reimbursement policies without requesting any payments from the candidate.';
+  } else if (hasAmbiguousFeeMention) {
+    paymentCase = 'AMBIGUOUS_EVIDENCE';
+    paymentExplanation = 'Document mentions financial or payment terminology, but available evidence is insufficient to confirm whether candidate payment is demanded.';
+  } else if (candidateCompensation) {
+    paymentCase = 'NO_PAYMENT_EVIDENCE';
+    paymentExplanation = `Document defines candidate remuneration (${candidateCompensation.type}: ${candidateCompensation.amount || ''}) without requiring any candidate payments.`;
+  } else {
+    paymentCase = 'NO_PAYMENT_EVIDENCE';
+    paymentExplanation = 'Zero candidate fees, training charges, or caution deposits detected in document.';
+  }
+
   if (isFeeDemand) {
     ruleSuspicion += 1.0; ruleCount++;
     if (!flags.some(f => f.rule === "payment_demand")) {
@@ -722,7 +790,7 @@ export function extractDocumentSignals(
   // --- DYNAMIC CLAIM EXTRACTION (RAG PRE-PROCESSING) ---
   const extracted_claims: import('../../types').DocumentClaim[] = [];
 
-  if (detectedCompanyName) {
+  if (detectedCompanyName && !isFilenameOrPlaceholder(detectedCompanyName)) {
     extracted_claims.push({
       id: `CLM-${extracted_claims.length + 1}`,
       claim_type: "ORGANIZATION",
@@ -731,6 +799,16 @@ export function extractDocumentSignals(
       confidence: 90,
       verification_status: "UNVERIFIED",
       explanation: "Extracted from document header/text; pending corporate registry check.",
+    });
+  } else {
+    extracted_claims.push({
+      id: `CLM-${extracted_claims.length + 1}`,
+      claim_type: "ORGANIZATION",
+      raw_claim_text: "Organization claimed as 'Organization not reliably identified'",
+      normalized_value: "Organization not reliably identified",
+      confidence: 30,
+      verification_status: "UNVERIFIED",
+      explanation: "Document lacks clear corporate identity, statutory registration identifiers, or verified employer letterhead.",
     });
   }
 
@@ -949,6 +1027,8 @@ export function extractDocumentSignals(
     },
     requested_fees: detailedFees.map(d => ({ amount: d.amount, reason: d.category, channel: d.channel })),
     fee_details: detailedFees,
+    payment_case: paymentCase,
+    payment_explanation: paymentExplanation,
     candidate_compensation: candidateCompensation,
     detected_stipend: candidateCompensation?.amount,
     risk_signals: flags.map(f => f.message),

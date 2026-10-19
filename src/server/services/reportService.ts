@@ -301,41 +301,13 @@ export function compileFullReport(params: CompileReportParams): LegitifyReport {
     signatory_forensics: params.signatoryForensics,
     pipeline_trace: params.pipelineTrace,
     has_fee_demand: Boolean(
-      documentData?.has_fee_demand ||
-      (params.fraudPatterns as any)?.hasPaymentDemand ||
-      (params as any).hasPaymentDemand ||
-      scoreResult.rules_triggered.some(r => r.rule_id === 'R001' || r.name?.toLowerCase().includes('fee') || r.description?.toLowerCase().includes('fee') || r.explanation?.toLowerCase().includes('fee')) ||
-      scoreResult.hard_caps_applied.some(c => c.toLowerCase().includes('fee') || c.toLowerCase().includes('payment'))
+      (documentData?.payment_case === 'EXPLICIT_DEMAND' || documentData?.payment_case === 'CONDITIONAL_DEMAND') ||
+      (documentData?.has_fee_demand && documentData?.payment_case !== 'POLICY_MENTION_WITHOUT_DEMAND' && documentData?.payment_case !== 'WARNING_AGAINST_PAYMENT' && documentData?.payment_case !== 'NO_PAYMENT_EVIDENCE') ||
+      scoreResult.rules_triggered.some(r => r.rule_id === 'R002' && (r as any).triggered !== false) ||
+      scoreResult.hard_caps_applied.some(c => c.toLowerCase().includes('payment_request_cap'))
     ),
     overall_risk_score: scoreResult.overall_risk_score ?? Math.max(1, Math.min(99, 100 - scoreResult.trust_score)),
-    assessments: (() => {
-      const isFee = Boolean(
-        documentData?.has_fee_demand ||
-        (params.fraudPatterns as any)?.hasPaymentDemand ||
-        (params as any).hasPaymentDemand ||
-        scoreResult.rules_triggered.some(r => r.rule_id === 'R001' || r.name?.toLowerCase().includes('fee') || r.description?.toLowerCase().includes('fee') || r.explanation?.toLowerCase().includes('fee')) ||
-        scoreResult.hard_caps_applied.some(c => c.toLowerCase().includes('fee') || c.toLowerCase().includes('payment'))
-      );
-      const list = scoreResult.assessments || [];
-      if (!isFee) return list;
-      return list.map(a => {
-        if (a.id === 'financial_safety') {
-          const feeDetail = (documentData?.fee_details || [])[0];
-          return {
-            ...a,
-            risk_score: Math.max(a.risk_score || 0, 96),
-            risk_band: 'CRITICAL_RISK' as const,
-            risk_band_label: 'Critical Fraud Risk',
-            evidence_found: feeDetail
-              ? `Mandatory candidate payment detected: ${feeDetail.category || 'Fee'}${feeDetail.amount ? ' of ' + feeDetail.amount : ''}${feeDetail.recipient ? ' payable to ' + feeDetail.recipient : ''}. Exact quote: "${feeDetail.exact_quote || ''}"`
-              : 'Explicit candidate fee, caution deposit, or monetary demand detected in document.',
-            why_it_matters: 'Legitimate employers never demand candidate registration fees, training charges, or caution deposits. Upfront payment demands are an immediate scam indicator.',
-            recommended_next_step: 'NEVER transfer funds, UPI payments, or bank deposits. Genuine employers never charge candidates. Report immediately to 1930 Cybercrime Helpline.',
-          };
-        }
-        return a;
-      });
-    })(),
+    assessments: scoreResult.assessments || [],
     external_research: params.externalResearch,
     evidence: params.evidence || [],
     extracted_claims: (params.documentData as any)?.extracted_claims || [],

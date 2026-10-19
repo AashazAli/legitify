@@ -334,14 +334,42 @@ export function isFilenameOrPlaceholder(name?: string): boolean {
   if (!name || typeof name !== 'string') return true;
   const s = name.trim().toLowerCase();
   if (s.length < 2) return true;
+
+  // Generic placeholders
   if (/^(?:unknown(?:\s*(?:organization|company|entity))?|uploaded\s*document|unnamed\s*document|sample\s*offer|test\s*doc|image|file|screenshot|scan|untitled|doc|n\/a|none|null|undefined)$/i.test(s)) return true;
+  if (/^corporate\s+entity$/i.test(s) || /^investigated\s+(?:organization|entity)$/i.test(s)) return true;
+
+  // File names, images, timestamps
   if (/whatsapp\s*image/i.test(s)) return true;
   if (/screenshot\s*20\d\d/i.test(s)) return true;
   if (/img[-_]?20\d\d/i.test(s)) return true;
   if (/\.(png|jpe?g|pdf|webp|bmp|gif|tiff|docx?|txt)$/i.test(s)) return true;
-  if (/^corporate\s+entity$/i.test(s) || /^investigated\s+(?:organization|entity)$/i.test(s)) return true;
   if (/^whatsapp\s+image\s+\d{4}/i.test(s)) return true;
   if (/^\d{8,}[_\-\d]*$/.test(s)) return true; // pure timestamp or unix epoch
+
+  // Document structure headings, section labels, and OCR fragments (e.g., "(Fist ection)", "First Section", "Section 1")
+  if (/^\(?\s*(?:first|second|third|fourth|fist|last|initial|preliminary)\s+(?:section|ection|part|page|clause|phase|annexure|stage)\s*\)?$/i.test(s)) return true;
+  if (/^\(?\s*(?:section|part|clause|annexure|appendix|schedule|page|table|step)\s*[\d\w.:\-_]*\s*\)?$/i.test(s)) return true;
+  if (/^(?:terms\s*(?:and|&)\s*conditions|confidential|private\s*(?:and|&)\s*confidential|candidate\s*copy|employer\s*copy|to\s*whom\s*it\s*may\s*concern|declaration|overview|introduction|table\s*of\s*contents|subject|salutation|acknowledgement)$/i.test(s)) return true;
+  if (/^(?:offer\s*letter|appointment\s*letter|internship\s*offer|internship\s*letter|employment\s*agreement|contract\s*agreement|joining\s*letter|relieving\s*letter|experience\s*letter)$/i.test(s)) return true;
+  if (/^(?:software\s*(?:engineer|developer)|data\s*analyst|web\s*developer|intern|trainee|fresher|human\s*resources|hr\s*department)$/i.test(s)) return true;
+
+  // Parenthesized fragments lacking alphabetic characters or purely punctuation
+  if (/^\(?\s*[^a-zA-Z0-9]*\s*\)?$/.test(s)) return true;
+  if (!/[a-zA-Z]/.test(s)) return true;
+
   return false;
+}
+
+/**
+ * Validates whether an extracted string resembles a legitimate organization entity.
+ */
+export function isValidOrganizationName(name?: string): boolean {
+  if (!name || typeof name !== 'string') return false;
+  if (isFilenameOrPlaceholder(name)) return false;
+  const trimmed = name.trim();
+  if (trimmed.length < 2 || trimmed.length > 80) return false;
+  if (!/[a-zA-Z]/.test(trimmed)) return false;
+  return true;
 }
 
