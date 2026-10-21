@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { generateClaimInvestigationQueue } from '../services/huggingfaceService';
+import { generateClaimInvestigationQueue, callHuggingFaceChat } from '../services/huggingfaceService';
+import { HuggingFaceProvider, getActiveAIProvider } from '../services/aiProvider';
 import { validateAssertion, validateAssertionScope, guardFindingsList, runReportAssertionGuard } from '../services/reportAssertionGuard';
 import { extractDocumentSignals } from '../services/documentService';
 import { detectVisualRegions, determineSignatoryState } from '../services/visualForensicsService';
@@ -245,6 +246,75 @@ describe('Document Service: Absence of Signatory Is Not Fraud', () => {
     if (advisory) {
       assert.strictEqual(advisory.severity, 'info', 'Advisory must have severity: info');
     }
+  });
+});
+
+describe('Hugging Face LLM Provider & Chatbot Integration', () => {
+  const originalHfToken = process.env.HF_TOKEN;
+
+  it('callHuggingFaceChat rejects when HF_TOKEN is empty', async () => {
+    delete process.env.HF_TOKEN;
+    delete process.env.HUGGINGFACE_TOKEN;
+    await assert.rejects(
+      async () => {
+        await callHuggingFaceChat([{ role: 'user', content: 'hello' }]);
+      },
+      /HF_TOKEN is not configured/
+    );
+    if (originalHfToken) process.env.HF_TOKEN = originalHfToken;
+  });
+
+  it('HuggingFaceProvider isAvailable reflects token presence', async () => {
+    const provider = new HuggingFaceProvider();
+    process.env.HF_TOKEN = 'test_token_123';
+    assert.strictEqual(await provider.isAvailable(), true);
+
+    delete process.env.HF_TOKEN;
+    delete process.env.HUGGINGFACE_TOKEN;
+    assert.strictEqual(await provider.isAvailable(), false);
+    if (originalHfToken) process.env.HF_TOKEN = originalHfToken;
+  });
+
+  it('getActiveAIProvider prioritizes HuggingFaceProvider when HF_TOKEN is configured', () => {
+    process.env.HF_TOKEN = 'test_token_active';
+    const active = getActiveAIProvider();
+    assert.ok(active instanceof HuggingFaceProvider, 'Expected HuggingFaceProvider when HF_TOKEN is active');
+    if (originalHfToken) process.env.HF_TOKEN = originalHfToken;
+    else delete process.env.HF_TOKEN;
+  });
+
+  it('HuggingFaceProvider answers domain off-topic queries with guardrail message without calling LLM', async () => {
+    const provider = new HuggingFaceProvider();
+    const offTopicAns = await provider.answerCopilot('What is the recipe for chicken biryani?', {});
+    assert.ok(offTopicAns.includes('Legitify Domain Guardrail Notice'));
+    assert.ok(!/[\u{1F300}-\u{1F9FF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u.test(offTopicAns));
+  });
+
+  it('HuggingFaceProvider responds to greetings conversationally', async () => {
+    const provider = new HuggingFaceProvider();
+    const greetingAns = await provider.answerCopilot('Hello, how can you help me?', {
+      company_name: 'Microsoft India',
+      user_name: 'Rahul',
+    });
+    assert.ok(greetingAns.includes('Hello Rahul'));
+    assert.ok(greetingAns.includes('Microsoft India'));
+    assert.ok(!/[\u{1F300}-\u{1F9FF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u.test(greetingAns));
+  });
+
+  it('HuggingFaceProvider gracefully falls back to deterministic evidence engine when token absent', async () => {
+    delete process.env.HF_TOKEN;
+    delete process.env.HUGGINGFACE_TOKEN;
+    const provider = new HuggingFaceProvider();
+    const answer = await provider.answerCopilot('Does this offer letter demand any caution deposit or fees?', {
+      company_name: 'Tata Consultancy Services',
+      payment_case: 'NO_PAYMENT_EVIDENCE',
+      assessments: [
+        { id: 'financial_safety', name: 'Payment and Financial Fee Safety', risk_score: 4, exact_quote: 'Zero upfront fees.' }
+      ]
+    });
+    assert.match(answer, /zero candidate registration fees|zero-fee compliant/i);
+    assert.ok(!/[\u{1F300}-\u{1F9FF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u.test(answer));
+    if (originalHfToken) process.env.HF_TOKEN = originalHfToken;
   });
 });
 

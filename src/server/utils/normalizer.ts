@@ -348,13 +348,14 @@ export function isFilenameOrPlaceholder(name?: string): boolean {
   if (/^\d{8,}[_\-\d]*$/.test(s)) return true; // pure timestamp or unix epoch
 
   // Document structure headings, section labels, and OCR fragments (e.g., "(Fist ection)", "First Section", "Section 1")
-  if (/^\(?\s*(?:first|second|third|fourth|fist|last|initial|preliminary)\s+(?:section|ection|part|page|clause|phase|annexure|stage)\s*\)?$/i.test(s)) return true;
-  if (/^\(?\s*(?:section|part|clause|annexure|appendix|schedule|page|table|step)\s*[\d\w.:\-_]*\s*\)?$/i.test(s)) return true;
+  if (/\b(?:first|second|third|fourth|fist|last|initial|preliminary)\s+(?:section|ection|part|page|clause|phase|annexure|stage)\b/i.test(s)) return true;
+  if (/\b(?:section|ection|annexure|appendix|schedule)\s*[\d\w.:\-_]*/i.test(s) && !/(?:pvt|ltd|limited|llp|llc|inc|corp|technologies|solutions)/i.test(s)) return true;
   if (/^(?:terms\s*(?:and|&)\s*conditions|confidential|private\s*(?:and|&)\s*confidential|candidate\s*copy|employer\s*copy|to\s*whom\s*it\s*may\s*concern|declaration|overview|introduction|table\s*of\s*contents|subject|salutation|acknowledgement)$/i.test(s)) return true;
   if (/^(?:offer\s*letter|appointment\s*letter|internship\s*offer|internship\s*letter|employment\s*agreement|contract\s*agreement|joining\s*letter|relieving\s*letter|experience\s*letter)$/i.test(s)) return true;
   if (/^(?:software\s*(?:engineer|developer)|data\s*analyst|web\s*developer|intern|trainee|fresher|human\s*resources|hr\s*department)$/i.test(s)) return true;
 
-  // Parenthesized fragments lacking alphabetic characters or purely punctuation
+  // Parenthesized fragments lacking corporate suffixes (e.g. "(Fist ection)")
+  if (/^\s*\([^)]+\)\s*$/.test(s) && !/(?:pvt|ltd|limited|inc|corp|technologies|solutions)/i.test(s)) return true;
   if (/^\(?\s*[^a-zA-Z0-9]*\s*\)?$/.test(s)) return true;
   if (!/[a-zA-Z]/.test(s)) return true;
 

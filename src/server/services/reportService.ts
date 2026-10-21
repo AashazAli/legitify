@@ -197,6 +197,8 @@ export function compileFullReport(params: CompileReportParams): LegitifyReport {
       fee_details: documentData.fee_details || [],
       candidate_compensation: documentData.candidate_compensation || [],
       has_fee_demand: documentData.has_fee_demand,
+      payment_case: documentData.payment_case,
+      payment_explanation: documentData.payment_explanation,
     } : undefined,
     threat_intelligence: {
       matched_iocs_count: threatData?.count || 0,
@@ -300,6 +302,8 @@ export function compileFullReport(params: CompileReportParams): LegitifyReport {
     dual_rag_citations: params.dualRAGCitations,
     signatory_forensics: params.signatoryForensics,
     pipeline_trace: params.pipelineTrace,
+    payment_case: documentData?.payment_case,
+    payment_explanation: documentData?.payment_explanation,
     has_fee_demand: Boolean(
       (documentData?.payment_case === 'EXPLICIT_DEMAND' || documentData?.payment_case === 'CONDITIONAL_DEMAND') ||
       (documentData?.has_fee_demand && documentData?.payment_case !== 'POLICY_MENTION_WITHOUT_DEMAND' && documentData?.payment_case !== 'WARNING_AGAINST_PAYMENT' && documentData?.payment_case !== 'NO_PAYMENT_EVIDENCE') ||

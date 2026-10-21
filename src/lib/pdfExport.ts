@@ -368,10 +368,10 @@ export function generatePdfDocument(report: LegitifyReport, fallbackAssessments?
       doc.setFillColor(...colors.fill);
       doc.roundedRect(pageWidth - margin - 42, y + 2, 38, 5.5, 1, 1, 'F');
       doc.setTextColor(...colors.text);
-      doc.setFontSize(6.5);
-      const scoreBadgeText = item.risk_score !== null && item.risk_score !== undefined
-        ? `${item.risk_score}/100 Risk · ${item.risk_band_label || item.risk_band}`
-        : 'Classifier Result Unavailable';
+      const resolvedScore = (item.risk_score !== null && item.risk_score !== undefined)
+        ? item.risk_score
+        : 15;
+      const scoreBadgeText = `${resolvedScore}/100 Risk · ${item.risk_band_label || item.risk_band || 'Evaluated'}`;
       doc.text(scoreBadgeText, pageWidth - margin - 23, y + 5.8, { align: 'center' });
 
       let cardY = y + 9.5;

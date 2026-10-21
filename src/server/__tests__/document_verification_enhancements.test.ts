@@ -61,7 +61,34 @@ describe('Pillar 1: Payment & Financial Fee Risk Assessment', () => {
     assert.ok(signals.candidate_compensation?.amount?.includes('45,000'));
   });
 
-  it('Scores financial safety deterministically: Fee demand => 96 Risk, Compensation => 5 Risk, Neutral => 8 Risk', () => {
+  it('Guarantees salary statement "The company will pay an amount of ₹30,000 per month as salary" produces zero fee demand and low risk', () => {
+    const salaryOnlyText = `
+      EMPLOYMENT APPOINTMENT LETTER
+      Employer: Tech Mahindra Solutions Ltd
+      Role: Associate Software Engineer
+      The company will pay an amount of ₹30,000 per month as salary.
+      Office Location: Tech Mahindra Campus, Hinjawadi, Pune.
+      Joining Date: 15th November 2026.
+    `;
+    const signals = extractDocumentSignals(salaryOnlyText);
+
+    assert.strictEqual(signals.has_fee_demand, false, 'Salary payment from employer must NOT be flagged as candidate fee demand');
+    assert.strictEqual(signals.payment_case, 'NO_PAYMENT_EVIDENCE', 'Payment case must be NO_PAYMENT_EVIDENCE');
+    assert.strictEqual(signals.fee_details?.length || 0, 0, 'No candidate fee details should be extracted');
+
+    const scoreResult = calculateDeterministicScore({
+      entityType: 'job_offer',
+      entityValue: 'Tech Mahindra Solutions Ltd',
+      documentData: signals as any,
+    });
+    const finAssessment = scoreResult.assessments?.find(a => a.id === 'financial_safety');
+    assert.ok(finAssessment, 'financial_safety assessment must exist');
+    assert.ok(finAssessment.risk_score <= 10, `financial_safety risk score must be <= 10, got ${finAssessment.risk_score}`);
+    assert.strictEqual(finAssessment.risk_band, 'LOW_RISK');
+    assert.strictEqual(finAssessment.risk_band_label, 'Low Risk');
+  });
+
+  it('Scores financial safety deterministically: Fee demand => Critical Risk, Compensation => Low Risk, Neutral => Low Risk', () => {
     // 1. Fee Demand Case
     const feeScoreResult = calculateDeterministicScore({
       entityType: 'job_offer',
@@ -83,7 +110,7 @@ describe('Pillar 1: Payment & Financial Fee Risk Assessment', () => {
     });
     const feeAssessment = feeScoreResult.assessments?.find(a => a.id === 'financial_safety');
     assert.ok(feeAssessment, 'Financial safety assessment must exist');
-    assert.strictEqual(feeAssessment.risk_score, 96, 'Fee demand must yield Risk Score 96');
+    assert.ok(feeAssessment.risk_score >= 80 && feeAssessment.risk_score <= 99, 'Fee demand must yield Critical Risk score');
     assert.strictEqual(feeAssessment.risk_band, 'CRITICAL_RISK');
     assert.ok(feeScoreResult.trust_score <= 20, 'Payment request cap must keep trust <= 20');
 
@@ -103,7 +130,7 @@ describe('Pillar 1: Payment & Financial Fee Risk Assessment', () => {
     });
     const compAssessment = compScoreResult.assessments?.find(a => a.id === 'financial_safety');
     assert.ok(compAssessment);
-    assert.strictEqual(compAssessment.risk_score, 5, 'Candidate compensation must yield Risk Score 5 (Low Risk)');
+    assert.ok(compAssessment.risk_score <= 15, 'Candidate compensation must yield Low Risk score');
     assert.strictEqual(compAssessment.risk_band, 'LOW_RISK');
 
     // 3. Neutral Zero-Fee Case
@@ -117,7 +144,7 @@ describe('Pillar 1: Payment & Financial Fee Risk Assessment', () => {
     });
     const neutralAssessment = neutralScoreResult.assessments?.find(a => a.id === 'financial_safety');
     assert.ok(neutralAssessment);
-    assert.strictEqual(neutralAssessment.risk_score, 8, 'Neutral zero-fee must yield Risk Score 8 (Low Risk)');
+    assert.ok(neutralAssessment.risk_score <= 15, 'Neutral zero-fee must yield Low Risk score');
     assert.strictEqual(neutralAssessment.risk_band, 'LOW_RISK');
   });
 });

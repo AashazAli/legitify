@@ -2,6 +2,10 @@
 // LEGITIFY EXPRESS API SERVER
 // Evidence-First Trust Intelligence Server Endpoints
 // ==============================================================================
+import dotenv from 'dotenv';
+dotenv.config();
+dotenv.config({ path: '.env.local' });
+
 import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
@@ -917,6 +921,37 @@ app.post(['/api/copilot', '/copilot'], async (req, res) => {
           context.user_email = context.user_email || user.email;
         }
       } catch {}
+    }
+
+    // Enhance context from persisted report if scan_id is provided and context is partial
+    const scanId = context.scan_id || req.body.scan_id;
+    if (scanId && (!context.external_research || !context.document_analysis || !context.assessments)) {
+      try {
+        const { data: reportRow } = await supabaseAdmin
+          .from('reports')
+          .select('report_json')
+          .eq('scan_id', scanId)
+          .maybeSingle();
+        if (reportRow?.report_json) {
+          const rJson = typeof reportRow.report_json === 'string' ? JSON.parse(reportRow.report_json) : reportRow.report_json;
+          context.external_research = context.external_research || rJson.external_research;
+          context.document_analysis = context.document_analysis || rJson.document_analysis;
+          context.assessments = context.assessments || rJson.scoring?.assessments || rJson.assessments;
+          context.trust_score = context.trust_score ?? rJson.scoring?.trust_score ?? rJson.trust_score;
+          context.confidence_score = context.confidence_score ?? rJson.scoring?.confidence_score ?? rJson.confidence_score;
+          context.verdict = context.verdict || rJson.scoring?.verdict || rJson.verdict;
+          context.company_name = context.company_name || rJson.entity_name || rJson.company_name;
+          context.extracted_claims = context.extracted_claims || rJson.extracted_claims;
+          context.evidence = context.evidence || rJson.evidence;
+          context.raw_text = context.raw_text || (rJson.document_analysis as any)?.extracted_text;
+          context.fee_details = context.fee_details || rJson.document_analysis?.fee_details || rJson.fee_details;
+          context.payment_case = context.payment_case || rJson.document_analysis?.payment_case || rJson.payment_case;
+          context.has_fee_demand = context.has_fee_demand ?? rJson.has_fee_demand ?? rJson.document_analysis?.has_fee_demand;
+          context.mlPrediction = context.mlPrediction || rJson.ml_prediction || rJson.mlPrediction;
+        }
+      } catch (e) {
+        console.warn('Could not load report_json for scan in copilot', scanId, e);
+      }
     }
 
     const aiProvider = await getActiveAIProvider();

@@ -150,7 +150,7 @@ const GENUINE_INDICATORS: [RegExp, number, string, boolean][] = [
 // --- FRAUD INDICATORS (InternShield & Cyber Reference Framework) ---
 const FRAUD_INDICATORS: [RegExp, number, string][] = [
   // 1. Fee & Payment Traps
-  [/(?<!basic\s+|gross\s+|net\s+)(?:pay|deposit|transfer|send|remit)\s*(?:rs\.?|₹|inr|money|amount|fee|charge)/i, 0.20, "Requests money/payment from candidate"],
+  [/(?:candidate|applicant|student|intern|you)\s*(?:must|is\s+required\s+to|needs?\s+to|have\s+to|shall)\s*(?:pay|deposit|transfer|remit)|(?:pay|deposit|transfer)\s+(?:registration|caution|security|admission|portal|training|booking|enrolment|acceptance|processing)\s*(?:fee|deposit|charges?|amount)|pay\s+(?:₹|rs\.?|inr|\$)?\s*[0-9,]+(?:\s*\/-)?\s*(?:before\s*joining|to\s*(?:confirm|accept|secure)|via\s*upi|online\s*to)/i, 0.20, "Requests money/payment from candidate"],
   [/(registration\s*fees?|processing\s*fees?|security\s*(?:deposit|amount|fee))/i, 0.20, "Demands registration/processing fee or security deposit"],
   [/(caution\s*(?:deposit|money|amount|fee)|laptop\s*deposit|equipment\s*deposit)/i, 0.20, "Demands caution deposit or hardware/equipment deposit"],
   [/(internship\s*fees?|enrolment\s*fees?|enrollment\s*fees?|admission\s*fees?|acceptance\s*fees?)/i, 0.20, "Demands candidate internship/enrolment fee"],
@@ -343,7 +343,10 @@ export function extractDocumentSignals(
   // Pattern A: Explicit letterhead or document header prefixes
   const prefixMatch = text.match(/(?:Offer\s*Letter\s*(?:from|for|by)|Welcome\s*to|Employment\s*Offer\s*-\s*|Sub:\s*Appointment\s*(?:at|in|with)|Company\s*Name\s*:\s*|Organisation\s*:\s*|Organization\s*:\s*|Employer\s*:\s*)([A-Z0-9][A-Za-z0-9\s&.,'-]{2,50}(?:Pvt\s*Ltd|Private\s*Limited|Limited|Ltd|LLC|Inc|Corp|Technologies|Solutions|Enterprises|Infotech|Services|Global|Aviation|Motors|Consultancy|Systems)?)/i);
   if (prefixMatch && prefixMatch[1]?.trim()) {
-    detectedCompanyName = prefixMatch[1].trim();
+    const cand = prefixMatch[1].trim();
+    if (!isFilenameOrPlaceholder(cand) && !cand.startsWith('(')) {
+      detectedCompanyName = cand;
+    }
   }
 
   // Pattern B: Legal entity markers (e.g. Acme Corp Ltd, Tech Solutions Private Limited, Clinchsoft Technologies)
@@ -427,23 +430,39 @@ export function extractDocumentSignals(
 
   const docSentences = text.split(/(?<=[.!?\n])\s+/).filter(s => s.trim().length > 0);
 
+  // Helper to detect candidate compensation (stipend/salary paid TO candidate)
+  const isCandidateCompensationSentence = (s: string): boolean => {
+    return /(?:stipend\s*(?:of|is|:)?|salary\s*(?:of|is|:)?|compensation\s*(?:of|is|:)?|remuneration\s*(?:of|is|:)?|ctc\s*(?:of|is|:)?|will\s+(?:receive|be\s+paid|earn)\s+(?:a\s+)?(?:stipend|salary|remuneration)|paid\s+(?:to\s+you|to\s+the\s+candidate|to\s+the\s+intern|monthly|per\s+month)|transferred\s+to\s+your\s+(?:bank\s+)?account|credited\s+to\s+your|basic\s+pay|gross\s+salary|net\s+salary|package\s+of)/i.test(s) &&
+      !/(?:candidate|student|intern|applicant)\s*(?:must|needs?|is\s+required\s+to)\s*(?:pay|deposit|transfer)/i.test(s) &&
+      !/(?:registration\s*fee|security\s*deposit|caution\s*deposit|training\s*fee|laptop\s*deposit)/i.test(s);
+  };
+
+  // Helper to detect corporate expense/reimbursement policies
+  const isCorporatePolicySentence = (s: string): boolean => {
+    return /(?:reimbursement\s+(?:policy|of\s+expenses?)|travel\s+(?:allowance|expenses?|reimbursement)|expenses?\s+(?:incurred\s+will\s+be\s+reimbursed|covered\s+by\s+the\s+company|borne\s+by\s+the\s+company)|provident\s+fund|pf\s+deduction|tax\s+deducted\s+at\s+source|tds|medical\s+insurance|group\s+insurance|health\s+benefits|gratuity|company\s+will\s+reimburse)/i.test(s) &&
+      !/(?:pay\s+before|registration\s*fee|caution\s*deposit|security\s*deposit|training\s*fee)/i.test(s);
+  };
+
   const isNegatedSentence = (s: string): boolean => {
-    return /(?:no\s+(?:registration|application|processing|training|onboarding|security|caution|internship)?\s*fees?|no\s+(?:security|caution)?\s*deposits?|never\s+(?:charge|collect|demand|request|ask)|do\s+not\s+(?:charge|collect|demand|request|ask)|will\s+not\s+(?:charge|collect|demand|request|ask)|shall\s+not\s+(?:charge|collect|demand|request|ask)|(?:fee|fees|deposit|payment)\s+(?:is\s+|are\s+)?not\s+required|without\s+any\s+(?:fee|charges?|deposit)|free\s+of\s+(?:any\s+)?(?:charge|cost|fee)|no\s+payment\s+is\s+required|we\s+do\s+not\s+collect|do\s+not\s+pay\s+anyone)/i.test(s);
+    return /(?:no\s+(?:registration|application|processing|training|onboarding|security|caution|internship)?\s*fees?|no\s+(?:security|caution)?\s*deposits?|never\s+(?:charge|collect|demand|request|ask)|do\s+not\s+(?:charge|collect|demand|request|ask)|will\s+not\s+(?:charge|collect|demand|request|ask)|shall\s+not\s+(?:charge|collect|demand|request|ask)|(?:fee|fees|deposit|payment)\s+(?:is\s+|are\s+)?not\s+required|without\s+any\s+(?:fee|charges?|deposit)|free\s+of\s+(?:any\s+)?(?:charge|cost|fee)|no\s+payment\s+is\s+required|we\s+do\s+not\s+collect|do\s+not\s+pay\s+anyone|beware\s+of\s+(?:fraud|scams?)|neither\s+charge\s+nor\s+collect)/i.test(s);
   };
 
   const isFeeSentence = (s: string): boolean => {
     if (isNegatedSentence(s)) return false;
-    return /(?:registration\s*fees?|caution\s*(?:deposit|money|fee)|security\s*deposit|internship\s*fees?|enrolment\s*fees?|enrollment\s*fees?|laptop\s*(?:deposit|security|fee)|pay\s+online|pay\s+(?:₹|rs\.?|inr|\$)?\s*[0-9,]+|deposit\s*(?:of\s*)?(?:₹|rs\.?|inr|\$)\s*[0-9,]+|upi\s*id|gpay|phonepe|must\s+deposit|must\s+pay|required\s+to\s+pay|refundable\s*(?:security|caution|laptop)?\s*(?:fee|deposit))/i.test(s);
+    if (isCandidateCompensationSentence(s)) return false;
+    if (isCorporatePolicySentence(s)) return false;
+    // Genuine candidate fee demands
+    return /(?:registration\s*fees?|caution\s*(?:deposit|money|fee|amount)|security\s*(?:deposit|amount)|internship\s*fees?|enrolment\s*fees?|enrollment\s*fees?|laptop\s*(?:deposit|security|fee)|equipment\s*(?:deposit|charge)|onboarding\s*(?:fees?|charges?|deposit)|training\s*(?:fees?|cost|charges?)|kit\s*charges?|uniform\s*(?:deposit|fee)|slot\s*booking\s*(?:amount|fee)|booking\s*amount|admission\s*fees?|acceptance\s*fees?|document(?:ation)?\s*(?:verification\s*)?(?:charges?|fees?)|portal\s*activation\s*(?:fee|charge)|(?:candidate|student|intern|applicant)\s*(?:must|needs?|is\s+required\s+to|have\s+to)\s*(?:pay|deposit|transfer|remit)|pay\s+(?:online|immediately|before\s*joining|to\s*confirm|via\s*upi|into\s*the\s*account)\s*(?:₹|rs\.?|inr|\$)?\s*[0-9,]+|(?:pay|deposit|transfer)\s+(?:a\s+)?(?:mandatory|refundable|non-refundable)\s*(?:fee|deposit|amount|charge)|(?:transfer|deposit|pay)\s+(?:₹|rs\.?|inr|\$)\s*[0-9,]+(?:\s*\/-)?\s*(?:before\s*joining|to\s*confirm|as\s*(?:a\s*)?(?:fee|deposit|security|caution|registration|charge)))/i.test(s);
   };
 
-  const hasPositiveFeeExplicit = docSentences.some(isFeeSentence) || upiMatches.length > 0;
+  const hasPositiveFeeExplicit = docSentences.some(isFeeSentence) || (upiMatches.length > 0 && docSentences.some(s => upiMatches.some(u => s.includes(u)) && /(?:pay|transfer|send|deposit|remit)/i.test(s)));
   const hasFeeNegation = docSentences.some(isNegatedSentence) && !hasPositiveFeeExplicit;
 
   let fraudMatches = 0;
   for (const [pattern, penalty, desc] of FRAUD_INDICATORS) {
     const isFeePattern = desc.toLowerCase().includes('fee') || desc.toLowerCase().includes('deposit') || desc.toLowerCase().includes('payment') || desc.toLowerCase().includes('money');
-    if (isFeePattern && hasFeeNegation) {
-      continue; // Respect explicit negation clauses ONLY when no concrete fee demands exist
+    if (isFeePattern && (hasFeeNegation || !hasPositiveFeeExplicit)) {
+      continue; // Respect explicit negation clauses AND ensure we do not trigger fee red flags if no positive fee demand was found in sentences
     }
     if (pattern.test(textLower)) {
       fraudPenalty += penalty;
@@ -583,64 +602,72 @@ export function extractDocumentSignals(
     }
   }
 
-  // Payment demands & fee trigger patterns (non-global to prevent regex state drift)
-  const feeTriggerRegex = /(?:registration\s*fees?|training\s*(?:fees?|cost|charges?)|security\s*(?:deposit|amount|fee)|laptop\s*(?:deposit|fee|security)|caution\s*(?:deposit|money|amount|fee)|mandatory\s*(?:fees?|payment|deposit|charges?)|internship\s*fees?|enrolment\s*fees?|enrollment\s*fees?|application\s*fees?|onboarding\s*(?:fees?|charges?|deposit)|document(?:ation)?\s*(?:verification\s*)?(?:charges?|fees?)|id\s*card\s*(?:fees?|charges?)|uniform\s*(?:deposit|fee|charge)|processing\s*fees?|admission\s*fees?|acceptance\s*fees?|slot\s*booking|booking\s*amount|portal\s*(?:activation|charge|fee)|refundable\s*(?:deposit|fee|amount|charges?)|equipment\s*(?:charge|fee|cost|deposit)|background\s*(?:verification|check)\s*(?:fee|charge)|required\s+to\s+pay|need\s+to\s+pay|must\s+pay|pay\s+(?:mandatory|immediately|before\s*joining|to\s*join|security\s*deposit|registration|via\s*upi|online|the\s+internship)|pay\s+(?:₹|rs\.?|inr|\$)?\s*[0-9,]+|deposit\s*(?:of\s*)?(?:₹|rs\.?|inr|\$)\s*[0-9,]+|transfer\s*(?:of\s*)?(?:₹|rs\.?|inr|\$)\s*[0-9,]+|remit\s*(?:of\s*)?(?:₹|rs\.?|inr|\$)\s*[0-9,]+|to\s+confirm\s+your\s+(?:enrolment|enrollment|selection|seat|internship)[^\n]*?pay)/i;
-  const hasPaymentFlagTriggered = flags.some(f =>
-    (f.rule === "nlp_classifier" || f.rule === "payment_demand") &&
-    (f.message.toLowerCase().includes("money") || f.message.toLowerCase().includes("payment") || f.message.toLowerCase().includes("fee") || f.message.toLowerCase().includes("deposit"))
-  );
+  // Payment demands & fee trigger patterns (strictly candidate-directed)
+  const feeTriggerRegex = /(?:registration\s*fees?|training\s*(?:fees?|cost|charges?)|security\s*(?:deposit|amount|fee)|laptop\s*(?:deposit|fee|security)|caution\s*(?:deposit|money|amount|fee)|mandatory\s*(?:fees?|payment|deposit|charges?)|internship\s*fees?|enrolment\s*fees?|enrollment\s*fees?|application\s*fees?|onboarding\s*(?:fees?|charges?|deposit)|document(?:ation)?\s*(?:verification\s*)?(?:charges?|fees?)|id\s*card\s*(?:fees?|charges?)|uniform\s*(?:deposit|fee|charge)|processing\s*fees?|admission\s*fees?|acceptance\s*fees?|slot\s*booking\s*(?:fee|amount)|booking\s*amount|portal\s*(?:activation|charge|fee)|refundable\s*(?:deposit|fee|amount|charges?)|equipment\s*(?:charge|fee|cost|deposit)|background\s*(?:verification|check)\s*(?:fee|charge)|(?:candidate|student|intern|applicant)\s*(?:must|needs?|is\s+required\s+to|have\s+to)\s*(?:pay|deposit|transfer|remit)|pay\s+(?:mandatory|immediately|before\s*joining|to\s*join|security\s*deposit|registration|via\s*upi|online)\s*(?:₹|rs\.?|inr|\$)?\s*[0-9,]*|deposit\s*(?:of\s*)?(?:₹|rs\.?|inr|\$)\s*[0-9,]+(?:\s*\/-)?\s*(?:before\s*joining|to\s*confirm|as\s*(?:a\s*)?(?:deposit|security|caution))|transfer\s*(?:of\s*)?(?:₹|rs\.?|inr|\$)\s*[0-9,]+(?:\s*\/-)?\s*(?:before\s*joining|to\s*confirm|as\s*(?:a\s*)?(?:fee|deposit))|to\s+confirm\s+your\s+(?:enrolment|enrollment|selection|seat|internship)[^\n]*?pay)/i;
+
   // Detailed financial fee evidence extraction
   let feeQuote: string | undefined;
   for (const s of docSentences) {
-    if (!isNegatedSentence(s) && (feeTriggerRegex.test(s) || (upiMatches.length > 0 && upiMatches.some(u => s.includes(u))))) {
-      feeQuote = s.trim();
-      break;
+    if (!isNegatedSentence(s) && !isCandidateCompensationSentence(s) && !isCorporatePolicySentence(s)) {
+      if (feeTriggerRegex.test(s) || (upiMatches.length > 0 && upiMatches.some(u => s.includes(u)) && /(?:pay|transfer|send|deposit|remit)/i.test(s))) {
+        feeQuote = s.trim();
+        break;
+      }
     }
   }
 
-  const hasPositiveFeeMatch = Boolean(feeQuote) || hasPositiveFeeExplicit;
-  const isFeeDemand = hasPositiveFeeMatch || (hasPaymentFlagTriggered && !hasFeeNegation);
+  const isFeeDemand = Boolean(feeQuote) || hasPositiveFeeExplicit;
 
   const feeAmountMatch = feeQuote?.match(/(?:₹|rs\.?|inr|\$)\s*([0-9,]+(?:\.\d{1,2})?)/i) ||
-    (!hasFeeNegation ? text.match(/(?:fee|deposit|pay|amount|sum|charge)\s*(?:of|is|:)?\s*(?:₹|rs\.?|inr|\$)\s*([0-9,]+(?:\.\d{1,2})?)/i) : null);
+    (isFeeDemand ? text.match(/(?:fee|deposit|caution|registration|charge)\s*(?:of|is|:)?\s*(?:₹|rs\.?|inr|\$)\s*([0-9,]+(?:\.\d{1,2})?)/i) : null);
   const detectedFeeAmount = feeAmountMatch ? feeAmountMatch[0].trim() : undefined;
 
   let feeRecipient: string | undefined = upiMatches[0];
-  if (!feeRecipient) {
+  if (!feeRecipient && isFeeDemand) {
     const upiDirectMatch = text.match(/(?:upi(?:\s*id)?|pay\s*to|transfer\s*to|via\s*upi\s*to)\s*[:\-]?\s*([a-zA-Z0-9.\-_]{2,64}@[a-zA-Z0-9.\-_]{2,32})/i);
     if (upiDirectMatch) feeRecipient = upiDirectMatch[1].trim();
   }
-  if (!feeRecipient) {
+  if (!feeRecipient && isFeeDemand) {
     const bankMatch = text.match(/(?:beneficiary|account\s*holder|a\/c\s*name|transfer\s*to|in\s*favour\s*of)\s*[:\-]?\s*([A-Za-z0-9\s&.]{3,35})/i);
     if (bankMatch) feeRecipient = bankMatch[1].trim();
     else if (detectedCompanyName) feeRecipient = `Claimed: ${detectedCompanyName}`;
   }
 
-  const isRefundable = /refundable/i.test(text) && !/non[- ]refundable/i.test(feeQuote || text);
-  const refundTermsMatch = text.match(/(?:refundable\s+(?:after|upon|on|within)[^\n.]{5,60}|refunded\s+(?:after|upon)[^\n.]{5,60})/i);
+  const isRefundable = isFeeDemand && /refundable/i.test(feeQuote || text) && !/non[- ]refundable/i.test(feeQuote || text);
+  const refundTermsMatch = isFeeDemand ? text.match(/(?:refundable\s+(?:after|upon|on|within)[^\n.]{5,60}|refunded\s+(?:after|upon)[^\n.]{5,60})/i) : null;
   const refundTerms = refundTermsMatch ? refundTermsMatch[0].trim() : (isRefundable ? 'Claimed as refundable upon milestones or tenure' : undefined);
 
-  const deadlineMatch = text.match(/(?:within\s+\d+\s*(?:hours?|days?)|before\s+\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|by\s+[A-Za-z]+\s+\d{1,2}(?:st|nd|rd|th)?|immediate\s+transfer)/i);
+  const deadlineMatch = isFeeDemand ? text.match(/(?:within\s+\d+\s*(?:hours?|days?)|before\s+\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|by\s+[A-Za-z]+\s+\d{1,2}(?:st|nd|rd|th)?|immediate\s+transfer)/i) : null;
   const feeDeadline = deadlineMatch ? deadlineMatch[0].trim() : undefined;
 
   // Distinguish incoming applicant compensation (stipend/salary paid TO candidate)
   const compMatch = text.match(/(?:stipend|salary|compensation|ctc|remuneration|will\s+receive\s+a\s+stipend)\s*(?:of|is|:)?\s*((?:rs\.?|inr|₹|\$)?\s*[\d,]+(?:\.\d{1,2})?\s*(?:per\s+month|\/month|\/mo|p\.m\.|per\s+annum|\/year|p\.a\.|lpa|per\s+week)?)/i);
   let candidateCompensation: { type: 'STIPEND' | 'SALARY' | 'CTC' | 'REIMBURSEMENT'; amount?: string; raw_quote?: string } | undefined;
   if (compMatch) {
-    candidateCompensation = {
-      type: /ctc|per\s+annum|lpa/i.test(compMatch[0]) ? 'CTC' : /stipend/i.test(compMatch[0]) ? 'STIPEND' : 'SALARY',
-      amount: compMatch[1]?.trim() || compMatch[0].trim(),
-      raw_quote: compMatch[0].trim(),
-    };
+    const rawAmt = compMatch[1]?.trim() || '';
+    const fullMatch = compMatch[0].trim();
+    const hasCurrency = /(?:rs\.?|inr|₹|\$|€|£)/i.test(rawAmt) || /(?:rs\.?|inr|₹|\$|€|£)/i.test(fullMatch);
+    const hasUnit = /(?:per\s+month|\/month|\/mo|p\.m\.|per\s+annum|\/year|p\.a\.|lpa|lac|lakh|crore|per\s+week|\/week|\/day|per\s+day|\/hr|per\s+hour)/i.test(rawAmt) || /(?:per\s+month|\/month|\/mo|p\.m\.|per\s+annum|\/year|p\.a\.|lpa|lac|lakh|crore|per\s+week|\/week|\/day|per\s+day|\/hr|per\s+hour)/i.test(fullMatch);
+    const numOnly = parseFloat(rawAmt.replace(/[^0-9.]/g, ''));
+    const isValidComp = (hasCurrency || hasUnit) ? true : (!isNaN(numOnly) && numOnly >= 500);
+
+    if (isValidComp) {
+      candidateCompensation = {
+        type: /ctc|per\s+annum|lpa/i.test(fullMatch) ? 'CTC' : /stipend/i.test(fullMatch) ? 'STIPEND' : 'SALARY',
+        amount: rawAmt || fullMatch,
+        raw_quote: fullMatch,
+      };
+    }
   }
 
   const detailedFees: DetailedPaymentEvidence[] = [];
   if (isFeeDemand) {
     let feeCategory = 'UPFRONT_FEE_DEMAND';
-    if (/caution\s*deposit|security\s*deposit/i.test(feeQuote || text)) feeCategory = 'SECURITY_DEPOSIT';
+    if (/caution\s*(?:deposit|money|amount|fee)/i.test(feeQuote || text)) feeCategory = 'SECURITY_DEPOSIT';
+    else if (/security\s*deposit/i.test(feeQuote || text)) feeCategory = 'SECURITY_DEPOSIT';
     else if (/registration\s*fee/i.test(feeQuote || text)) feeCategory = 'REGISTRATION_FEE';
     else if (/training\s*(?:fee|cost|charge)/i.test(feeQuote || text)) feeCategory = 'TRAINING_FEE';
-    else if (/laptop\s*deposit/i.test(feeQuote || text)) feeCategory = 'EQUIPMENT_CHARGE';
+    else if (/laptop\s*deposit|equipment\s*deposit/i.test(feeQuote || text)) feeCategory = 'EQUIPMENT_CHARGE';
     else if (/onboarding|processing|document/i.test(feeQuote || text)) feeCategory = 'PROCESSING_FEE';
 
     detailedFees.push({
@@ -651,7 +678,7 @@ export function extractDocumentSignals(
       is_refundable: isRefundable,
       refund_terms: refundTerms,
       deadline: feeDeadline,
-      exact_quote: feeQuote || (hasPositiveFeeMatch ? 'Candidate monetary payment or deposit requested in document' : 'Payment demand indicated in text'),
+      exact_quote: feeQuote || 'Candidate monetary payment or caution deposit requested in document',
       why_it_matters: isRefundable
         ? 'Advance-fee fraud schemes frequently promise refunds upon completion to lower candidate skepticism. Legitimate corporate employers do not collect refundable caution deposits.'
         : 'Legitimate employers and internship providers never demand candidate registration fees or caution deposits. Any fee demand is an immediate scam indicator.',
@@ -663,19 +690,25 @@ export function extractDocumentSignals(
   let paymentCase: 'EXPLICIT_DEMAND' | 'CONDITIONAL_DEMAND' | 'POLICY_MENTION_WITHOUT_DEMAND' | 'WARNING_AGAINST_PAYMENT' | 'NO_PAYMENT_EVIDENCE' | 'AMBIGUOUS_EVIDENCE' = 'NO_PAYMENT_EVIDENCE';
   let paymentExplanation = '';
 
+  const isContentIncomplete = text.trim().length < 50;
+
   const hasWarningAgainstPayment = docSentences.some(s =>
-    /(?:beware\s+of\s+fraud|never\s+(?:charge|collect|ask\s+for|demand)\s+(?:money|fees?|deposits?)|we\s+(?:do\s+not|never)\s+(?:charge|collect|demand|ask\s+for)\s+(?:any\s+)?(?:fees?|money|charges?|deposits?)|recruitment\s+is\s+free\s+of\s+(?:any\s+)?(?:cost|charge|fees?)|do\s+not\s+pay\s+(?:any\s+)?(?:money|fees?|charges?)|company\s+does\s+not\s+(?:charge|collect|demand))/i.test(s)
+    /(?:beware\s+of\s+fraud|never\s+(?:charge|collect|ask\s+for|demand)\s+(?:money|fees?|deposits?)|we\s+(?:do\s+not|never)\s+(?:charge|collect|demand|ask\s+for)\s+(?:any\s+)?(?:fees?|money|charges?|deposits?)|recruitment\s+is\s+free\s+of\s+(?:any\s+)?(?:cost|charge|fees?)|do\s+not\s+pay\s+(?:any\s+)?(?:money|fees?|charges?)|company\s+does\s+not\s+(?:charge|collect|demand)|neither\s+charge\s+nor\s+collect)/i.test(s)
   );
 
   const hasFinancialPolicyMention = docSentences.some(s =>
-    !isFeeSentence(s) && /(?:reimbursement\s+policy|travel\s+(?:allowance|expenses?)|medical\s+insurance|provident\s+fund|pf\s+deduction|tax\s+deducted\s+at\s+source|tds|corporate\s+credit\s+card|relocation\s+(?:allowance|expenses?)|gratuity|company\s+will\s+reimburse)/i.test(s)
+    !isFeeSentence(s) && (isCorporatePolicySentence(s) || /(?:reimbursement\s+policy|travel\s+(?:allowance|expenses?)|medical\s+insurance|provident\s+fund|pf\s+deduction|tax\s+deducted\s+at\s+source|tds|corporate\s+credit\s+card|relocation\s+(?:allowance|expenses?)|gratuity|company\s+will\s+reimburse)/i.test(s))
   );
 
   const hasAmbiguousFeeMention = docSentences.some(s =>
-    !isFeeSentence(s) && !isNegatedSentence(s) && /(?:payment\s+terms|deposit\s+terms|financial\s+clause|transaction\s+details)/i.test(s)
+    !isFeeSentence(s) && !isNegatedSentence(s) && !isCandidateCompensationSentence(s) && !isCorporatePolicySentence(s) &&
+    /(?:payment\s+terms|deposit\s+terms|financial\s+clause|transaction\s+details|fee\s+structure|payment\s+schedule|billing\s+clause)/i.test(s)
   );
 
-  if (isFeeDemand) {
+  if (isContentIncomplete) {
+    paymentCase = 'AMBIGUOUS_EVIDENCE';
+    paymentExplanation = 'Source document text is incomplete, unreadable, or insufficient to reach a conclusive payment finding.';
+  } else if (isFeeDemand) {
     if (isRefundable || /conditional|subject\s+to/i.test(refundTerms || '')) {
       paymentCase = 'CONDITIONAL_DEMAND';
       paymentExplanation = `Document contains conditional candidate payment/deposit request: ${refundTerms || 'Refund claimed upon tenure or milestones'}.`;
@@ -683,7 +716,7 @@ export function extractDocumentSignals(
       paymentCase = 'EXPLICIT_DEMAND';
       paymentExplanation = `Explicit candidate monetary payment or deposit requested in offer letter: "${feeQuote || detectedFeeAmount || 'Mandatory fee demand'}".`;
     }
-  } else if (hasWarningAgainstPayment || (hasFeeNegation && !candidateCompensation)) {
+  } else if (hasWarningAgainstPayment || hasFeeNegation) {
     paymentCase = 'WARNING_AGAINST_PAYMENT';
     paymentExplanation = 'Document explicitly warns applicants against paying recruitment fees and affirms that legitimate hiring is free of cost.';
   } else if (hasFinancialPolicyMention) {
@@ -691,7 +724,7 @@ export function extractDocumentSignals(
     paymentExplanation = 'Document outlines general organizational financial or reimbursement policies without requesting any payments from the candidate.';
   } else if (hasAmbiguousFeeMention) {
     paymentCase = 'AMBIGUOUS_EVIDENCE';
-    paymentExplanation = 'Document mentions financial or payment terminology, but available evidence is insufficient to confirm whether candidate payment is demanded.';
+    paymentExplanation = 'Document mentions financial or payment terminology, but available evidence is insufficient to establish that candidate payment is demanded.';
   } else if (candidateCompensation) {
     paymentCase = 'NO_PAYMENT_EVIDENCE';
     paymentExplanation = `Document defines candidate remuneration (${candidateCompensation.type}: ${candidateCompensation.amount || ''}) without requiring any candidate payments.`;

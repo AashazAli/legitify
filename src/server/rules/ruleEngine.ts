@@ -65,14 +65,25 @@ export function evaluateRules(ctx: RuleEngineContext): {
   // ----------------------------------------------------------------------------
   // R002: Upfront payment & training fee demands
   // ----------------------------------------------------------------------------
-  const hasThreatFee = ctx.threatData?.matches?.some(i => i.threat_type === 'FEE_FRAUD') ||
-    (ctx.threatData as any)?.indicators?.some((i: any) => i.threat_type === 'FEE_FRAUD');
-  const hasFeeDemand = Boolean(
-    ctx.documentData?.has_fee_demand ||
+  const isNonDemandCase = ctx.documentData?.payment_case === 'POLICY_MENTION_WITHOUT_DEMAND' ||
+    ctx.documentData?.payment_case === 'WARNING_AGAINST_PAYMENT' ||
+    ctx.documentData?.payment_case === 'NO_PAYMENT_EVIDENCE' ||
+    ctx.documentData?.payment_case === 'AMBIGUOUS_EVIDENCE';
+
+  const isExplicitDemand = ctx.documentData?.payment_case === 'EXPLICIT_DEMAND' || ctx.documentData?.payment_case === 'CONDITIONAL_DEMAND';
+
+  const hasThreatFee = !isNonDemandCase && (
+    ctx.threatData?.matches?.some(i => i.threat_type === 'FEE_FRAUD') ||
+    (ctx.threatData as any)?.indicators?.some((i: any) => i.threat_type === 'FEE_FRAUD')
+  );
+
+  const hasFeeDemand = !isNonDemandCase && Boolean(
+    isExplicitDemand ||
+    (ctx.documentData?.has_fee_demand && !isNonDemandCase) ||
     (ctx.documentData?.fee_details && ctx.documentData.fee_details.length > 0) ||
     (ctx.documentData?.requested_fees && ctx.documentData.requested_fees.length > 0) ||
     hasThreatFee ||
-    ctx.evidence.some(e => e.evidence_type === 'UPFRONT_FEE_DEMAND' || e.evidence_type === 'FEE_FRAUD')
+    ctx.evidence.some(e => (e.evidence_type === 'UPFRONT_FEE_DEMAND' || e.evidence_type === 'FEE_FRAUD') && e.status === 'NEGATIVE' && e.severity === 'CRITICAL')
   );
 
   if (hasFeeDemand) {
@@ -197,7 +208,7 @@ export function evaluateRules(ctx: RuleEngineContext): {
   if (
     ctx.companyData &&
     ctx.companyData.status === "ACTIVE" &&
-    (ctx.recruiterData?.is_free_provider || ctx.domainData?.lookalike_detected || ctx.documentData?.has_fee_demand)
+    (ctx.recruiterData?.is_free_provider || ctx.domainData?.lookalike_detected || (ctx.documentData?.has_fee_demand && !isNonDemandCase))
   ) {
     const r006: RuleEvaluation = {
       rule_id: "R006",

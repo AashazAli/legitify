@@ -13,6 +13,7 @@ import os from 'os';
 import { fileURLToPath } from 'url';
 
 dotenv.config();
+dotenv.config({ path: '.env.local' });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -494,3 +495,140 @@ export function generateClaimInvestigationQueue(
     allQueries,
   };
 }
+
+// ==============================================================================
+// HUGGING FACE INFERENCE PROVIDERS - CHAT COMPLETION INTEGRATION
+// Endpoint: https://router.huggingface.co/v1/chat/completions (OpenAI Compatible)
+// Default Model: Qwen/Qwen3-8B (Configurable via HF_MODEL)
+// ==============================================================================
+
+export const HF_ROUTER_CHAT_URL = process.env.HF_ROUTER_BASE_URL || 'https://router.huggingface.co/v1/chat/completions';
+export const HF_PRIMARY_MODEL = process.env.HF_MODEL || 'Qwen/Qwen3-8B';
+export const HF_FALLBACK_MODEL = process.env.HF_FALLBACK_MODEL || 'Qwen/Qwen2.5-7B-Instruct';
+
+export interface HfChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+export interface HfChatResult {
+  text: string;
+  modelUsed: string;
+  isFallback: boolean;
+  errorNotice?: string;
+}
+
+/**
+ * Execute a hosted LLM chat completion using Hugging Face Inference Providers.
+ * Supports configurable model selection, provider routing, timeouts, and error handling.
+ */
+export async function callHuggingFaceChat(
+  messages: HfChatMessage[],
+  options: {
+    model?: string;
+    fallbackModel?: string;
+    maxTokens?: number;
+    temperature?: number;
+    timeoutMs?: number;
+  } = {}
+): Promise<HfChatResult> {
+  const token = (process.env.HF_TOKEN || process.env.HUGGINGFACE_TOKEN || '').trim();
+  if (!token) {
+    throw new Error('HF_TOKEN is not configured in backend environment variables.');
+  }
+
+  const primaryModel = options.model || process.env.HF_MODEL || 'Qwen/Qwen3-8B';
+  const fallbackModel = options.fallbackModel || process.env.HF_FALLBACK_MODEL || 'Qwen/Qwen2.5-7B-Instruct';
+  const timeoutMs = options.timeoutMs || 25000;
+
+  const tryModel = async (modelName: string): Promise<{ text: string } | null> => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(HF_ROUTER_CHAT_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: modelName,
+          messages,
+          max_tokens: options.maxTokens || 1024,
+          temperature: options.temperature ?? 0.2,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        let parsedError: any;
+        try { parsedError = JSON.parse(errorBody); } catch { parsedError = { error: errorBody }; }
+
+        const errorMsg = typeof parsedError.error === 'string'
+          ? parsedError.error
+          : (parsedError.error?.message || parsedError.message || `HTTP ${response.status}`);
+
+        if (response.status === 402) {
+          throw new Error(`INSUFFICIENT_CREDITS: Hugging Face account has no remaining inference credits (HTTP 402). ${errorMsg}`);
+        }
+        if (response.status === 401) {
+          throw new Error(`UNAUTHORIZED: Invalid Hugging Face API token (HTTP 401).`);
+        }
+        if (response.status === 400 && (errorMsg.includes('not supported') || errorMsg.includes('model_not_supported'))) {
+          console.warn(`[Hugging Face] Model ${modelName} not supported on provider. Attempting fallback...`);
+          return null;
+        }
+        if (response.status === 404) {
+          console.warn(`[Hugging Face] Model ${modelName} not found (404). Attempting fallback...`);
+          return null;
+        }
+
+        throw new Error(`HF_INFERENCE_ERROR (${response.status}): ${errorMsg}`);
+      }
+
+      const data: any = await response.json();
+      const answer = data.choices?.[0]?.message?.content?.trim();
+      if (!answer) {
+        throw new Error('EMPTY_RESPONSE: Hugging Face model returned an empty response.');
+      }
+      return { text: answer };
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        throw new Error(`TIMEOUT: Hugging Face inference request timed out after ${timeoutMs}ms.`);
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
+
+  // 1. Try primary model (e.g. Qwen/Qwen3-8B)
+  try {
+    const primaryResult = await tryModel(primaryModel);
+    if (primaryResult) {
+      return { text: primaryResult.text, modelUsed: primaryModel, isFallback: false };
+    }
+  } catch (err: any) {
+    if (err.message.includes('INSUFFICIENT_CREDITS') || err.message.includes('UNAUTHORIZED')) {
+      throw err;
+    }
+    console.warn(`[Hugging Face] Primary model ${primaryModel} failed: ${err.message}. Trying fallback ${fallbackModel}...`);
+  }
+
+  // 2. Try fallback model if different
+  if (fallbackModel && fallbackModel !== primaryModel) {
+    try {
+      const fallbackResult = await tryModel(fallbackModel);
+      if (fallbackResult) {
+        return { text: fallbackResult.text, modelUsed: fallbackModel, isFallback: true };
+      }
+    } catch (err: any) {
+      throw err;
+    }
+  }
+
+  throw new Error(`MODEL_UNAVAILABLE: Neither primary model (${primaryModel}) nor fallback model (${fallbackModel}) could be reached on Hugging Face Inference Providers.`);
+}
+
