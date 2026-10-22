@@ -717,9 +717,20 @@ function extractTextFromBinary(buffer: ArrayBuffer): { text: string; words: stri
  * Safely extracts suspicious fee demand keywords while respecting sentence-level negation
  * and distinguishing candidate compensation / company expense policies.
  */
+export function splitTextIntoSentences(raw: string): string[] {
+  if (!raw) return [];
+  const protectedText = raw
+    .replace(/\b(Rs|rs|inr|INR)\.\s*(\d)/gi, '$1_DOT_ $2')
+    .replace(/\b(Mr|Mrs|Ms|Dr|Prof|Sr|Jr|No|Ltd|Pvt|Ref|eg|ie|approx)\.\s+/gi, '$1_DOT_ ');
+  return protectedText
+    .split(/(?<=[.!?\n])\s+/)
+    .map(s => s.replace(/_DOT_\s*/g, '. ').trim())
+    .filter(s => s.length > 0);
+}
+
 export function extractSuspiciousFeeKeywords(text: string): string[] {
   if (!text) return [];
-  const sentences = text.split(/(?<=[.!?\n])\s+/);
+  const sentences = splitTextIntoSentences(text);
   const found: string[] = [];
 
   const isGuideDoc = /(?:how\s+to\s+know\s+if\s+a\s+consultancy\s+is\s+fake|common\s+(?:job\s+)?consultancy\s+scam|scam\s+scripts|what\s+the\s+ai\s+checker\s+looks\s+for|online\s+job\s+offer\s+verifier|verification\s+guide|checker\s+guide|internship\s+scam\s+warning\s+signs|identifying\s+recruitment\s+fraud|awareness\s+guide|case[- ]style\s+examples)/i.test(text);
@@ -1159,9 +1170,9 @@ export function analyzeDocumentSemantics(
   // 5. Fee / Monetary Demand Detection (Negation & Compensation Aware)
   const feePatternsRegex = [
     /(?:registration\s*fees?|training\s*(?:fees?|cost|charge)|security\s*(?:deposit|amount|fee)|laptop\s*deposit|caution\s*(?:deposit|money|amount|fee)|mandatory\s*(?:fees?|payment|deposit|charge)|internship\s*fees?|enrolment\s*fees?|enrollment\s*fees?|application\s*fees?|onboarding\s*(?:fees?|charges?|deposit)|document(?:ation)?\s*(?:verification\s*)?(?:charge|fee)s?|id\s*card\s*(?:fees?|charges?)|uniform\s*(?:deposit|fee|charge)|processing\s*fees?|admission\s*fees?|acceptance\s*fees?|slot\s*booking|booking\s*amount|portal\s*activation)/i,
-    /(?:required|need|must|instructed)\s+to\s+pay/i,
-    /to\s+confirm\s+your\s+(?:enrolment|enrollment|selection|seat|internship|appointment)[^\n]*?pay/i,
-    /(?:candidate|student|intern|applicant|you)\s*(?:must|needs?|is\s+required\s+to|have\s+to|shall)\s*(?:pay|deposit|transfer|remit)/i,
+    /(?:required|need|must|instructed|(?:are|is)\s+required)\s+to\s+pay/i,
+    /to\s+confirm\s+your\s+(?:enrolment|enrollment|selection|admission|offer|seat|internship|appointment)[^\n]*?pay/i,
+    /(?:candidate|student|intern|applicant|you)\s*(?:must|needs?\s+to|(?:is|are|be)\s+required\s+to|have\s+to|has\s+to|shall|will\s+need\s+to)\s*(?:pay|deposit|transfer|remit)/i,
     /pay\s+(?:online|immediately|before\s*joining|to\s*confirm|via\s*upi|into\s*the\s*account)\s*(?:₹|rs\.?|inr|\$)?\s*[0-9,]+/i,
     /(?:pay|deposit|transfer)\s+(?:a\s+)?(?:mandatory|refundable|non-refundable)\s*(?:fee|deposit|amount|charge)/i,
     /(?:transfer|deposit|pay)\s+(?:₹|rs\.?|inr|\$)\s*[0-9,]+(?:\s*\/-)?\s*(?:before\s*joining|to\s*confirm|as\s*(?:a\s*)?(?:fee|deposit|security|caution|registration|charge))/i,
@@ -1170,27 +1181,31 @@ export function analyzeDocumentSemantics(
     /(?:pay\s*(?:to|via|through)\s*(?:upi|account|bank|qr|link))/i,
     /(?:fee|charge|deposit)\s+(?:of\s+)?(?:₹|rs\.?|inr|\$)\s*[0-9,]+/i,
     /(?:transaction\s*(?:id|reference|receipt|proof)\s*to\s*confirm)/i,
+    /(?:service\s*charges?|panel\s*charges?|placement\s*fees?|profile\s*activation)/i,
+    /(?:transfer\s+(?:the\s+)?(?:small\s+)?booking\s*amount|until\s+(?:the\s+)?service\s*charge\s+is\s+cleared)/i,
+    /(?:interview[- ])?slot\s*booking/i,
   ];
 
   const isGuideDoc = /(?:how\s+to\s+know\s+if\s+a\s+consultancy\s+is\s+fake|common\s+(?:job\s+)?consultancy\s+scam|scam\s+scripts|what\s+the\s+ai\s+checker\s+looks\s+for|online\s+job\s+offer\s+verifier|verification\s+guide|checker\s+guide|internship\s+scam\s+warning\s+signs|identifying\s+recruitment\s+fraud|awareness\s+guide|case[- ]style\s+examples)/i.test(text);
 
   const isSemEducational = (s: string) => {
-    const trimmed = s.trim();
-    if (/["'“‘”’]/.test(trimmed)) return true;
+    if (/(?:booking\s*amount|service\s*charge|registration\s*fees?|caution\s*(?:deposit|money)|security\s*deposit|training\s*fees?|placement\s*fees?|panel\s*charges?|(?:interview[- ])?slot\s*booking|transfer\s+to|pay\s+to|pay\s+now|pay\s+first|upi)/i.test(s)) {
+      return false;
+    }
     if (!isGuideDoc) return false;
+    const trimmed = s.trim();
     if (/^[•\-\*+\d.]\s*\+?/i.test(trimmed)) return true;
-    if (/scam|guide|verifier|warning|checklist|example|case[- ]style|pattern|what\s+to|how\s+to|what\s+the\s+ai|looks\s+for|students\s+should|was\s+selected|asked\s+to\s+pay|consultanc/i.test(trimmed)) return true;
-    if (!/(?:pay\s+to|transfer\s+to\s+[0-9]|upi\s*[:\-]|gpay|phonepe)/i.test(trimmed)) return true;
+    if (/scam|guide|verifier|warning|checklist|example|case[- ]style|pattern|what\s+to|how\s+to|what\s+the\s+ai|looks\s+for|students\s+should/i.test(trimmed)) return true;
     return false;
   };
 
-  const semSentences = text.split(/(?<=[.!?\n])\s+/);
+  const semSentences = splitTextIntoSentences(text);
   const isSemNegated = (s: string) => /(?:no\s+(?:registration|application|processing|training|onboarding|security|caution|internship)?\s*fees?|no\s+(?:security|caution)?\s*deposits?|never\s+(?:charge|collect|demand|request|ask)|do\s+not\s+(?:charge|collect|demand|request|ask)|will\s+not\s+(?:charge|collect|demand|request|ask)|shall\s+not\s+(?:charge|collect|demand|request|ask)|does\s+not\s+(?:charge|collect|demand|request|ask)|(?:fee|fees|deposit|payment)\s+(?:is\s+|are\s+)?not\s+required|not\s+required\s+to\s+pay|do\s+not\s+need\s+to\s+pay|do\s+not\s+have\s+to\s+pay|need\s+not\s+pay|without\s+any\s+(?:fee|charges?|deposit)|free\s+of\s+(?:any\s+)?(?:charge|cost|fee)|no\s+payment\s+(?:is\s+)?required|we\s+do\s+not\s+collect|do\s+not\s+pay\s+anyone|beware\s+of\s+(?:fraud|scams?)|neither\s+charge\s+nor\s+collect|zero\s+(?:fees?|charges?|deposits?)|at\s+no\s+cost|free\s+recruitment|strictly\s+prohibits?\s+(?:any\s+)?(?:fees?|charges?|money)|never\s+asks?\s+(?:candidates?|applicants?|students?)\s+(?:to\s+pay|for\s+(?:any\s+)?money))/i.test(s);
   const isSemCompensation = (s: string) => /(?:stipend\s*(?:of|is|:)?|salary\s*(?:of|is|:)?|compensation\s*(?:of|is|:)?|remuneration\s*(?:of|is|:)?|ctc|will\s+(?:receive|be\s+paid|earn)\s+(?:a\s+)?(?:stipend|salary|remuneration)|paid\s+(?:to\s+you|to\s+the\s+candidate|to\s+the\s+intern|monthly|per\s+month)|transferred\s+to\s+your\s+(?:bank\s+)?account|credited\s+to\s+your|basic\s+pay|gross\s+salary|net\s+salary|package\s+of|company\s+will\s+pay|we\s+will\s+pay|employer\s+will\s+pay)/i.test(s) &&
-    !/(?:candidate|student|intern|applicant)\s*(?:must|needs?|is\s+required\s+to)\s*(?:pay|deposit|transfer)/i.test(s) &&
-    !/(?:registration\s*fee|security\s*deposit|caution\s*deposit|training\s*fee|laptop\s*deposit)/i.test(s);
+    !/(?:candidate|student|intern|applicant|you)\s*(?:must|needs?|(?:is|are|be)\s+required\s+to|have\s+to)\s*(?:pay|deposit|transfer)/i.test(s) &&
+    !/(?:registration\s*fee|security\s*deposit|caution\s*deposit|training\s*fee|laptop\s*deposit|booking\s*amount|service\s*charge|slot\s*booking|transfer\s+(?:the\s+)?(?:small\s+)?booking|to\s+confirm[^\n]*?pay)/i.test(s);
   const isSemCorporatePolicy = (s: string) => /(?:reimbursement\s+(?:policy|of\s+expenses?)|travel\s+(?:allowance|expenses?|reimbursement)|expenses?\s+(?:incurred\s+will\s+be\s+reimbursed|covered\s+by\s+the\s+company)|provident\s+fund|pf\s+deduction|tax\s+deducted\s+at\s+source|tds|medical\s+insurance|group\s+insurance|health\s+benefits|gratuity|company\s+will\s+reimburse)/i.test(s) &&
-    !/(?:pay\s+before|registration\s*fee|caution\s*deposit|security\s*deposit|training\s*fee)/i.test(s);
+    !/(?:pay\s+before|pay\s+now|registration\s*fee|caution\s*deposit|security\s*deposit|training\s*fee|booking\s*amount|service\s*charge)/i.test(s);
 
   const feeKeywordsFound: string[] = [];
   for (const sentence of semSentences) {

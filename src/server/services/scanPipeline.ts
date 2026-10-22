@@ -139,11 +139,20 @@ export async function runScanPipeline(params: ExecuteScanParams): Promise<Legiti
 
   if (fileBuffer && filename && mimeType) {
     docResult = await processDocument(fileBuffer, filename, mimeType);
-    if ((docResult.extracted_text?.length || 0) < 30 && combinedTextCorpus.length > 10) {
+    if (combinedTextCorpus.length > 10) {
       const pasted = await processDocument(Buffer.from(combinedTextCorpus, 'utf-8'), 'pasted_text.txt', 'text/plain');
-      evidence.push(...pasted.evidence);
-      docResult.has_fee_demand = docResult.has_fee_demand || pasted.has_fee_demand;
-      (docResult as any).suspicious_patterns = [...(docResult.suspicious_patterns || []), ...(pasted.suspicious_patterns || [])];
+      if (pasted.has_fee_demand) {
+        docResult.has_fee_demand = true;
+        docResult.fee_details = [...(docResult.fee_details || []), ...(pasted.fee_details || [])];
+        if (docResult.payment_case !== 'CONDITIONAL_DEMAND') {
+          docResult.payment_case = pasted.payment_case || 'EXPLICIT_DEMAND';
+          docResult.payment_explanation = pasted.payment_explanation || docResult.payment_explanation;
+        }
+      }
+      if ((docResult.extracted_text?.length || 0) < 30) {
+        evidence.push(...pasted.evidence);
+        (docResult as any).suspicious_patterns = [...(docResult.suspicious_patterns || []), ...(pasted.suspicious_patterns || [])];
+      }
     }
     recordTrace(
       'Document Decomposition & OCR',
@@ -421,7 +430,37 @@ export async function runScanPipeline(params: ExecuteScanParams): Promise<Legiti
     }
   }
 
-  const hasPaymentDemand = docResult?.has_fee_demand || claimLedger.normalizedEntities.paymentRequests.length > 0;
+  const hasPaymentDemand = Boolean(
+    docResult?.has_fee_demand ||
+    claimLedger.normalizedEntities.paymentRequests.length > 0 ||
+    (docResult?.fee_details && docResult.fee_details.length > 0)
+  );
+  if (hasPaymentDemand && docResult) {
+    docResult.has_fee_demand = true;
+    if (docResult.payment_case !== 'CONDITIONAL_DEMAND') {
+      docResult.payment_case = 'EXPLICIT_DEMAND';
+    }
+
+    if (!docResult.fee_details || docResult.fee_details.length === 0) {
+      if (claimLedger.normalizedEntities.paymentRequests.length > 0) {
+        docResult.fee_details = claimLedger.normalizedEntities.paymentRequests.map(req => {
+          const chunk = chunks.find(c => c.chunkId === req.chunkId);
+          const quote = chunk?.text?.slice(0, 200)?.trim() || `Candidate payment of ${req.amount} requested`;
+          return {
+            category: 'UPFRONT_FEE_DEMAND',
+            amount: req.amount,
+            channel: req.method !== 'UNSPECIFIED' ? req.method : undefined,
+            exact_quote: quote,
+            why_it_matters: 'Legitimate employers and internship providers never demand candidate registration fees or caution deposits. Any fee demand is an immediate scam indicator.',
+            confidence: 96,
+          };
+        });
+        if (!docResult.fee_amount_detected) {
+          docResult.fee_amount_detected = claimLedger.normalizedEntities.paymentRequests[0]?.amount;
+        }
+      }
+    }
+  }
 
   // Step 5.5: Dual RAG Layer 2: Index External Evidence into EXTERNAL_EVIDENCE_RAG
   indexExternalEvidence(scanId, evidence);

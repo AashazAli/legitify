@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { EvidenceItem, RuleEvaluation, MLPredictionResult } from '../../types';
 import { isFilenameOrPlaceholder } from '../utils/normalizer';
 import { callHuggingFaceChat, HfChatMessage } from './huggingfaceService';
+import { splitTextIntoSentences } from './documentService';
 
 export interface AISynthesisInput {
   entityName: string;
@@ -321,7 +322,7 @@ export function generateEvidenceGroundedAnswer(question: string, context: Record
   // Helper: Find sentences in raw document matching query terms with word-boundary awareness
   const findMatchingDocSentences = (keywords: string[]): string[] => {
     if (!docText) return [];
-    const sentences = docText.split(/(?<=[.!?\n])\s+/);
+    const sentences = splitTextIntoSentences(docText);
     return sentences.filter(s => {
       const sLower = s.toLowerCase();
       return keywords.some(k => {

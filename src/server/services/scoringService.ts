@@ -448,15 +448,12 @@ export function calculateDeterministicScore(inputs: ScoringInputs): Deterministi
     documentConfidence = 95;
     const paymentCase = inputs.documentData.payment_case;
     const isExplicitOrConditionalFee = paymentCase === 'EXPLICIT_DEMAND' || paymentCase === 'CONDITIONAL_DEMAND';
-    const isExplicitNonFee = paymentCase === 'POLICY_MENTION_WITHOUT_DEMAND' || paymentCase === 'WARNING_AGAINST_PAYMENT' || paymentCase === 'NO_PAYMENT_EVIDENCE';
 
-    const hasDetectedFee = isExplicitOrConditionalFee || (
-      !isExplicitNonFee && Boolean(
-        inputs.documentData.has_fee_demand === true ||
-        (inputs.documentData.fee_details && inputs.documentData.fee_details.length > 0) ||
-        (inputs.documentData.requested_fees && inputs.documentData.requested_fees.length > 0) ||
-        evidenceList.some(e => (e.category === 'FINANCIAL' || (e.category as any) === 'PAYMENT' || e.category === 'OFFER') && e.severity === 'CRITICAL' && (e.evidence_type === 'FEE_DEMAND' || e.evidence_type === 'PAYMENT_REQUEST'))
-      )
+    const hasDetectedFee = isExplicitOrConditionalFee || Boolean(
+      inputs.documentData.has_fee_demand === true ||
+      (inputs.documentData.fee_details && inputs.documentData.fee_details.length > 0) ||
+      (inputs.documentData.requested_fees && inputs.documentData.requested_fees.length > 0) ||
+      evidenceList.some(e => (e.category === 'FINANCIAL' || (e.category as any) === 'PAYMENT' || e.category === 'OFFER') && e.severity === 'CRITICAL' && (e.evidence_type === 'FEE_DEMAND' || e.evidence_type === 'PAYMENT_REQUEST'))
     );
 
     const rawComp = inputs.documentData.candidate_compensation;
@@ -834,12 +831,8 @@ export function calculateDeterministicScore(inputs: ScoringInputs): Deterministi
   // Constraint 2: Confirmed candidate payment demand cap (max 20)
   const scoringPaymentCase = inputs.documentData?.payment_case;
   const isExplicitOrConditionalFeeDemand = scoringPaymentCase === 'EXPLICIT_DEMAND' || scoringPaymentCase === 'CONDITIONAL_DEMAND';
-  const isPolicyOrWarningCase = scoringPaymentCase === 'POLICY_MENTION_WITHOUT_DEMAND' ||
-    scoringPaymentCase === 'WARNING_AGAINST_PAYMENT' ||
-    scoringPaymentCase === 'NO_PAYMENT_EVIDENCE' ||
-    scoringPaymentCase === 'AMBIGUOUS_EVIDENCE';
 
-  const hasFeeDemand = !isPolicyOrWarningCase && Boolean(
+  const hasFeeDemand = Boolean(
     isExplicitOrConditionalFeeDemand ||
     inputs.documentData?.has_fee_demand ||
     (inputs.documentData?.fee_details && inputs.documentData.fee_details.length > 0) ||
@@ -1122,11 +1115,8 @@ export function buildStandardAssessments(
   const hasComp = candidateCompList.length > 0 || Boolean(inputs.documentData?.detected_stipend);
 
   const rawDocPaymentCase = inputs.documentData?.payment_case;
-  const isDocNonDemand = rawDocPaymentCase === 'NO_PAYMENT_EVIDENCE' ||
-    rawDocPaymentCase === 'POLICY_MENTION_WITHOUT_DEMAND' ||
-    rawDocPaymentCase === 'WARNING_AGAINST_PAYMENT';
 
-  const isExplicitDemand = !isDocNonDemand && (
+  const isExplicitDemand = (
     rawDocPaymentCase === 'EXPLICIT_DEMAND' ||
     Boolean(inputs.documentData?.has_fee_demand) ||
     Boolean(feeDetails.length > 0 && !primaryFee?.is_refundable) ||
@@ -1135,7 +1125,7 @@ export function buildStandardAssessments(
     Boolean(inputs.documentData?.fee_amount_detected)
   );
 
-  const isConditionalDemand = !isDocNonDemand && (
+  const isConditionalDemand = (
     rawDocPaymentCase === 'CONDITIONAL_DEMAND' ||
     Boolean(primaryFee?.is_refundable || (primaryFee?.refund_terms && primaryFee.refund_terms.length > 5))
   );

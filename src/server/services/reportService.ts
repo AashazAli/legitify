@@ -302,11 +302,13 @@ export function compileFullReport(params: CompileReportParams): LegitifyReport {
     dual_rag_citations: params.dualRAGCitations,
     signatory_forensics: params.signatoryForensics,
     pipeline_trace: params.pipelineTrace,
-    payment_case: documentData?.payment_case,
+    payment_case: scoreResult.payment_case || documentData?.payment_case,
     payment_explanation: documentData?.payment_explanation,
     has_fee_demand: Boolean(
+      (scoreResult.payment_case === 'EXPLICIT_DEMAND' || scoreResult.payment_case === 'CONDITIONAL_DEMAND') ||
       (documentData?.payment_case === 'EXPLICIT_DEMAND' || documentData?.payment_case === 'CONDITIONAL_DEMAND') ||
-      (documentData?.has_fee_demand && documentData?.payment_case !== 'POLICY_MENTION_WITHOUT_DEMAND' && documentData?.payment_case !== 'WARNING_AGAINST_PAYMENT' && documentData?.payment_case !== 'NO_PAYMENT_EVIDENCE') ||
+      documentData?.has_fee_demand ||
+      (documentData?.fee_details && documentData.fee_details.length > 0) ||
       scoreResult.rules_triggered.some(r => r.rule_id === 'R002' && (r as any).triggered !== false) ||
       scoreResult.hard_caps_applied.some(c => c.toLowerCase().includes('payment_request_cap'))
     ),

@@ -651,27 +651,23 @@ function UserScanView({
 
       if (fReport) {
         // Bi-directional forensic reconciliation
-        const isServerPaymentNegative = Boolean(
-          finalReport.payment_case === 'POLICY_MENTION_WITHOUT_DEMAND' ||
-          finalReport.payment_case === 'WARNING_AGAINST_PAYMENT' ||
-          finalReport.payment_case === 'NO_PAYMENT_EVIDENCE' ||
-          finalReport.document_analysis?.payment_case === 'POLICY_MENTION_WITHOUT_DEMAND' ||
-          finalReport.document_analysis?.payment_case === 'WARNING_AGAINST_PAYMENT' ||
-          finalReport.document_analysis?.payment_case === 'NO_PAYMENT_EVIDENCE'
-        );
-        const serverFee = !isServerPaymentNegative && Boolean(
+        const serverFee = Boolean(
           finalReport.has_fee_demand ||
+          finalReport.payment_case === 'EXPLICIT_DEMAND' ||
+          finalReport.payment_case === 'CONDITIONAL_DEMAND' ||
           finalReport.document_analysis?.has_fee_demand ||
-          finalReport.document_analysis?.fee_details?.length ||
-          finalReport.rules_triggered?.some(r => r.rule_id === 'R002' && (r as any).triggered !== false)
+          (finalReport.document_analysis?.fee_details && finalReport.document_analysis.fee_details.length > 0) ||
+          finalReport.rules_triggered?.some(r => r.rule_id === 'R002' && (r as any).triggered !== false) ||
+          finalReport.hard_caps_applied?.some(c => c.toLowerCase().includes('payment_request_cap'))
         );
-        const clientFee = !isServerPaymentNegative && Boolean(fReport.semantics?.hasFeeDemand);
-        const feeDetected = serverFee || (clientFee && fReport.scoring.authenticityScore <= 35 && !finalReport.trust_score);
+        const clientFee = Boolean(fReport.semantics?.hasFeeDemand);
+        const feeDetected = serverFee || clientFee;
 
         // If genuine fee demand detected, enforce fee safety cap!
         if (feeDetected) {
           finalReport.has_fee_demand = true;
-          finalReport.trust_score = Math.min(finalReport.trust_score !== undefined ? finalReport.trust_score : 20, fReport.scoring.authenticityScore, 24);
+          finalReport.payment_case = finalReport.payment_case === 'CONDITIONAL_DEMAND' ? 'CONDITIONAL_DEMAND' : 'EXPLICIT_DEMAND';
+          finalReport.trust_score = Math.min(finalReport.trust_score !== undefined ? finalReport.trust_score : 18, fReport.scoring.authenticityScore, 20);
           finalReport.verdict = "LIKELY SCAM";
           finalReport.risk_level = "CRITICAL";
         } else {
@@ -898,7 +894,32 @@ function UserReportView({
     ? (fSemantics?.detectedCompany || report.document_analysis?.extracted_entities?.detected_company || "Investigated Organization")
     : rawName;
 
-  const trustScore = typeof activeForensicReport?.scoring?.authenticityScore === "number"
+  const serverFee = Boolean(
+    report.has_fee_demand ||
+    (report as any).hasPaymentDemand ||
+    report.payment_case === 'EXPLICIT_DEMAND' ||
+    report.payment_case === 'CONDITIONAL_DEMAND' ||
+    report.document_analysis?.has_fee_demand ||
+    (report.document_analysis?.fee_details && report.document_analysis.fee_details.length > 0) ||
+    (report.document_analysis?.extracted_entities?.payment_demands && report.document_analysis.extracted_entities.payment_demands.length > 0) ||
+    report.rules_triggered?.some(r => r.rule_id === 'R002' && (r as any).triggered !== false) ||
+    report.hard_caps_applied?.some(c => c.toLowerCase().includes('payment_request_cap'))
+  );
+
+  const clientFee = Boolean(activeForensicReport?.semantics?.hasFeeDemand);
+
+  const isExplicitZeroFeeEmployer = Boolean(
+    !serverFee && !clientFee && (
+      report.payment_case === 'POLICY_MENTION_WITHOUT_DEMAND' ||
+      report.payment_case === 'WARNING_AGAINST_PAYMENT' ||
+      report.document_analysis?.payment_case === 'POLICY_MENTION_WITHOUT_DEMAND' ||
+      report.document_analysis?.payment_case === 'WARNING_AGAINST_PAYMENT'
+    )
+  );
+
+  const hasFeeDemand = (serverFee || clientFee) && !isExplicitZeroFeeEmployer;
+
+  const rawTrustScore = typeof activeForensicReport?.scoring?.authenticityScore === "number"
     ? Math.round(activeForensicReport.scoring.authenticityScore)
     : typeof report.trust_score === "number"
     ? Math.round(report.trust_score)
@@ -907,6 +928,8 @@ function UserReportView({
     : typeof report.confidence_score === "number"
     ? Math.round(report.confidence_score)
     : 26;
+
+  const trustScore = hasFeeDemand ? Math.min(rawTrustScore, 20) : rawTrustScore;
 
   const confidence = typeof activeForensicReport?.scoring?.confidenceMetric === "number"
     ? Math.round(activeForensicReport.scoring.confidenceMetric)
@@ -918,31 +941,6 @@ function UserReportView({
 
   const scanId = report.scan_id || `LGF-2026-${Date.now().toString().slice(-6)}`;
   const inputType = String(report.input_type || (report.document_analysis?.filename?.endsWith('.pdf') ? "PDF" : "IMAGE")).toUpperCase();
-
-  const isServerPaymentNegative = Boolean(
-    report.payment_case === 'POLICY_MENTION_WITHOUT_DEMAND' ||
-    report.payment_case === 'WARNING_AGAINST_PAYMENT' ||
-    report.payment_case === 'NO_PAYMENT_EVIDENCE' ||
-    report.payment_case === 'AMBIGUOUS_EVIDENCE' ||
-    report.document_analysis?.payment_case === 'POLICY_MENTION_WITHOUT_DEMAND' ||
-    report.document_analysis?.payment_case === 'WARNING_AGAINST_PAYMENT' ||
-    report.document_analysis?.payment_case === 'NO_PAYMENT_EVIDENCE' ||
-    report.document_analysis?.payment_case === 'AMBIGUOUS_EVIDENCE'
-  );
-
-  const serverFee = !isServerPaymentNegative && Boolean(
-    report.has_fee_demand ||
-    (report as any).hasPaymentDemand ||
-    report.document_analysis?.has_fee_demand ||
-    report.document_analysis?.fee_details?.length ||
-    report.document_analysis?.extracted_entities?.payment_demands?.length ||
-    report.rules_triggered?.some(r => r.rule_id === 'R002' && (r as any).triggered !== false) ||
-    report.hard_caps_applied?.some(c => c.toLowerCase().includes('payment_request_cap'))
-  );
-
-  const hasFeeDemand = serverFee || (!isServerPaymentNegative && Boolean(
-    activeForensicReport?.semantics?.hasFeeDemand
-  ));
 
   const theme = getVerdictTheme(report.verdict, trustScore, hasFeeDemand);
 
@@ -1018,16 +1016,19 @@ function UserReportView({
         {
           id: 'financial_safety',
           name: 'Payment and Financial Fee Safety',
-          risk_score: report.payment_case === 'WARNING_AGAINST_PAYMENT' ? 3 :
+          risk_score: (hasFeeDemand || report.payment_case === 'EXPLICIT_DEMAND') ? (fSemantics?.hasUrgency ? 93 : 87) :
+            report.payment_case === 'CONDITIONAL_DEMAND' ? 82 :
+            report.payment_case === 'WARNING_AGAINST_PAYMENT' ? 3 :
             report.payment_case === 'POLICY_MENTION_WITHOUT_DEMAND' ? 8 :
-            report.payment_case === 'CONDITIONAL_DEMAND' ? (hasFeeDemand ? 82 : 74) :
-            report.payment_case === 'AMBIGUOUS_EVIDENCE' ? 42 :
-            report.payment_case === 'NO_PAYMENT_EVIDENCE' ? 5 :
-            (hasFeeDemand || report.payment_case === 'EXPLICIT_DEMAND') ? (fSemantics?.hasUrgency ? 93 : 87) : 6,
-          risk_band: (report.payment_case === 'NO_PAYMENT_EVIDENCE' || report.payment_case === 'WARNING_AGAINST_PAYMENT' || report.payment_case === 'POLICY_MENTION_WITHOUT_DEMAND') ? 'LOW_RISK' : (hasFeeDemand || report.payment_case === 'EXPLICIT_DEMAND') ? 'CRITICAL_RISK' : report.payment_case === 'CONDITIONAL_DEMAND' ? 'CRITICAL_RISK' : report.payment_case === 'AMBIGUOUS_EVIDENCE' ? 'MODERATE_RISK' : 'LOW_RISK',
-          risk_band_label: (report.payment_case === 'NO_PAYMENT_EVIDENCE' || report.payment_case === 'WARNING_AGAINST_PAYMENT' || report.payment_case === 'POLICY_MENTION_WITHOUT_DEMAND') ? 'Low Risk' : (hasFeeDemand || report.payment_case === 'EXPLICIT_DEMAND') ? 'Critical Fraud Risk' : report.payment_case === 'CONDITIONAL_DEMAND' ? 'Critical Fraud Risk' : report.payment_case === 'AMBIGUOUS_EVIDENCE' ? 'Moderate Risk' : 'Low Risk',
+            report.payment_case === 'AMBIGUOUS_EVIDENCE' ? 42 : 5,
+          risk_band: (hasFeeDemand || report.payment_case === 'EXPLICIT_DEMAND' || report.payment_case === 'CONDITIONAL_DEMAND') ? 'CRITICAL_RISK' : report.payment_case === 'AMBIGUOUS_EVIDENCE' ? 'MODERATE_RISK' : 'LOW_RISK',
+          risk_band_label: (hasFeeDemand || report.payment_case === 'EXPLICIT_DEMAND' || report.payment_case === 'CONDITIONAL_DEMAND') ? 'Critical Fraud Risk' : report.payment_case === 'AMBIGUOUS_EVIDENCE' ? 'Moderate Risk' : 'Low Risk',
           evidence_found: (hasFeeDemand || report.payment_case === 'EXPLICIT_DEMAND')
-            ? 'Explicit candidate fee, caution deposit, or monetary demand detected in document.'
+            ? (report.document_analysis?.fee_details?.[0]?.exact_quote
+              ? `Explicit candidate fee or enrolment payment demanded: "${report.document_analysis.fee_details[0].exact_quote}"`
+              : (activeForensicReport?.semantics?.feeDemandKeywords && activeForensicReport.semantics.feeDemandKeywords.length > 0)
+              ? `Explicit candidate fee demand detected: [${activeForensicReport.semantics.feeDemandKeywords.join(', ')}].`
+              : 'Explicit candidate fee, caution deposit, or monetary demand detected in document.')
             : report.payment_case === 'CONDITIONAL_DEMAND'
             ? 'Conditional or refundable deposit requested from candidate.'
             : report.payment_case === 'POLICY_MENTION_WITHOUT_DEMAND'
@@ -1173,7 +1174,39 @@ function UserReportView({
         }
       ];
 
-  const displayAssessments: import('../types').AssessmentItem[] = rawAssessmentsList;
+  const normalizedAssessmentsList = rawAssessmentsList.map(item => {
+    if (item.id === 'financial_safety') {
+      if (hasFeeDemand || report.payment_case === 'EXPLICIT_DEMAND') {
+        const quote = report.document_analysis?.fee_details?.[0]?.exact_quote ||
+          (activeForensicReport?.semantics?.feeDemandKeywords?.length ? `[${activeForensicReport.semantics.feeDemandKeywords.join(', ')}]` : undefined);
+        return {
+          ...item,
+          risk_score: Math.max(item.risk_score || 0, fSemantics?.hasUrgency ? 93 : 87),
+          risk_band: 'CRITICAL_RISK' as const,
+          risk_band_label: 'Critical Fraud Risk',
+          evidence_found: quote
+            ? `Explicit candidate fee or enrolment payment demanded: "${quote}"`
+            : (item.evidence_found && !item.evidence_found.toLowerCase().includes('zero')
+              ? item.evidence_found
+              : 'Explicit candidate fee, caution deposit, or monetary demand detected in document.'),
+          recommended_next_step: 'NEVER transfer funds or UPI payments. Terminate contact and report to 1930 Cybercrime Helpline.',
+        };
+      } else if (report.payment_case === 'CONDITIONAL_DEMAND') {
+        return {
+          ...item,
+          risk_score: Math.max(item.risk_score || 0, 82),
+          risk_band: 'CRITICAL_RISK' as const,
+          risk_band_label: 'Critical Fraud Risk',
+          recommended_next_step: 'NEVER transfer funds or refundable deposits. Terminate contact.',
+        };
+      }
+    }
+    return item;
+  });
+
+  const displayAssessments: import('../types').AssessmentItem[] = normalizedAssessmentsList.filter(
+    (item) => item.id !== 'signatory_identity'
+  );
 
   const executiveSummary = (() => {
     let summary = report.ai_synthesis?.summary || theme.description;

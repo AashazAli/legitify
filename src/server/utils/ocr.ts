@@ -65,25 +65,34 @@ export async function analyzeDocumentDeepForensics(
       const client = new GoogleGenAI({ apiKey });
       const base64Data = buffer.toString('base64');
 
-      const response = await client.models.generateContent({
-        model: process.env.GEMINI_MODEL || 'gemini-3.6-flash',
-        contents: [
-          {
-            role: 'user',
-            parts: [
+      let response: any;
+      const candidateModels = [
+        process.env.GEMINI_MODEL || 'gemini-3.6-flash',
+        'gemini-2.5-flash',
+        'gemini-1.5-flash'
+      ];
+
+      for (const m of candidateModels) {
+        try {
+          response = await client.models.generateContent({
+            model: m,
+            contents: [
               {
-                inlineData: {
-                  mimeType: normalizedMime || 'application/pdf',
-                  data: base64Data,
-                },
-              },
-              {
-                text: `You are an elite forensic document analyst. Deeply inspect this document image/PDF.
+                role: 'user',
+                parts: [
+                  {
+                    inlineData: {
+                      mimeType: normalizedMime || 'application/pdf',
+                      data: base64Data,
+                    },
+                  },
+                  {
+                    text: `You are an elite forensic document analyst. Deeply inspect this document image/PDF.
 Extract:
 1. Complete verbatim transcription of every single line, word, number, date, and character.
 2. Visual forensics: Is there a signature? (digital/handwritten/printed), Signatory name & designation, Is there an official company seal/stamp? Is there a letterhead logo?
 3. Recruiter contact: Email address, HR name, phone number.
-4. Financial clauses: Is there any registration fee, security deposit, laptop charge, or training fee?
+4. Financial clauses: Is there any registration fee, caution deposit, security deposit, booking amount, interview-slot charge, service charge, laptop charge, or training fee? If any fee, charge, deposit, or payment is demanded from the candidate, list it in "fees_detected".
 
 Return JSON format:
 {
@@ -98,13 +107,18 @@ Return JSON format:
   "emails": ["..."],
   "fees_detected": ["..."]
 }`,
+                  },
+                ],
               },
             ],
-          },
-        ],
-      });
+          });
+          if (response?.text) break;
+        } catch (mErr: any) {
+          console.warn(`[Forensics] Gemini model ${m} failed, trying next:`, mErr?.message || mErr);
+        }
+      }
 
-      const responseText = response.text?.trim() || '';
+      const responseText = response?.text?.trim() || '';
       try {
         const jsonMatch = responseText.match(/\{.*\}/s);
         if (jsonMatch) {
