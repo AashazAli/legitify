@@ -722,17 +722,32 @@ export function extractSuspiciousFeeKeywords(text: string): string[] {
   const sentences = text.split(/(?<=[.!?\n])\s+/);
   const found: string[] = [];
 
-  const isNegated = (s: string) => /(?:no\s+(?:registration|application|processing|training|onboarding|security|caution|internship)?\s*fees?|no\s+(?:security|caution)?\s*deposits?|never\s+(?:charge|collect|demand|request|ask)|do\s+not\s+(?:charge|collect|demand|request|ask)|will\s+not\s+(?:charge|collect|demand|request|ask)|shall\s+not\s+(?:charge|collect|demand|request|ask)|(?:fee|fees|deposit|payment)\s+(?:is\s+|are\s+)?not\s+required|without\s+any\s+(?:fee|charges?|deposit)|free\s+of\s+(?:any\s+)?(?:charge|cost|fee)|no\s+payment\s+is\s+required|we\s+do\s+not\s+collect|do\s+not\s+pay\s+anyone|beware\s+of\s+(?:fraud|scams?)|neither\s+charge\s+nor\s+collect)/i.test(s);
+  const isGuideDoc = /(?:how\s+to\s+know\s+if\s+a\s+consultancy\s+is\s+fake|common\s+(?:job\s+)?consultancy\s+scam|scam\s+scripts|what\s+the\s+ai\s+checker\s+looks\s+for|online\s+job\s+offer\s+verifier|verification\s+guide|checker\s+guide|internship\s+scam\s+warning\s+signs|identifying\s+recruitment\s+fraud|awareness\s+guide|case[- ]style\s+examples)/i.test(text);
+
+  const isEducational = (s: string) => {
+    const trimmed = s.trim();
+    if (/["'“‘”’]/.test(trimmed)) return true;
+    if (!isGuideDoc) return false;
+    if (/^[•\-\*+\d.]\s*\+?/i.test(trimmed)) return true;
+    if (/scam|guide|verifier|warning|checklist|example|case[- ]style|pattern|what\s+to|how\s+to|what\s+the\s+ai|looks\s+for|students\s+should|was\s+selected|asked\s+to\s+pay|consultanc/i.test(trimmed)) return true;
+    if (!/(?:pay\s+to|transfer\s+to\s+[0-9]|upi\s*[:\-]|gpay|phonepe)/i.test(trimmed)) return true;
+    return false;
+  };
+
+  const isNegated = (s: string) => /(?:no\s+(?:registration|application|processing|training|onboarding|security|caution|internship)?\s*fees?|no\s+(?:security|caution)?\s*deposits?|never\s+(?:charge|collect|demand|request|ask)|do\s+not\s+(?:charge|collect|demand|request|ask)|will\s+not\s+(?:charge|collect|demand|request|ask)|shall\s+not\s+(?:charge|collect|demand|request|ask)|does\s+not\s+(?:charge|collect|demand|request|ask)|(?:fee|fees|deposit|payment)\s+(?:is\s+|are\s+)?not\s+required|not\s+required\s+to\s+pay|do\s+not\s+need\s+to\s+pay|do\s+not\s+have\s+to\s+pay|need\s+not\s+pay|without\s+any\s+(?:fee|charges?|deposit)|free\s+of\s+(?:any\s+)?(?:charge|cost|fee)|no\s+payment\s+(?:is\s+)?required|we\s+do\s+not\s+collect|do\s+not\s+pay\s+anyone|beware\s+of\s+(?:fraud|scams?)|neither\s+charge\s+nor\s+collect|zero\s+(?:fees?|charges?|deposits?)|at\s+no\s+cost|free\s+recruitment|strictly\s+prohibits?\s+(?:any\s+)?(?:fees?|charges?|money)|never\s+asks?\s+(?:candidates?|applicants?|students?)\s+(?:to\s+pay|for\s+(?:any\s+)?money))/i.test(s);
 
   const isCompensation = (s: string) => /(?:stipend\s*(?:of|is|:)?|salary\s*(?:of|is|:)?|compensation\s*(?:of|is|:)?|remuneration\s*(?:of|is|:)?|ctc|will\s+receive\s+a\s+stipend|paid\s+to\s+you|credited\s+to\s+your|transferred\s+to\s+your|basic\s+pay|gross\s+salary)/i.test(s) && !/(?:candidate|intern|student)\s*(?:must|needs?|required\s+to)\s*(?:pay|deposit)/i.test(s);
 
   const isCorporatePolicy = (s: string) => /(?:reimbursement\s+policy|travel\s+allowance|provident\s+fund|medical\s+insurance|company\s+will\s+reimburse)/i.test(s);
 
   for (const s of sentences) {
-    if (isNegated(s) || isCompensation(s) || isCorporatePolicy(s)) continue;
+    if (isNegated(s) || isCompensation(s) || isCorporatePolicy(s) || isEducational(s)) continue;
     const sLower = s.toLowerCase();
     for (const pat of SUSPICIOUS_FEE_PATTERNS) {
-      if (sLower.includes(pat.keyword) && !found.includes(pat.keyword)) {
+      const isMatch = pat.keyword === 'crypto'
+        ? (/\bcrypto\b/i.test(sLower) && !/cryptograph/i.test(sLower))
+        : sLower.includes(pat.keyword);
+      if (isMatch && !found.includes(pat.keyword)) {
         found.push(pat.keyword);
       }
     }
@@ -1157,8 +1172,20 @@ export function analyzeDocumentSemantics(
     /(?:transaction\s*(?:id|reference|receipt|proof)\s*to\s*confirm)/i,
   ];
 
+  const isGuideDoc = /(?:how\s+to\s+know\s+if\s+a\s+consultancy\s+is\s+fake|common\s+(?:job\s+)?consultancy\s+scam|scam\s+scripts|what\s+the\s+ai\s+checker\s+looks\s+for|online\s+job\s+offer\s+verifier|verification\s+guide|checker\s+guide|internship\s+scam\s+warning\s+signs|identifying\s+recruitment\s+fraud|awareness\s+guide|case[- ]style\s+examples)/i.test(text);
+
+  const isSemEducational = (s: string) => {
+    const trimmed = s.trim();
+    if (/["'“‘”’]/.test(trimmed)) return true;
+    if (!isGuideDoc) return false;
+    if (/^[•\-\*+\d.]\s*\+?/i.test(trimmed)) return true;
+    if (/scam|guide|verifier|warning|checklist|example|case[- ]style|pattern|what\s+to|how\s+to|what\s+the\s+ai|looks\s+for|students\s+should|was\s+selected|asked\s+to\s+pay|consultanc/i.test(trimmed)) return true;
+    if (!/(?:pay\s+to|transfer\s+to\s+[0-9]|upi\s*[:\-]|gpay|phonepe)/i.test(trimmed)) return true;
+    return false;
+  };
+
   const semSentences = text.split(/(?<=[.!?\n])\s+/);
-  const isSemNegated = (s: string) => /(?:no\s+(?:registration|application|processing|training|onboarding|security|caution|internship)?\s*fees?|no\s+(?:security|caution)?\s*deposits?|never\s+(?:charge|collect|demand|request|ask)|do\s+not\s+(?:charge|collect|demand|request|ask)|will\s+not\s+(?:charge|collect|demand|request|ask)|shall\s+not\s+(?:charge|collect|demand|request|ask)|(?:fee|fees|deposit|payment)\s+(?:is\s+|are\s+)?not\s+required|without\s+any\s+(?:fee|charges?|deposit)|free\s+of\s+(?:any\s+)?(?:charge|cost|fee)|no\s+payment\s+is\s+required|we\s+do\s+not\s+collect|do\s+not\s+pay\s+anyone|beware\s+of\s+(?:fraud|scams?)|neither\s+charge\s+nor\s+collect)/i.test(s);
+  const isSemNegated = (s: string) => /(?:no\s+(?:registration|application|processing|training|onboarding|security|caution|internship)?\s*fees?|no\s+(?:security|caution)?\s*deposits?|never\s+(?:charge|collect|demand|request|ask)|do\s+not\s+(?:charge|collect|demand|request|ask)|will\s+not\s+(?:charge|collect|demand|request|ask)|shall\s+not\s+(?:charge|collect|demand|request|ask)|does\s+not\s+(?:charge|collect|demand|request|ask)|(?:fee|fees|deposit|payment)\s+(?:is\s+|are\s+)?not\s+required|not\s+required\s+to\s+pay|do\s+not\s+need\s+to\s+pay|do\s+not\s+have\s+to\s+pay|need\s+not\s+pay|without\s+any\s+(?:fee|charges?|deposit)|free\s+of\s+(?:any\s+)?(?:charge|cost|fee)|no\s+payment\s+(?:is\s+)?required|we\s+do\s+not\s+collect|do\s+not\s+pay\s+anyone|beware\s+of\s+(?:fraud|scams?)|neither\s+charge\s+nor\s+collect|zero\s+(?:fees?|charges?|deposits?)|at\s+no\s+cost|free\s+recruitment|strictly\s+prohibits?\s+(?:any\s+)?(?:fees?|charges?|money)|never\s+asks?\s+(?:candidates?|applicants?|students?)\s+(?:to\s+pay|for\s+(?:any\s+)?money))/i.test(s);
   const isSemCompensation = (s: string) => /(?:stipend\s*(?:of|is|:)?|salary\s*(?:of|is|:)?|compensation\s*(?:of|is|:)?|remuneration\s*(?:of|is|:)?|ctc|will\s+(?:receive|be\s+paid|earn)\s+(?:a\s+)?(?:stipend|salary|remuneration)|paid\s+(?:to\s+you|to\s+the\s+candidate|to\s+the\s+intern|monthly|per\s+month)|transferred\s+to\s+your\s+(?:bank\s+)?account|credited\s+to\s+your|basic\s+pay|gross\s+salary|net\s+salary|package\s+of|company\s+will\s+pay|we\s+will\s+pay|employer\s+will\s+pay)/i.test(s) &&
     !/(?:candidate|student|intern|applicant)\s*(?:must|needs?|is\s+required\s+to)\s*(?:pay|deposit|transfer)/i.test(s) &&
     !/(?:registration\s*fee|security\s*deposit|caution\s*deposit|training\s*fee|laptop\s*deposit)/i.test(s);
@@ -1167,11 +1194,14 @@ export function analyzeDocumentSemantics(
 
   const feeKeywordsFound: string[] = [];
   for (const sentence of semSentences) {
-    if (isSemNegated(sentence) || isSemCompensation(sentence) || isSemCorporatePolicy(sentence)) continue;
+    if (isSemNegated(sentence) || isSemCompensation(sentence) || isSemCorporatePolicy(sentence) || isSemEducational(sentence)) continue;
     const sentLower = sentence.toLowerCase();
 
     for (const pat of SUSPICIOUS_FEE_PATTERNS) {
-      if (sentLower.includes(pat.keyword) && !feeKeywordsFound.includes(pat.keyword)) {
+      const isMatch = pat.keyword === 'crypto'
+        ? (/\bcrypto\b/i.test(sentLower) && !/cryptograph/i.test(sentLower))
+        : sentLower.includes(pat.keyword);
+      if (isMatch && !feeKeywordsFound.includes(pat.keyword)) {
         feeKeywordsFound.push(pat.keyword);
       }
     }

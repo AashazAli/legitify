@@ -16,14 +16,12 @@ import {
   runScan,
   getScans,
   getScanReport,
-  askCopilot,
   getAnalytics,
 } from "../lib/api";
 import { LegitifyReport, ScanRecord } from "../types";
 import { PublicExperiencePanel } from "./components/PublicExperiencePanel";
 import { ForensicExplanationPanel } from "./components/ForensicExplanationPanel";
 import { SecureDropzone } from "./components/forensics/SecureDropzone";
-import { ForensicReportDashboard } from "./components/forensics/ForensicReportDashboard";
 import { runCompleteForensicAnalysis } from "../lib/forensics/AnalysisEngine";
 import { CompleteForensicReport, MagicValidationResult } from "../lib/forensics/types";
 
@@ -37,7 +35,6 @@ type PortalRole = "user" | "admin";
 type UserView =
   | "user_scan"
   | "user_report"
-  | "user_copilot"
   | "user_safety"
   | "user_settings";
 
@@ -45,7 +42,6 @@ type AdminView =
   | "admin_mission"
   | "admin_report"
   | "admin_scan"
-  | "admin_copilot"
   | "admin_threats"
   | "admin_analytics"
   | "admin_cases"
@@ -119,133 +115,6 @@ function AnimatedCounter({ value }: { value: number }) {
     return () => clearInterval(timer);
   }, [value]);
   return <span>{current.toLocaleString()}</span>;
-}
-
-// ================================================================
-// RICH MARKDOWN & EVIDENCE CITATION RENDERER FOR COPILOT
-// ================================================================
-
-function FormattedCopilotMessage({ text }: { text: string }) {
-  const lines = text.split("\n");
-
-  const renderFormattedChunk = (content: string) => {
-    return content.split(/(\*\*.*?\*\*|\[Doc-P\d+-C\d+\]|\[Ext-[A-Za-z0-9_-]+\]|\[E-\d+\]|`.*?`)/g).map((chunk, cIdx) => {
-      if (chunk.startsWith("**") && chunk.endsWith("**")) {
-        return <strong key={cIdx} className="text-slate-900 font-semibold">{chunk.slice(2, -2)}</strong>;
-      }
-      if (/^\[Doc-P\d+-C\d+\]$/.test(chunk)) {
-        return (
-          <span key={cIdx} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-mono text-xs font-medium border border-blue-200 mx-1" title="Verified Document Citation">
-            <FileText className="w-3 h-3 text-blue-600" />
-            <span>{chunk.slice(1, -1)}</span>
-          </span>
-        );
-      }
-      if (/^\[Ext-[A-Za-z0-9_-]+\]$/.test(chunk)) {
-        return (
-          <span key={cIdx} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-purple-50 text-purple-700 font-mono text-xs font-medium border border-purple-200 mx-1" title="External Intelligence Citation">
-            <Globe className="w-3 h-3 text-purple-600" />
-            <span>{chunk.slice(1, -1)}</span>
-          </span>
-        );
-      }
-      if (/^\[E-\d+\]$/.test(chunk)) {
-        return (
-          <span key={cIdx} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-mono text-xs font-medium border border-indigo-200 mx-1" title="Evidence Locker Record">
-            <ShieldCheck className="w-3 h-3 text-indigo-600" />
-            <span>{chunk.slice(1, -1)}</span>
-          </span>
-        );
-      }
-      if (chunk.startsWith("`") && chunk.endsWith("`")) {
-        return <code key={cIdx} className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-800 font-mono text-xs border border-slate-200">{chunk.slice(1, -1)}</code>;
-      }
-      return chunk;
-    });
-  };
-
-  return (
-    <div className="space-y-3 text-sm leading-relaxed text-slate-800 font-sans">
-      {lines.map((line, idx) => {
-        const trimmed = line.trim();
-        if (!trimmed) return <div key={idx} className="h-1.5" />;
-
-        if (trimmed === "---") {
-          return <hr key={idx} className="border-slate-200 my-3" />;
-        }
-
-        if (trimmed.startsWith("###")) {
-          const content = trimmed.replace(/^###\s*/, "");
-          return (
-            <div key={idx} className="pt-3 pb-1 border-b border-slate-200 flex items-center gap-2">
-              <span className="text-base font-bold text-slate-900 tracking-tight">
-                {content}
-              </span>
-            </div>
-          );
-        }
-
-        if (trimmed.startsWith("##")) {
-          const content = trimmed.replace(/^##\s*/, "");
-          return (
-            <div key={idx} className="pt-4 pb-1.5 border-b border-slate-200 flex items-center gap-2">
-              <span className="text-lg font-bold text-slate-900 tracking-tight">
-                {content}
-              </span>
-            </div>
-          );
-        }
-
-        if (trimmed.startsWith(">")) {
-          const content = trimmed.replace(/^>\s*/, "");
-          return (
-            <div key={idx} className="pl-3 py-2 my-2 border-l-2 border-blue-500 bg-slate-50 rounded-r-lg text-slate-700 italic text-sm">
-              {renderFormattedChunk(content)}
-            </div>
-          );
-        }
-
-        if (trimmed.startsWith("**") && trimmed.includes(":**")) {
-          const parts = trimmed.split(":**");
-          const title = parts[0].replace(/\*\*/g, "");
-          const rest = parts.slice(1).join(":**");
-          return (
-            <div key={idx} className="pt-1.5 font-medium text-slate-900">
-              <span className="text-blue-700 font-semibold">{title}:</span> {renderFormattedChunk(rest)}
-            </div>
-          );
-        }
-
-        if (trimmed.startsWith("*") || trimmed.startsWith("-")) {
-          const content = trimmed.replace(/^[*-]\s*/, "");
-          return (
-            <div key={idx} className="flex items-start gap-2.5 pl-1 text-slate-700">
-              <div className="w-1.5 h-1.5 rounded-full bg-slate-400 mt-2 flex-shrink-0" />
-              <div className="flex-1 leading-relaxed">{renderFormattedChunk(content)}</div>
-            </div>
-          );
-        }
-
-        if (/^\d+\./.test(trimmed)) {
-          const match = trimmed.match(/^(\d+)\.\s*(.*)/);
-          if (match) {
-            const num = match[1];
-            const content = match[2];
-            return (
-              <div key={idx} className="flex items-start gap-2.5 pl-1 text-slate-700">
-                <span className="w-5 h-5 rounded bg-slate-100 text-[11px] font-sans font-medium text-slate-600 flex items-center justify-center flex-shrink-0 mt-0.5 border border-slate-200">
-                  {num}
-                </span>
-                <div className="flex-1 leading-relaxed">{renderFormattedChunk(content)}</div>
-              </div>
-            );
-          }
-        }
-
-        return <p key={idx} className="text-slate-700 leading-relaxed">{renderFormattedChunk(trimmed)}</p>;
-      })}
-    </div>
-  );
 }
 
 // ================================================================
@@ -624,7 +493,6 @@ function UserSidebar({ active, onNav }: { active: UserView; onNav: (v: UserView)
   const ITEMS: { id: UserView; label: string; icon: any }[] = [
     { id: "user_scan",    label: "Verify Document",         icon: Cpu },
     { id: "user_report",  label: "Verification Report",     icon: FileText },
-    { id: "user_copilot", label: "Investigation Assistant", icon: Brain },
     { id: "user_safety",  label: "Safety Guidelines",       icon: ShieldCheck },
     { id: "user_settings",label: "Account Settings",        icon: Settings },
   ];
@@ -672,12 +540,10 @@ function UserSidebar({ active, onNav }: { active: UserView; onNav: (v: UserView)
 
 function UserScanView({
   onScanComplete,
-  onOpenCopilot,
   userToken,
   userName,
 }: {
   onScanComplete: (report: LegitifyReport, forensicReport?: CompleteForensicReport) => void;
-  onOpenCopilot: (prompt?: string) => void;
   userToken?: string;
   userName?: string;
 }) {
@@ -785,19 +651,19 @@ function UserScanView({
 
       if (fReport) {
         // Bi-directional forensic reconciliation
-        const serverFee = Boolean(
-          finalReport.has_fee_demand ||
-          finalReport.document_analysis?.has_fee_demand ||
-          finalReport.document_analysis?.fee_details?.length ||
-          finalReport.rules_triggered?.some(r => r.rule_id === 'R002' && (r as any).triggered !== false)
-        );
-        const isServerPaymentNegative = !serverFee && (
+        const isServerPaymentNegative = Boolean(
           finalReport.payment_case === 'POLICY_MENTION_WITHOUT_DEMAND' ||
           finalReport.payment_case === 'WARNING_AGAINST_PAYMENT' ||
           finalReport.payment_case === 'NO_PAYMENT_EVIDENCE' ||
           finalReport.document_analysis?.payment_case === 'POLICY_MENTION_WITHOUT_DEMAND' ||
           finalReport.document_analysis?.payment_case === 'WARNING_AGAINST_PAYMENT' ||
           finalReport.document_analysis?.payment_case === 'NO_PAYMENT_EVIDENCE'
+        );
+        const serverFee = !isServerPaymentNegative && Boolean(
+          finalReport.has_fee_demand ||
+          finalReport.document_analysis?.has_fee_demand ||
+          finalReport.document_analysis?.fee_details?.length ||
+          finalReport.rules_triggered?.some(r => r.rule_id === 'R002' && (r as any).triggered !== false)
         );
         const clientFee = !isServerPaymentNegative && Boolean(fReport.semantics?.hasFeeDemand);
         const feeDetected = serverFee || (clientFee && fReport.scoring.authenticityScore <= 35 && !finalReport.trust_score);
@@ -860,17 +726,6 @@ function UserScanView({
   return (
     <div className="flex-1 overflow-y-auto p-6 md:p-10 flex flex-col items-center justify-center bg-slate-50 relative">
       <div className="max-w-2xl w-full space-y-6 relative z-10">
-        <div className="flex justify-center">
-          <button
-            onClick={() => onOpenCopilot("How do I know if an internship is genuine or asking for a scam deposit?")}
-            className="px-4 py-2 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 hover:text-slate-900 text-xs font-sans transition-all flex items-center gap-2.5 cursor-pointer shadow-xs"
-          >
-            <Brain className="w-4 h-4 text-blue-600" />
-            <span>Consult Forensic Trust Assistant</span>
-            <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
-          </button>
-        </div>
-
         <div className="text-center space-y-2">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-[11px] font-sans font-medium text-blue-700">
             <Cpu className="w-3.5 h-3.5 text-blue-600" />
@@ -1003,7 +858,6 @@ function UserReportView({
   report: rawReport,
   forensicReport,
   onNewScan,
-  onOpenCopilot,
   onUpdateReport,
   userToken,
   userName,
@@ -1011,14 +865,12 @@ function UserReportView({
   report: LegitifyReport;
   forensicReport?: CompleteForensicReport | null;
   onNewScan: () => void;
-  onOpenCopilot: (prompt?: string) => void;
   onUpdateReport?: (newReport: LegitifyReport) => void;
   userToken?: string;
   userName?: string;
 }) {
   const [reportState, setReportState] = useState<LegitifyReport>((rawReport as any)?.report || rawReport || {});
   const activeForensicReport = forensicReport || (reportState as any)?.forensicAnalysis;
-  const [activeReportTab, setActiveReportTab] = useState<'dossier' | 'forensics'>('dossier');
 
   useEffect(() => {
     setReportState((rawReport as any)?.report || rawReport || {});
@@ -1067,17 +919,7 @@ function UserReportView({
   const scanId = report.scan_id || `LGF-2026-${Date.now().toString().slice(-6)}`;
   const inputType = String(report.input_type || (report.document_analysis?.filename?.endsWith('.pdf') ? "PDF" : "IMAGE")).toUpperCase();
 
-  const serverFee = Boolean(
-    report.has_fee_demand ||
-    (report as any).hasPaymentDemand ||
-    report.document_analysis?.has_fee_demand ||
-    report.document_analysis?.fee_details?.length ||
-    report.document_analysis?.extracted_entities?.payment_demands?.length ||
-    report.rules_triggered?.some(r => r.rule_id === 'R002' && (r as any).triggered !== false) ||
-    report.hard_caps_applied?.some(c => c.toLowerCase().includes('payment_request_cap'))
-  );
-
-  const isServerPaymentNegative = !serverFee && (
+  const isServerPaymentNegative = Boolean(
     report.payment_case === 'POLICY_MENTION_WITHOUT_DEMAND' ||
     report.payment_case === 'WARNING_AGAINST_PAYMENT' ||
     report.payment_case === 'NO_PAYMENT_EVIDENCE' ||
@@ -1086,6 +928,16 @@ function UserReportView({
     report.document_analysis?.payment_case === 'WARNING_AGAINST_PAYMENT' ||
     report.document_analysis?.payment_case === 'NO_PAYMENT_EVIDENCE' ||
     report.document_analysis?.payment_case === 'AMBIGUOUS_EVIDENCE'
+  );
+
+  const serverFee = !isServerPaymentNegative && Boolean(
+    report.has_fee_demand ||
+    (report as any).hasPaymentDemand ||
+    report.document_analysis?.has_fee_demand ||
+    report.document_analysis?.fee_details?.length ||
+    report.document_analysis?.extracted_entities?.payment_demands?.length ||
+    report.rules_triggered?.some(r => r.rule_id === 'R002' && (r as any).triggered !== false) ||
+    report.hard_caps_applied?.some(c => c.toLowerCase().includes('payment_request_cap'))
   );
 
   const hasFeeDemand = serverFee || (!isServerPaymentNegative && Boolean(
@@ -1170,9 +1022,10 @@ function UserReportView({
             report.payment_case === 'POLICY_MENTION_WITHOUT_DEMAND' ? 8 :
             report.payment_case === 'CONDITIONAL_DEMAND' ? (hasFeeDemand ? 82 : 74) :
             report.payment_case === 'AMBIGUOUS_EVIDENCE' ? 42 :
+            report.payment_case === 'NO_PAYMENT_EVIDENCE' ? 5 :
             (hasFeeDemand || report.payment_case === 'EXPLICIT_DEMAND') ? (fSemantics?.hasUrgency ? 93 : 87) : 6,
-          risk_band: (hasFeeDemand || report.payment_case === 'EXPLICIT_DEMAND') ? 'CRITICAL_RISK' : report.payment_case === 'CONDITIONAL_DEMAND' ? 'CRITICAL_RISK' : report.payment_case === 'AMBIGUOUS_EVIDENCE' ? 'MODERATE_RISK' : 'LOW_RISK',
-          risk_band_label: (hasFeeDemand || report.payment_case === 'EXPLICIT_DEMAND') ? 'Critical Fraud Risk' : report.payment_case === 'CONDITIONAL_DEMAND' ? 'Critical Fraud Risk' : report.payment_case === 'AMBIGUOUS_EVIDENCE' ? 'Moderate Risk' : 'Low Risk',
+          risk_band: (report.payment_case === 'NO_PAYMENT_EVIDENCE' || report.payment_case === 'WARNING_AGAINST_PAYMENT' || report.payment_case === 'POLICY_MENTION_WITHOUT_DEMAND') ? 'LOW_RISK' : (hasFeeDemand || report.payment_case === 'EXPLICIT_DEMAND') ? 'CRITICAL_RISK' : report.payment_case === 'CONDITIONAL_DEMAND' ? 'CRITICAL_RISK' : report.payment_case === 'AMBIGUOUS_EVIDENCE' ? 'MODERATE_RISK' : 'LOW_RISK',
+          risk_band_label: (report.payment_case === 'NO_PAYMENT_EVIDENCE' || report.payment_case === 'WARNING_AGAINST_PAYMENT' || report.payment_case === 'POLICY_MENTION_WITHOUT_DEMAND') ? 'Low Risk' : (hasFeeDemand || report.payment_case === 'EXPLICIT_DEMAND') ? 'Critical Fraud Risk' : report.payment_case === 'CONDITIONAL_DEMAND' ? 'Critical Fraud Risk' : report.payment_case === 'AMBIGUOUS_EVIDENCE' ? 'Moderate Risk' : 'Low Risk',
           evidence_found: (hasFeeDemand || report.payment_case === 'EXPLICIT_DEMAND')
             ? 'Explicit candidate fee, caution deposit, or monetary demand detected in document.'
             : report.payment_case === 'CONDITIONAL_DEMAND'
@@ -1457,46 +1310,15 @@ function UserReportView({
 
   return (
     <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6 bg-slate-50 max-w-5xl mx-auto font-sans text-slate-900">
-      {/* Top Forensic / Corporate Switcher Tab */}
-      {activeForensicReport && (
-        <div className="flex items-center justify-between flex-wrap gap-3 pb-3 border-b border-slate-200">
-          <div className="flex items-center gap-1.5 p-1 rounded-lg bg-slate-100 text-xs font-sans">
-            <button
-              onClick={() => setActiveReportTab('dossier')}
-              className={`px-3 py-1.5 rounded-md transition-all font-medium flex items-center gap-2 cursor-pointer ${
-                activeReportTab === 'dossier'
-                  ? 'bg-white text-blue-700 font-semibold shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Shield className="w-3.5 h-3.5" /> Verification Dossier
-            </button>
-            <button
-              onClick={() => setActiveReportTab('forensics')}
-              className={`px-3 py-1.5 rounded-md transition-all font-medium flex items-center gap-2 cursor-pointer ${
-                activeReportTab === 'forensics'
-                  ? 'bg-white text-blue-700 font-semibold shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Cpu className="w-3.5 h-3.5" /> Pixel & Optical Signal Inspector
-            </button>
-          </div>
-
+      {activeForensicReport?.custody?.custodyId && (
+        <div className="flex items-center justify-end pb-3 border-b border-slate-200">
           <div className="text-[11px] font-sans text-slate-500">
             Chain of Custody: <span className="text-slate-800 font-mono font-semibold">{activeForensicReport.custody.custodyId}</span>
           </div>
         </div>
       )}
 
-      {activeReportTab === 'forensics' && activeForensicReport ? (
-        <ForensicReportDashboard
-          report={activeForensicReport}
-          onNewScan={onNewScan}
-          onExportPdf={handleDownloadPDF}
-        />
-      ) : (
-        <div className="space-y-6">
+      <div className="space-y-6">
           {/* Top Header Dossier */}
           <div className="p-6 rounded-xl bg-white border border-slate-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-sm">
             <div className="space-y-1.5">
@@ -2419,750 +2241,29 @@ function UserReportView({
         onReinvestigate={handleReinvestigate}
       />
 
-      {/* Section 4.7: Interactive Evidence-Grounded AI Copilot */}
-      <ReportCopilotInline
-        report={report}
-        companyName={cleanCompany}
-        userToken={userToken}
-        userName={userName}
-        onOpenFullscreenCopilot={onOpenCopilot}
-      />
-
       {/* Footer Actions */}
       <div className="flex flex-wrap items-center gap-4 pt-4">
         <button
-          onClick={() => onOpenCopilot()}
-          className="flex-1 py-3 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-xs font-sans font-medium text-slate-700 hover:text-slate-900 flex items-center justify-center gap-2 transition-colors shadow-xs cursor-pointer"
-        >
-          <Brain className="w-4 h-4 text-blue-600" />
-          <span>Forensic Assistant Workspace</span>
-        </button>
-        <button
           onClick={onNewScan}
-          className="px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs font-sans transition-all shadow-xs cursor-pointer"
+          className="w-full sm:w-auto px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs font-sans transition-all shadow-xs cursor-pointer"
         >
           Verify Another Document
         </button>
       </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ================================================================
-// INLINE REPORT COPILOT CARD (EMBEDDED DIRECTLY IN SAFETY REPORT)
-// ================================================================
-
-function ReportCopilotInline({
-  report,
-  companyName,
-  userToken,
-  userName,
-  onOpenFullscreenCopilot,
-}: {
-  report: LegitifyReport;
-  companyName: string;
-  userToken?: string;
-  userName?: string;
-  onOpenFullscreenCopilot: (prompt?: string) => void;
-}) {
-  const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [lastQuestion, setLastQuestion] = useState<string | null>(null);
-  const [answer, setAnswer] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-
-  const SUGGESTIONS = [
-    { label: "Why this score?", prompt: "Why did LEGITIFY assign this score and verdict?" },
-    { label: "Recruiter authenticity", prompt: "Is this recruiter email domain authentic or a lookalike?" },
-    { label: "Stipend plausibility", prompt: "Is the offered stipend normal or suspiciously high?" },
-    { label: "MCA registration", prompt: "Is this company registered with the Ministry of Corporate Affairs?" },
-    { label: "Paid money procedure", prompt: "What emergency steps should I take if I already paid a deposit?" },
-    { label: "Draft verification email", prompt: "Generate verification questions I should send to this recruiter." },
-  ];
-
-  const handleAsk = async (questionText?: string) => {
-    const q = (questionText || query).trim();
-    if (!q || loading) return;
-    setLastQuestion(q);
-    setLoading(true);
-    setQuery("");
-
-    try {
-      const enriched = {
-        ...report,
-        scan_id: report.scan_id || (report as any).id,
-        user_name: userName || "Candidate",
-        raw_text: (report.document_analysis as any)?.extracted_text || (report as any).contextText || "",
-        assessments: report.assessments || (report.scoring as any)?.assessments || [],
-        external_research: report.external_research,
-        extracted_claims: (report as any).extracted_claims || [],
-        history: [
-          ...(lastQuestion && answer ? [{ role: 'user', content: lastQuestion }, { role: 'assistant', content: answer }] : [])
-        ]
-      };
-      const res = await askCopilot(enriched, q, userToken);
-      setAnswer(res);
-    } catch (err: any) {
-      setAnswer(`⚠️ **Connection Error:** Could not connect to the assistant service (${err?.message || 'Network error'}). Please ensure the server is active and retry.`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCopy = () => {
-    if (!answer) return;
-    navigator.clipboard.writeText(answer);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <div className="p-6 rounded-xl bg-white border border-slate-200 shadow-xs space-y-5 font-sans">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shadow-xs">
-            <Brain className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-base font-semibold text-slate-900 font-sans">
-                Interrogate Report with Forensic Assistant
-              </h3>
-              <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-sans font-medium border border-emerald-200">
-                ACTIVE
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 font-sans">
-              Query evidence records, domain checks, or fee clauses for {companyName}.
-            </p>
-          </div>
-        </div>
-
-        <button
-          onClick={() => onOpenFullscreenCopilot(lastQuestion || undefined)}
-          className="px-3.5 py-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-sans font-medium text-slate-700 hover:text-slate-900 flex items-center gap-2 transition-colors cursor-pointer shadow-xs flex-shrink-0"
-        >
-          <Brain className="w-3.5 h-3.5 text-blue-600" /> Full Assistant Workspace
-        </button>
-      </div>
-
-      {/* Suggested Quick Question Chips */}
-      <div className="flex flex-wrap gap-2">
-        {SUGGESTIONS.map((item, idx) => (
-          <button
-            key={idx}
-            onClick={() => handleAsk(item.prompt)}
-            className="px-3 py-1.5 rounded-lg text-xs font-sans font-medium bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 hover:text-slate-900 transition-colors cursor-pointer"
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Input Box */}
-      <div className="flex items-center gap-2.5">
-        <input
-          type="text"
-          placeholder={`Ask any question about ${companyName} (e.g. 'Why is the joining date urgent?' or 'Is this stipend real?')...`}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleAsk()}
-          className="flex-1 px-4 py-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs font-sans text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white"
-        />
-        <button
-          onClick={() => handleAsk()}
-          disabled={loading || !query.trim()}
-          className="px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs font-sans transition-all shadow-xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex-shrink-0 flex items-center gap-1.5"
-        >
-          {loading ? <Sparkles className="w-3.5 h-3.5 animate-spin" /> : "Query"}
-        </button>
-      </div>
-
-      {/* Loading state */}
-      {loading && (
-        <div className="p-4 rounded-lg bg-blue-50 border border-blue-100 flex items-center gap-2.5 text-xs text-blue-700 font-sans">
-          <Sparkles className="w-4 h-4 animate-spin flex-shrink-0" />
-          <span>Interrogating evidence locker and running evidence-grounded synthesis...</span>
-        </div>
-      )}
-
-      {/* Answer display */}
-      {answer && !loading && (
-        <div className="p-5 rounded-lg bg-slate-50 border border-slate-200 space-y-3 font-sans">
-          <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-sans font-semibold text-blue-700 uppercase tracking-wider">
-                Question:
-              </span>
-              <span className="text-xs font-medium text-slate-800">
-                "{lastQuestion}"
-              </span>
-            </div>
-            <button
-              onClick={handleCopy}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white text-xs font-sans text-slate-600 hover:text-slate-900 border border-slate-200 cursor-pointer shadow-xs"
-            >
-              {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-              <span>{copied ? "Copied" : "Copy"}</span>
-            </button>
-          </div>
-
-          <div className="max-h-[380px] overflow-y-auto pr-2 text-xs">
-            <FormattedCopilotMessage text={answer} />
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ================================================================
-// EVIDENCE-GROUNDED INVESTIGATION COPILOT VIEW (WITH CATEGORIES & TOOLS)
-// ================================================================
-
-function UserCopilotView({
-  report: rawReport,
-  forensicReport,
-  userToken,
-  userName,
-  initialQuestion,
-}: {
-  report: LegitifyReport;
-  forensicReport?: CompleteForensicReport | null;
-  userToken?: string;
-  userName?: string;
-  initialQuestion?: string;
-}) {
-  const report: LegitifyReport = (rawReport as any)?.report || rawReport || {};
-  const activeFReport = forensicReport || (rawReport as any)?.forensicAnalysis;
-  const rawDocText = activeFReport?.ocr?.rawText || (report.document_analysis as any)?.extracted_text || (report as any).contextText || "";
-  const fSemantics = activeFReport?.semantics;
-  const fStructure = activeFReport?.scoring?.structureAnalysis || fSemantics?.structure;
-
-  const rawName = fSemantics?.detectedCompany || report.company_name || report.entity_name || report.entity_value || "this investigated opportunity";
-  const cleanCompany = (rawName.match(/\.(png|jpg|jpeg|pdf)$/i) || rawName.includes("images ("))
-    ? (report.document_analysis?.extracted_entities?.detected_company || "this investigated opportunity")
-    : rawName;
-
-  const trustScore = typeof activeFReport?.scoring?.authenticityScore === "number"
-    ? Math.round(activeFReport.scoring.authenticityScore)
-    : typeof report.trust_score === "number"
-    ? Math.round(report.trust_score)
-    : (typeof (report as any).final_score === "number"
-    ? Math.round((report as any).final_score)
-    : (typeof report.confidence_score === "number" ? Math.round(report.confidence_score) : 26));
-
-  const [question, setQuestion] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const [messages, setMessages] = useState<{ role: "user" | "assistant"; text: string; time: string }[]>([
-    {
-      role: "assistant",
-      text: `Hello ${userName || "Candidate"}.\n\n### Forensic Investigation Assistant Active\n\n**Active Investigation Context:**\n* **Target Entity:** **${cleanCompany}**\n* **Trust Score:** **${trustScore}/100** (${trustScore <= 40 ? 'High Risk Profile' : 'Low Risk Profile'})\n\nResponses are strictly grounded in our Evidence Locker and RAG corpus. Select an investigative check below, or enter a specific query.`,
-      time: "Just now",
-    }
-  ]);
-  const [loading, setLoading] = useState(false);
-
-  const CATEGORIES = [
-    { id: "all", label: "All Quick Checks" },
-    { id: "score", label: "Forensic Scoring" },
-    { id: "recruiter", label: "Recruiter & Domain" },
-    { id: "financial", label: "Stipend & Fee" },
-    { id: "legal", label: "MCA21 & Legal" },
-    { id: "emergency", label: "Emergency Actions" },
-  ];
-
-  const QUICK_TOOLS = [
-    { cat: "score", label: "Explain Decision", query: "Why did LEGITIFY give this score and verdict?" },
-    { cat: "legal", label: "Verify Company", query: "Is the company actually registered and legally active in MCA21?" },
-    { cat: "recruiter", label: "Verify Recruiter", query: "Is this recruiter email really associated with the company?" },
-    { cat: "financial", label: "Stipend Plausibility", query: "Is the offered stipend normal or suspiciously inflated?" },
-    { cat: "financial", label: "Deposit Clauses", query: "Can a genuine company ask candidates to pay a laptop deposit or training fee?" },
-    { cat: "recruiter", label: "Certificate Check", query: "The certificate appears genuine. Why is the internship still risky?" },
-    { cat: "score", label: "Community Evidence", query: "What did people online and public forums say about this company?" },
-    { cat: "score", label: "Find Red Flags", query: "Show me the strongest warning signals and evidence IDs." },
-    { cat: "score", label: "False Positive Check", query: "Could this assessment be a false positive?" },
-    { cat: "recruiter", label: "Generate HR Questions", query: "Generate verification questions I should send to this recruiter." },
-    { cat: "emergency", label: "Executive Summary", query: "Give me a simple structured explanation of the risks." },
-    { cat: "emergency", label: "Incident Protocol", query: "What emergency steps should I take if I already paid a deposit?" },
-    { cat: "score", label: "Challenge Result", query: "I know this company personally and want to challenge this result." },
-  ];
-
-  const filteredTools = categoryFilter === "all" ? QUICK_TOOLS : QUICK_TOOLS.filter(t => t.cat === categoryFilter);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, loading]);
-
-  const handleSend = async (queryText?: string) => {
-    const q = (queryText || question).trim();
-    if (!q || loading) return;
-    setQuestion("");
-    const newHistory = [
-      ...messages,
-      { role: "user" as const, text: q, time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }
-    ];
-    setMessages(newHistory);
-    setLoading(true);
-
-    try {
-      const enriched = {
-        ...report,
-        scan_id: report.scan_id || (report as any).id,
-        forensicAnalysis: activeFReport,
-        raw_text: rawDocText,
-        document_text: rawDocText,
-        structureAnalysis: fStructure,
-        detectedRisks: activeFReport?.scoring?.reasons?.riskIndicators || report.red_flags || [],
-        user_name: userName || "Candidate",
-        assessments: report.assessments || (report.scoring as any)?.assessments || [],
-        external_research: report.external_research || (activeFReport as any)?.external_research,
-        extracted_claims: (report as any).extracted_claims || [],
-        history: messages.slice(-8).map(m => ({ role: m.role, content: m.text })),
-      };
-      const res = await askCopilot(enriched, q, userToken);
-      setMessages([
-        ...newHistory,
-        { role: "assistant", text: res, time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }
-      ]);
-    } catch (err: any) {
-      setMessages([
-        ...newHistory,
-        {
-          role: "assistant",
-          text: `⚠️ **Connection Error:** Unable to reach the assistant reasoning service (${err?.message || 'Network error'}). Please verify the server is active and retry your question.`,
-          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-        }
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleClearHistory = () => {
-    setMessages([
-      {
-        role: "assistant",
-        text: `Session cleared. Active target: **${cleanCompany}** (${trustScore}/100).\n\nEnter your query or select a standard diagnostic tool below.`,
-        time: "Just now",
-      }
-    ]);
-  };
-
-  const handleDownloadTranscript = () => {
-    const transcript = `# LEGITIFY Forensic Investigation Transcript\n\nTarget: ${cleanCompany}\nCase: #${report.scan_id || "LGF-2026-000184"}\nScore: ${trustScore}/100\nDate: ${new Date().toLocaleString()}\n\n---\n\n` +
-      messages.map(m => `### ${m.role === "user" ? "Investigator" : "LEGITIFY Assistant"} (${m.time})\n\n${m.text}\n\n---\n`).join("\n");
-    const blob = new Blob([transcript], { type: "text/markdown;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `Legitify_Transcript_${(cleanCompany || "report").replace(/[^a-zA-Z0-9]/g, "_")}.md`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  useEffect(() => {
-    if (initialQuestion) {
-      handleSend(initialQuestion);
-    }
-  }, [initialQuestion]);
-
-  return (
-    <div className="flex-1 flex flex-col bg-slate-50 overflow-hidden font-sans">
-      {/* Copilot Header */}
-      <div className="px-6 py-4 border-b border-slate-200 bg-white flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center">
-            <Brain className="w-4 h-4" />
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold text-slate-900 font-sans">
-              Forensic Investigation Assistant
-            </h3>
-            <p className="text-xs text-slate-500 font-sans">Target: {cleanCompany} · Case: #{report.scan_id || "LGF-2026-000184"}</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleDownloadTranscript}
-            className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-xs font-sans font-medium text-slate-700 hover:text-slate-900 flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
-            title="Download Transcript"
-          >
-            <Download className="w-3.5 h-3.5 text-slate-500" /> Download Transcript
-          </button>
-          <button
-            onClick={handleClearHistory}
-            className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-xs font-sans font-medium text-slate-700 hover:text-rose-600 flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
-            title="Clear Chat"
-          >
-            <RefreshCw className="w-3.5 h-3.5 text-slate-500" /> Reset Chat
-          </button>
-        </div>
-      </div>
-
-      {/* Messages Thread */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4 max-w-4xl mx-auto w-full">
-        {messages.map((m, idx) => (
-          <div key={idx} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
-            <div
-              className={`max-w-2xl p-4 rounded-xl text-xs font-sans ${
-                m.role === "user"
-                  ? "bg-blue-600 text-white rounded-br-none shadow-xs"
-                  : "bg-white border border-slate-200 rounded-bl-none text-slate-800 shadow-xs"
-              }`}
-            >
-              {m.role === "user" ? (
-                <span className="leading-relaxed">{m.text}</span>
-              ) : (
-                <FormattedCopilotMessage text={m.text} />
-              )}
-            </div>
-            <span className="text-[10px] text-slate-400 font-sans mt-1 px-1">{m.time}</span>
-          </div>
-        ))}
-        {loading && (
-          <div className="flex items-center gap-2.5 text-xs text-blue-700 font-sans p-4 rounded-xl bg-white border border-slate-200 max-w-md shadow-xs">
-            <Sparkles className="w-4 h-4 animate-spin text-blue-600" />
-            <span>Retrieving Evidence Locker records & running synthesis...</span>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Quick Action Category Filters & Buttons */}
-      <div className="p-4 border-t border-slate-200 bg-white">
-        {/* Category Filter Pills */}
-        <div className="max-w-4xl mx-auto flex items-center gap-1.5 mb-2.5 overflow-x-auto pb-1">
-          {CATEGORIES.map(cat => (
-            <button
-              key={cat.id}
-              onClick={() => setCategoryFilter(cat.id)}
-              className={`px-2.5 py-1 rounded-md text-xs font-sans font-medium whitespace-nowrap transition-all cursor-pointer ${
-                categoryFilter === cat.id
-                  ? "bg-blue-50 text-blue-700 border border-blue-200 font-semibold"
-                  : "bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200"
-              }`}
-            >
-              {cat.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Quick Tools list */}
-        <div className="max-w-4xl mx-auto flex flex-wrap gap-2 mb-3">
-          {filteredTools.map((tool, i) => (
-            <button
-              key={i}
-              onClick={() => handleSend(tool.query)}
-              className="px-2.5 py-1 rounded-md text-xs font-sans font-medium bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 hover:text-slate-900 transition-colors cursor-pointer"
-            >
-              {tool.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="max-w-4xl mx-auto flex items-center gap-3">
-          <input
-            type="text"
-            placeholder="Ask anything grounded in evidence (e.g. 'Why is the recruiter suspicious?' or 'Generate verification questions')..."
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSend()}
-            className="flex-1 px-4 py-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs font-sans text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white"
-          />
-          <button
-            onClick={() => handleSend()}
-            disabled={loading}
-            className="px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs font-sans transition-all shadow-xs flex-shrink-0 cursor-pointer disabled:opacity-50"
-          >
-            Query
-          </button>
-        </div>
       </div>
     </div>
   );
 }
 
-// ================================================================
-// PERSISTENT FLOATING AI COPILOT ASSISTANT (AVAILABLE ON EVERY VIEW)
-// ================================================================
 
-function FloatingCopilotWidget({
-  report,
-  userToken,
-  userName,
-}: {
-  report: LegitifyReport;
-  userToken?: string;
-  userName?: string;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(false);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const rawName = report.company_name || report.entity_name || report.entity_value || "Investigated Offer";
-  const cleanCompany = (rawName.match(/(\.(png|jpg|jpeg|pdf)$|^offer_letter|^images|^image\s*\(|^screenshot)/i))
-    ? (report.document_analysis?.extracted_entities?.detected_company || "Investigated Organization")
-    : rawName;
 
-  const trustScore = typeof report.trust_score === "number"
-    ? Math.round(report.trust_score)
-    : (typeof (report as any).final_score === "number"
-    ? Math.round((report as any).final_score)
-    : (typeof report.confidence_score === "number" ? Math.round(report.confidence_score) : 26));
 
-  const [messages, setMessages] = useState<{ role: "user" | "assistant"; text: string; time: string }[]>([
-    {
-      role: "assistant",
-      text: `Hello ${userName || "Candidate"}.\n\n### Forensic Assistant Active\n\nI am your evidence-grounded assistant for **${cleanCompany}**.\n\nYou can query this document's structure, recruiter credentials, stipend metrics, or MCA statutory verification. Select a prompt below or type your question.`,
-      time: "Just now",
-    }
-  ]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
 
-  useEffect(() => {
-    if (isOpen && !isMinimized) {
-      scrollToBottom();
-    }
-  }, [messages, isOpen, isMinimized]);
 
-  const handleSend = async (customPrompt?: string) => {
-    const q = (customPrompt || input).trim();
-    if (!q || loading) return;
-    setInput("");
-    const newHistory = [
-      ...messages,
-      { role: "user" as const, text: q, time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }
-    ];
-    setMessages(newHistory);
-    setLoading(true);
 
-    try {
-      const enriched = {
-        ...report,
-        scan_id: report.scan_id || (report as any).id,
-        user_name: userName || "Candidate",
-        raw_text: (report.document_analysis as any)?.extracted_text || (report as any).contextText || "",
-        assessments: report.assessments || (report.scoring as any)?.assessments || [],
-        external_research: report.external_research,
-        extracted_claims: (report as any).extracted_claims || [],
-        history: messages.slice(-8).map(m => ({ role: m.role, content: m.text })),
-      };
-      const ans = await askCopilot(enriched, q, userToken);
-      setMessages([
-        ...newHistory,
-        { role: "assistant", text: ans, time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }
-      ]);
-    } catch (err: any) {
-      setMessages([
-        ...newHistory,
-        {
-          role: "assistant",
-          text: `⚠️ **Connection Error:** Could not connect to the assistant service (${err?.message || 'Network error'}). Please try asking again.`,
-          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-        }
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const QUICK_PROMPTS = [
-    { label: "Why this score?", prompt: "Why did LEGITIFY assign this score and verdict?" },
-    { label: "Recruiter domain real?", prompt: "Is the recruiter email domain genuine or a lookalike domain?" },
-    { label: "Stipend plausibility?", prompt: "Is the offered stipend normal or suspiciously inflated?" },
-    { label: "Company MCA status", prompt: "Is this company legally registered in MCA21 records?" },
-    { label: "What if I paid money?", prompt: "What should I do right now if I transferred money to this recruiter?" },
-    { label: "Generate HR questions", prompt: "Generate verification questions I should send to this recruiter." },
-    { label: "Explain to parents", prompt: "Give me a 30-second explanation I can tell my parents about this offer." },
-  ];
-
-  const clearChat = () => {
-    setMessages([
-      {
-        role: "assistant",
-        text: `Chat cleared. Ready for your questions about **${cleanCompany}**! Ask anything about the offer letter, recruiter, or safety checks.`,
-        time: "Just now",
-      }
-    ]);
-  };
-
-  // If closed: show floating toggle button
-  if (!isOpen) {
-    return (
-      <div className="fixed bottom-6 right-6 z-50">
-        <button
-          onClick={() => { setIsOpen(true); setIsMinimized(false); }}
-          className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-700 text-slate-100 font-mono text-xs shadow-lg transition-all cursor-pointer"
-        >
-          <Brain className="w-4 h-4 text-sky-400" />
-          <span className="font-semibold">Forensic Assistant</span>
-          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-            ONLINE
-          </span>
-        </button>
-      </div>
-    );
-  }
-
-  // If minimized: show compact pill
-  if (isMinimized) {
-    return (
-      <div className="fixed bottom-6 right-6 z-50">
-        <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 shadow-xl">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => setIsMinimized(false)}>
-            <Brain className="w-3.5 h-3.5 text-sky-400" />
-            <span className="text-xs font-mono font-semibold text-slate-200">Forensic Assistant</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-          </div>
-          <div className="flex items-center gap-1 pl-2 border-l border-slate-800">
-            <button
-              onClick={() => setIsMinimized(false)}
-              className="p-1 text-slate-400 hover:text-slate-100 cursor-pointer"
-              title="Expand"
-            >
-              <ArrowRight className="w-3.5 h-3.5 rotate-[-45deg]" />
-            </button>
-            <button
-              onClick={() => setIsOpen(false)}
-              className="p-1 text-slate-400 hover:text-rose-400 cursor-pointer"
-              title="Close"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Full floating window
-  return (
-    <div className="fixed bottom-6 right-6 z-50 w-[420px] max-w-[calc(100vw-32px)] h-[580px] max-h-[calc(100vh-48px)] flex flex-col rounded-2xl bg-slate-950 border border-slate-800 shadow-2xl overflow-hidden font-sans">
-      {/* Widget Header */}
-      <div className="px-4 py-3 border-b border-slate-800 bg-slate-900 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-center text-sky-400">
-            <Brain className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h4 className="text-xs font-bold text-slate-100">Forensic Assistant</h4>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            </div>
-            <p className="text-[11px] text-slate-400 font-mono truncate max-w-[200px]">
-              {cleanCompany} ({trustScore}/100)
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1">
-          <button
-            onClick={clearChat}
-            className="p-1 rounded-md hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
-            title="Clear Chat History"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={() => setIsMinimized(true)}
-            className="p-1 rounded-md hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
-            title="Minimize"
-          >
-            <ChevronRight className="w-3.5 h-3.5 rotate-90" />
-          </button>
-          <button
-            onClick={() => setIsOpen(false)}
-            className="p-1 rounded-md hover:bg-slate-800 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer"
-            title="Close"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Messages Thread */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {messages.map((m, idx) => (
-          <div key={idx} className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}>
-            <div
-              className={`max-w-[88%] p-3 rounded-xl text-xs ${
-                m.role === "user"
-                  ? "bg-slate-800 text-slate-100 font-mono rounded-br-none border border-slate-700"
-                  : "bg-slate-900 border border-slate-800 text-slate-200 rounded-bl-none"
-              }`}
-            >
-              {m.role === "user" ? (
-                <span>{m.text}</span>
-              ) : (
-                <FormattedCopilotMessage text={m.text} />
-              )}
-            </div>
-            <span className="text-[10px] text-slate-500 font-mono mt-1 px-1">{m.time}</span>
-          </div>
-        ))}
-        {loading && (
-          <div className="flex items-center gap-2 text-xs text-sky-400 font-mono p-2.5 rounded-lg bg-slate-900 border border-slate-800 max-w-[80%]">
-            <Sparkles className="w-3.5 h-3.5 animate-spin flex-shrink-0" />
-            <span>Interrogating evidence & reasoning...</span>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Quick Prompts Bar */}
-      <div className="px-3 py-2 border-t border-slate-800 bg-slate-950 flex-shrink-0">
-        <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
-          {QUICK_PROMPTS.map((q, i) => (
-            <button
-              key={i}
-              onClick={() => handleSend(q.prompt)}
-              className="px-2.5 py-1 rounded-md text-[11px] font-mono bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-300 hover:text-slate-100 whitespace-nowrap cursor-pointer transition-all flex-shrink-0"
-            >
-              {q.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Input Box */}
-      <div className="p-3 border-t border-slate-800 bg-slate-900 flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            placeholder="Ask anything grounded in evidence..."
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSend()}
-            className="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-100 placeholder-slate-600 focus:outline-none focus:border-slate-700"
-          />
-          <button
-            onClick={() => handleSend()}
-            disabled={loading || !input.trim()}
-            className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-slate-950 font-semibold text-xs font-mono transition-all disabled:opacity-40 cursor-pointer flex-shrink-0"
-          >
-            Query
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ================================================================
 // ADMIN CASE REGISTRY & PREDICTION REVIEW/UPDATE VIEW
@@ -3475,13 +2576,11 @@ function AdminReportView({
   report,
   onBack,
   onUpdateScan,
-  onOpenCopilot,
   userToken,
 }: {
   report: LegitifyReport;
   onBack: () => void;
   onUpdateScan?: (scanId: string, updatedScore: number, updatedVerdict: string, notes: string) => Promise<void>;
-  onOpenCopilot?: (prompt?: string) => void;
   userToken?: string;
 }) {
   const [copiedJson, setCopiedJson] = useState(false);
@@ -3620,15 +2719,6 @@ function AdminReportView({
             {copiedJson ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
             <span>{copiedJson ? "JSON Copied" : "Raw JSON"}</span>
           </button>
-          {onOpenCopilot && (
-            <button
-              onClick={() => onOpenCopilot()}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[#131822] hover:bg-[#1A2232] text-slate-200 border border-[#1E2838] text-xs font-mono font-bold transition-all cursor-pointer"
-            >
-              <Brain className="w-4 h-4 text-sky-400" />
-              <span>Forensic Assistant</span>
-            </button>
-          )}
         </div>
       </div>
 
@@ -4216,7 +3306,6 @@ function AdminSidebar({ active, onNav }: { active: AdminView; onNav: (v: AdminVi
     { id: "admin_mission",   label: "Mission Operations",     icon: Activity },
     { id: "admin_report",    label: "Forensic Dossier & Math",icon: Shield, badge: "SOC" },
     { id: "admin_scan",      label: "Live Pipeline Scan",      icon: Search, badge: "RUN" },
-    { id: "admin_copilot",   label: "Forensic Assistant",     icon: Brain, badge: "AI" },
     { id: "admin_threats",   label: "Threat Intelligence IOC",icon: AlertTriangle },
     { id: "admin_analytics", label: "Platform Telemetry",     icon: BarChart2 },
     { id: "admin_cases",     label: "Case Registry & Review", icon: FileText, badge: "EDIT" },
@@ -4456,7 +3545,6 @@ export function App() {
   const [scans, setScans] = useState<ScanRecord[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [analyticsStats, setAnalyticsStats] = useState<any>(null);
-  const [copilotInitialPrompt, setCopilotInitialPrompt] = useState<string | undefined>();
 
   // 1. Check local cached user session
   useEffect(() => {
@@ -4587,11 +3675,6 @@ export function App() {
     }
   };
 
-  const handleOpenCopilotWithPrompt = (prompt?: string) => {
-    setCopilotInitialPrompt(prompt);
-    setUserView("user_copilot");
-  };
-
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
@@ -4633,7 +3716,6 @@ export function App() {
               {userView === "user_scan" && (
                 <UserScanView
                   onScanComplete={handleScanComplete}
-                  onOpenCopilot={handleOpenCopilotWithPrompt}
                   userToken={session?.access_token}
                   userName={user?.user_metadata?.full_name || "Sanjay Kumar. V"}
                 />
@@ -4643,19 +3725,9 @@ export function App() {
                   report={currentReport}
                   forensicReport={forensicReport}
                   onNewScan={() => setUserView("user_scan")}
-                  onOpenCopilot={handleOpenCopilotWithPrompt}
                   onUpdateReport={(newReport) => setCurrentReport(newReport)}
                   userToken={session?.access_token}
                   userName={user?.user_metadata?.full_name || "Sanjay Kumar. V"}
-                />
-              )}
-              {userView === "user_copilot" && (
-                <UserCopilotView
-                  report={currentReport}
-                  forensicReport={forensicReport}
-                  userToken={session?.access_token}
-                  userName={user?.user_metadata?.full_name || "Sanjay Kumar. V"}
-                  initialQuestion={copilotInitialPrompt}
                 />
               )}
               {userView === "user_safety" && <UserSafetyHubView />}
@@ -4697,7 +3769,6 @@ export function App() {
                     report={currentReport}
                     onBack={() => setAdminView("admin_mission")}
                     onUpdateScan={handleUpdateScanPrediction}
-                    onOpenCopilot={handleOpenCopilotWithPrompt}
                     userToken={session?.access_token}
                   />
                 ) : (
@@ -4719,18 +3790,8 @@ export function App() {
               {adminView === "admin_scan" && (
                 <UserScanView
                   onScanComplete={handleScanComplete}
-                  onOpenCopilot={handleOpenCopilotWithPrompt}
                   userToken={session?.access_token}
                   userName="Security Admin"
-                />
-              )}
-              {adminView === "admin_copilot" && (
-                <UserCopilotView
-                  report={currentReport}
-                  forensicReport={forensicReport}
-                  userToken={session?.access_token}
-                  userName="Security Admin"
-                  initialQuestion={copilotInitialPrompt}
                 />
               )}
               {adminView === "admin_threats" && <AdminThreatsView />}

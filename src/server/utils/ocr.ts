@@ -66,7 +66,7 @@ export async function analyzeDocumentDeepForensics(
       const base64Data = buffer.toString('base64');
 
       const response = await client.models.generateContent({
-        model: 'gemini-3.6-flash',
+        model: process.env.GEMINI_MODEL || 'gemini-3.6-flash',
         contents: [
           {
             role: 'user',
@@ -118,8 +118,29 @@ Return JSON format:
           visualForensics.letterhead_logo_detected = parsed.letterhead_logo_detected ?? true;
           detectedCompany = parsed.company_name;
           detectedSignatory = parsed.signatory_name;
-          if (Array.isArray(parsed.emails)) detectedEmails.push(...parsed.emails);
-          if (Array.isArray(parsed.fees_detected)) detectedFees.push(...parsed.fees_detected);
+          if (Array.isArray(parsed.fees_detected)) {
+            const genuineFees = parsed.fees_detected.filter((f: any) => {
+              if (!f || typeof f !== 'string') return false;
+              const clean = f.trim().toLowerCase();
+              if (
+                clean === 'none' || clean === 'n/a' || clean === 'nil' || clean === 'null' || clean === 'no' ||
+                clean.includes('no fee') || clean.includes('not detected') || clean.includes('none detected') ||
+                clean.includes('free of cost') || clean.includes('zero fee') || clean.includes('no registration') ||
+                clean.includes('no deposit')
+              ) {
+                return false;
+              }
+              if (
+                clean.includes('salary') || clean.includes('stipend') || clean.includes('ctc') ||
+                clean.includes('remuneration') || clean.includes('package') || clean.includes('p.m.') ||
+                clean.includes('per month') || clean.includes('lpa')
+              ) {
+                return false;
+              }
+              return true;
+            });
+            detectedFees.push(...genuineFees);
+          }
         } else {
           rawText = responseText;
         }

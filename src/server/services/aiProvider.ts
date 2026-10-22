@@ -1367,16 +1367,29 @@ export function formatExternalResearchForPrompt(research: any): string {
 // ----------------------------------------------------------------------------
 export class GeminiFlashProvider implements IAIProvider {
   private ai: GoogleGenAI | null = null;
+  private model: string;
 
   constructor() {
-    const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY || process.env.VITE_GEMINI_API_KEY;
     if (apiKey) {
       this.ai = new GoogleGenAI({ apiKey });
     }
+    this.model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
   }
 
   async isAvailable(): Promise<boolean> {
-    return !!(this.ai && (process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY));
+    return !!(this.ai && (process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY || process.env.VITE_GEMINI_API_KEY));
+  }
+
+  private async generateWithFallback(generateFn: (modelName: string) => Promise<any>): Promise<any> {
+    const primary = this.model;
+    const fallback = primary === 'gemini-3.6-flash' ? 'gemini-3.5-flash' : 'gemini-3.6-flash';
+    try {
+      return await generateFn(primary);
+    } catch (primaryErr: any) {
+      console.warn(`[GeminiFlashProvider] Primary model ${primary} request notice: ${primaryErr?.message || primaryErr}. Retrying with ${fallback}...`);
+      return await generateFn(fallback);
+    }
   }
 
   async generateSynthesis(input: AISynthesisInput): Promise<AISynthesisOutput> {
@@ -1405,11 +1418,13 @@ Return strictly a JSON object matching this schema:
   "limitations": [string]
 }`;
 
-      const response = await this.ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-        config: { responseMimeType: 'application/json' },
-      });
+      const response = await this.generateWithFallback((model) =>
+        this.ai!.models.generateContent({
+          model,
+          contents: prompt,
+          config: { responseMimeType: 'application/json' },
+        })
+      );
 
       const parsed = JSON.parse(response.text || '{}');
       return {
@@ -1501,18 +1516,206 @@ ${historyContext}
 9. Include practical verification actions: checking the official company careers portal, calling the registered reception boardline, and reporting fraud to the 1930 National Cybercrime Helpline if money was transferred.
 10. Format response cleanly using concise bullet points and bold key terms. Avoid repeating boilerplate document audit profiles on every turn.`;
 
-      const response = await this.ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: `${systemPrompt}\n\nUser Question: "${question}"`,
-      });
+      const response = await this.generateWithFallback((model) =>
+        this.ai!.models.generateContent({
+          model,
+          contents: `${systemPrompt}\n\nUser Question: "${question}"`,
+        })
+      );
 
-      const text = response.text?.trim();
+      let text = response.text?.trim();
+      if (text) {
+        text = text.replace(/[\u{1F300}-\u{1F9FF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
+      }
       if (text && text.length > 20) {
         return text;
       }
       return generateEvidenceGroundedAnswer(question, context);
     } catch (e) {
       console.warn("Gemini copilot generation fallback", e);
+      return generateEvidenceGroundedAnswer(question, context);
+    }
+  }
+}
+
+// ----------------------------------------------------------------------------
+// OPENAI GPT-4O AI PROVIDER (CHAT COMPLETIONS & EVIDENCE GROUNDING)
+// ----------------------------------------------------------------------------
+export class OpenAIProvider implements IAIProvider {
+  private model: string;
+
+  constructor() {
+    this.model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+  }
+
+  async isAvailable(): Promise<boolean> {
+    const key = (process.env.OPENAI_API_KEY || '').trim();
+    return Boolean(key && key.startsWith('sk-'));
+  }
+
+  async generateSynthesis(input: AISynthesisInput): Promise<AISynthesisOutput> {
+    const key = (process.env.OPENAI_API_KEY || '').trim();
+    if (!key) {
+      return new LocalAIProvider().generateSynthesis(input);
+    }
+
+    try {
+      const prompt = `You are the lead intelligence analyst at LEGITIFY. Generate a forensic analysis for:
+Entity: ${input.entityName} (${input.entityType})
+Score: ${input.trustScore}/100, Risk: ${input.riskLevel}, Verdict: ${input.verdict}
+Evidence items: ${JSON.stringify(input.evidence.map(e => ({ title: e.title, verified: e.verified, severity: e.severity, snippet: e.snippet })))}
+
+Return strictly a JSON object matching this schema without markdown fences:
+{
+  "executive_summary": string,
+  "structured_explanation": {
+    "what_we_found": [string],
+    "why_it_matters": [string],
+    "what_supports_it": [string],
+    "what_contradicts_it": [string],
+    "what_is_unknown": [string],
+    "recommendation": string
+  },
+  "recommendation": string,
+  "limitations": [string]
+}`;
+
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${key}`
+        },
+        body: JSON.stringify({
+          model: this.model,
+          messages: [
+            { role: 'system', content: 'You are an enterprise cybersecurity and employment fraud forensic AI. Always respond with valid JSON only. Do NOT use emojis.' },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.2,
+          max_tokens: 1024
+        })
+      });
+
+      const data = await res.json() as any;
+      if (!res.ok || data.error) {
+        console.warn(`[OpenAI Provider] API error: ${data.error?.message || res.statusText}`);
+        return new LocalAIProvider().generateSynthesis(input);
+      }
+
+      const rawText = data.choices?.[0]?.message?.content || '{}';
+      const cleanJson = rawText.replace(/```json\n?|```/g, '').trim();
+      const parsed = JSON.parse(cleanJson);
+      return {
+        ...parsed,
+        provider_used: "OPENAI_GPT4O_MINI",
+      };
+    } catch {
+      return new LocalAIProvider().generateSynthesis(input);
+    }
+  }
+
+  async answerCopilot(question: string, context: Record<string, any>): Promise<string> {
+    if (isDomainOffTopic(question)) {
+      return DOMAIN_GUARDRAIL_MESSAGE;
+    }
+
+    const userName = context.user_name || context.candidate_name || (context.user_email ? context.user_email.split('@')[0] : 'Candidate');
+    const compName = sanitizeCompanyName(context);
+
+    if (isGreeting(question)) {
+      return buildGreetingResponse(userName, compName);
+    }
+
+    const key = (process.env.OPENAI_API_KEY || '').trim();
+    if (!key) {
+      return generateEvidenceGroundedAnswer(question, context);
+    }
+
+    try {
+      const locker = buildEvidenceLocker(context);
+      const score = typeof context.trust_score === 'number'
+        ? context.trust_score
+        : (typeof context.confidence_score === 'number' ? context.confidence_score : 0);
+      const docChunks = context.document_chunks || [];
+      const extChunks = context.external_chunks || [];
+      const evidenceCitations = locker.map(e => `[${e.id}] (${e.type}): ${e.claim}`).slice(0, 15).join('\n');
+      const sampleIds = locker.length > 0 ? locker.map(l => '[' + l.id + ']').slice(0, 4).join(', ') : '[Doc-P1-C0], [Ext-DNS-01]';
+      const historyContext = Array.isArray(context.history) && context.history.length > 0
+        ? `\n--- PREVIOUS CONVERSATION HISTORY ---\n${context.history.map((h: any) => `${h.role === 'user' ? 'Candidate' : 'Copilot'}: ${h.text || h.content}`).join('\n')}\n--- END HISTORY ---\n`
+        : '';
+      const assessmentsList = Array.isArray(context.assessments) && context.assessments.length > 0
+        ? context.assessments
+        : (context.scoring?.assessments || []);
+      const assessmentsContext = assessmentsList.length > 0
+        ? `\n--- 12 MULTI-VECTOR RISK ASSESSMENTS ---\n${assessmentsList.map((a: any) => `- [${a.name}] (ID: ${a.id}): Risk Score ${a.risk_score}/100 | Band: ${a.risk_band_label || a.risk_band} | Evidence: ${a.evidence_found} | Quote: "${a.exact_quote || 'N/A'}" | Next Step: ${a.recommended_next_step}`).join('\n')}\n`
+        : '';
+      const paymentContext = buildPaymentContextSection(context);
+      const externalResearchContext = formatExternalResearchForPrompt(context);
+      const claimsContext = buildClaimsContextSection(context);
+
+      const systemPrompt = `You are the LEGITIFY AI Investigation Assistant, an advanced forensic copilot specializing in detecting recruitment scams, fake job offers, and corporate impersonation fraud.
+
+OPERATIONAL INSTRUCTIONS:
+1. Tone: Maintain a professional, objective, enterprise security posture. Absolutely NO emojis anywhere in your response.
+2. The investigated target organization is "${compName}". NEVER refer to the company as "images", "screenshot", or raw filenames.
+3. Evaluated Authenticity & Trust Score: ${score}/100.
+4. Answer the user's SPECIFIC question DIRECTLY and CONVERSATIONALLY in your very first sentence based on verified document evidence and stored external intelligence. Do NOT begin with rigid template headers. Answer naturally and concisely as an expert forensic advisor.
+5. Ground your explanation in the verified Multi-Vector Assessments, Evidence Locker records, Stored External Research, and Claims:
+${assessmentsContext}
+${paymentContext}
+${externalResearchContext}
+${claimsContext}
+--- EVIDENCE RECORDS ---
+${evidenceCitations || 'No evidence records available.'}
+--- DUAL RAG CITATIONS ---
+Document Chunks: ${JSON.stringify(docChunks.slice(0, 5))}
+External Evidence Chunks: ${JSON.stringify(extChunks.slice(0, 5))}
+${historyContext}
+6. Distinguish clearly: Corporate Entity Existence != Offer Letter Authenticity. Legitimate corporate employers NEVER demand candidate registration fees, caution deposits, or training charges.
+7. Cite actual Evidence IDs (e.g. ${sampleIds}) and Vector Risk Scores where applicable.
+8. If an assertion cannot be verified from the provided evidence, explicitly state: "This claim could not be verified from the available forensic evidence."
+9. Include practical verification actions: checking the official company careers portal, calling the registered reception boardline, and reporting fraud to the 1930 National Cybercrime Helpline if money was transferred.
+10. Format response cleanly using concise bullet points and bold key terms.`;
+
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${key}`
+        },
+        body: JSON.stringify({
+          model: this.model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: question }
+          ],
+          temperature: 0.2,
+          max_tokens: 1024
+        })
+      });
+
+      const data = await res.json() as any;
+      if (!res.ok || data.error) {
+        const errMsg = data.error?.message || res.statusText;
+        console.warn(`[OpenAI Copilot] Error: ${errMsg}. Falling back to deterministic engine.`);
+        if (errMsg.includes('credits') || errMsg.includes('quota')) {
+          const fallbackAnswer = generateEvidenceGroundedAnswer(question, context);
+          return `[Notice: OpenAI account has no credits remaining (HTTP 429). Switched to deterministic evidence-grounded engine.]\n\n${fallbackAnswer}`;
+        }
+        return generateEvidenceGroundedAnswer(question, context);
+      }
+
+      const text = (data.choices?.[0]?.message?.content || '').trim();
+      const emojiRegex = /[\u{1F300}-\u{1F9FF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu;
+      const cleanAnswer = text.replace(emojiRegex, '').trim();
+
+      if (cleanAnswer && cleanAnswer.length > 20) {
+        return cleanAnswer;
+      }
+      return generateEvidenceGroundedAnswer(question, context);
+    } catch (err: any) {
+      console.warn(`[OpenAI Copilot] Exception: ${err?.message || err}. Falling back to deterministic engine.`);
       return generateEvidenceGroundedAnswer(question, context);
     }
   }
@@ -1735,9 +1938,13 @@ export function getActiveAIProvider(): IAIProvider {
   if (hfToken) {
     return new HuggingFaceProvider();
   }
-  const geminiKey = (process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY || '').trim();
+  const geminiKey = (process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY || process.env.VITE_GEMINI_API_KEY || '').trim();
   if (geminiKey) {
     return new GeminiFlashProvider();
+  }
+  const openaiKey = (process.env.OPENAI_API_KEY || '').trim();
+  if (openaiKey && openaiKey.startsWith('sk-')) {
+    return new OpenAIProvider();
   }
   return new LocalAIProvider();
 }

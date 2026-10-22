@@ -238,7 +238,7 @@ app.get(['/api/health', '/health'], async (req, res) => {
         <div class="grid-item"><div class="grid-label">ML Model</div><div class="grid-val">Ready (${healthData.ml_model_version})</div></div>
         <div class="grid-item"><div class="grid-label">Document OCR</div><div class="grid-val">Ready (Tesseract WASM)</div></div>
         <div class="grid-item"><div class="grid-label">Threat Intel</div><div class="grid-val">Ready (VT + Safe Browsing + AbuseIPDB)</div></div>
-        <div class="grid-item"><div class="grid-label">AI Synthesis</div><div class="grid-val">Ready (${process.env.OPENAI_API_KEY ? 'OpenAI GPT-4o' : 'Gemini 1.5'})</div></div>
+        <div class="grid-item"><div class="grid-label">AI Synthesis</div><div class="grid-val">Ready (${process.env.GEMINI_API_KEY ? 'Gemini 3.6 Flash' : (process.env.OPENAI_API_KEY ? 'OpenAI GPT-4o' : 'Local AI')})</div></div>
         <div class="grid-item"><div class="grid-label">Domain Intel</div><div class="grid-val">Ready (DNS / RDAP)</div></div>
       </div>
     </div>
@@ -279,10 +279,10 @@ app.get(['/api/system/status', '/api/providers/status'], async (req, res) => {
     dbConnected = false;
   }
 
-  const aiMode = process.env.OPENAI_API_KEY
-    ? "OPENAI_GPT4O_MINI"
-    : (process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY)
+  const aiMode = (process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY)
     ? "GOOGLE_GEMINI"
+    : process.env.OPENAI_API_KEY
+    ? "OPENAI_GPT4O_MINI"
     : "DETERMINISTIC_GROUNDED";
 
   // Resolve live status of each keyed API
@@ -320,7 +320,7 @@ app.get(['/api/system/status', '/api/providers/status'], async (req, res) => {
       { name: "AbuseIPDB Threat Intelligence",       category: "THREAT_INTEL",     status: s(aipOk),      mode: "LIVE_FEED" },
       { name: "Contradiction & Conflict Engine",     category: "EVIDENCE_FUSION",  status: "CONNECTED",   mode: "DETERMINISTIC_ENGINE" },
       { name: "OpenAI GPT-4o-mini Forensic Reasoner", category: "AI_SYNTHESIS",   status: s(oaiOk),      mode: "LIVE_API" },
-      { name: "Google Gemini 1.5 Flash AI Synthesis", category: "AI_SYNTHESIS",   status: s(gemOk),      mode: "LIVE_API" },
+      { name: "Google Gemini 3.6 Flash AI Synthesis", category: "AI_SYNTHESIS",   status: s(gemOk),      mode: "LIVE_API" },
       { name: "Dual-AI Evidence Fusion Layer",       category: "AI_SYNTHESIS",     status: (oaiOk || gemOk) ? "CONNECTED" : "DETERMINISTIC_FALLBACK", mode: "PARALLEL_FUSION" },
       { name: "Resend Email Alert Dispatcher",       category: "NOTIFICATION",     status: s(resendOk),   mode: "EMAIL_DELIVERY" },
       { name: "Google OAuth 2.0",                    category: "AUTH",             status: s(googleOAuth), mode: "OAUTH2_SIGNIN" },

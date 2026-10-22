@@ -1122,15 +1122,23 @@ export function buildStandardAssessments(
   const hasComp = candidateCompList.length > 0 || Boolean(inputs.documentData?.detected_stipend);
 
   const rawDocPaymentCase = inputs.documentData?.payment_case;
-  const isExplicitDemand = rawDocPaymentCase === 'EXPLICIT_DEMAND' ||
+  const isDocNonDemand = rawDocPaymentCase === 'NO_PAYMENT_EVIDENCE' ||
+    rawDocPaymentCase === 'POLICY_MENTION_WITHOUT_DEMAND' ||
+    rawDocPaymentCase === 'WARNING_AGAINST_PAYMENT';
+
+  const isExplicitDemand = !isDocNonDemand && (
+    rawDocPaymentCase === 'EXPLICIT_DEMAND' ||
     Boolean(inputs.documentData?.has_fee_demand) ||
     Boolean(feeDetails.length > 0 && !primaryFee?.is_refundable) ||
     Boolean(inputs.rules_triggered?.some(r => r.rule_id === 'R002' && (r as any).triggered !== false)) ||
     Boolean(inputs.evidence?.some(e => (e.evidence_type === 'FEE_DEMAND' || e.evidence_type === 'UPFRONT_FEE_DEMAND' || e.evidence_type === 'PAYMENT_REQUEST') && (e.severity === 'CRITICAL' || e.status === 'NEGATIVE'))) ||
-    Boolean(inputs.documentData?.fee_amount_detected);
+    Boolean(inputs.documentData?.fee_amount_detected)
+  );
 
-  const isConditionalDemand = rawDocPaymentCase === 'CONDITIONAL_DEMAND' ||
-    Boolean(primaryFee?.is_refundable || (primaryFee?.refund_terms && primaryFee.refund_terms.length > 5));
+  const isConditionalDemand = !isDocNonDemand && (
+    rawDocPaymentCase === 'CONDITIONAL_DEMAND' ||
+    Boolean(primaryFee?.is_refundable || (primaryFee?.refund_terms && primaryFee.refund_terms.length > 5))
+  );
 
   const hasConcreteFee = isExplicitDemand || isConditionalDemand;
 
