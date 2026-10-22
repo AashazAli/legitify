@@ -1080,6 +1080,13 @@ app.post(['/api/notifications/email', '/notifications/email'], async (req, res) 
   }
 });
 
+process.on('uncaughtException', (err) => {
+  console.error('[LEGITIFY Server] Uncaught exception caught safely:', err?.message || err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[LEGITIFY Server] Unhandled rejection caught safely:', reason);
+});
+
 const isServerless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT || process.env.NOW_REGION);
 if (!isServerless && process.argv[1] && (process.argv[1].includes('server') || process.argv[1].includes('index.ts'))) {
   app.listen(PORT, () => {
