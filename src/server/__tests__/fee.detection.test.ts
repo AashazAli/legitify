@@ -176,3 +176,120 @@ describe('Chunking: Semantic Section Classification', () => {
     });
   });
 });
+
+describe('Required Regression Suite: Fee-Demand Detection and Context Classification', () => {
+  it('Detects target sentence: "To CONFIRM your enrolment, you are required to pay rsxxx" as EXPLICIT_DEMAND', async () => {
+    const { extractDocumentSignals } = await import('../services/documentService');
+    const res = extractDocumentSignals('To CONFIRM your enrolment, you are required to pay rsxxx');
+    assert.strictEqual(res.has_fee_demand, true);
+    assert.strictEqual(res.payment_case, 'EXPLICIT_DEMAND');
+    assert.ok(res.fee_details?.[0]?.exact_quote.includes('To CONFIRM your enrolment'));
+  });
+
+  it('Detects target sentence split across OCR/PDF line breaks as EXPLICIT_DEMAND', async () => {
+    const { extractDocumentSignals, splitTextIntoSentences } = await import('../services/documentService');
+    const text = 'To CONFIRM your enrolment,\nyou are required to pay rsxxx';
+    const sents = splitTextIntoSentences(text);
+    assert.ok(sents.length >= 1);
+    const res = extractDocumentSignals(text);
+    assert.strictEqual(res.has_fee_demand, true);
+    assert.strictEqual(res.payment_case, 'EXPLICIT_DEMAND');
+  });
+
+  it('Detects target sentence variant: "To confirm your enrollment, you must pay Rs. 5,000" as EXPLICIT_DEMAND', async () => {
+    const { extractDocumentSignals } = await import('../services/documentService');
+    const res = extractDocumentSignals('To confirm your enrollment, you must pay Rs. 5,000');
+    assert.strictEqual(res.has_fee_demand, true);
+    assert.strictEqual(res.payment_case, 'EXPLICIT_DEMAND');
+  });
+
+  it('Detects target sentence with trailing currency token: "To CONFIRM your enrolment, you are required to pay rs" as EXPLICIT_DEMAND', async () => {
+    const { extractDocumentSignals } = await import('../services/documentService');
+    const res = extractDocumentSignals('To CONFIRM your enrolment, you are required to pay rs');
+    assert.strictEqual(res.has_fee_demand, true);
+    assert.strictEqual(res.payment_case, 'EXPLICIT_DEMAND');
+    assert.ok(res.fee_details?.[0]?.exact_quote.includes('To CONFIRM your enrolment'));
+  });
+
+  it('Classifies genuine candidate stipend without payment demand as NO_PAYMENT_EVIDENCE or POLICY', async () => {
+    const { extractDocumentSignals } = await import('../services/documentService');
+    const res = extractDocumentSignals('Your monthly stipend will be Rs. 15,000 per month.');
+    assert.strictEqual(res.has_fee_demand, false);
+    assert.notStrictEqual(res.payment_case, 'EXPLICIT_DEMAND');
+    assert.notStrictEqual(res.payment_case, 'CONDITIONAL_DEMAND');
+  });
+
+  it('Classifies genuine annual salary without payment demand as NO_PAYMENT_EVIDENCE or POLICY', async () => {
+    const { extractDocumentSignals } = await import('../services/documentService');
+    const res = extractDocumentSignals('Your annual salary is Rs. 5,00,000 per annum payable monthly.');
+    assert.strictEqual(res.has_fee_demand, false);
+    assert.notStrictEqual(res.payment_case, 'EXPLICIT_DEMAND');
+  });
+
+  it('Classifies explicit fee negation "No registration fee is required from candidates" as NO payment demand', async () => {
+    const { extractDocumentSignals } = await import('../services/documentService');
+    const res = extractDocumentSignals('No registration fee is required from candidates. Application is free.');
+    assert.strictEqual(res.has_fee_demand, false);
+    assert.notStrictEqual(res.payment_case, 'EXPLICIT_DEMAND');
+  });
+
+  it('Classifies explicit anti-scam warning "Applicants are warned never to pay recruitment fees" as WARNING_AGAINST_PAYMENT', async () => {
+    const { extractDocumentSignals } = await import('../services/documentService');
+    const res = extractDocumentSignals('Applicants are warned never to pay recruitment fees to anyone. We never charge money.');
+    assert.strictEqual(res.has_fee_demand, false);
+    assert.strictEqual(res.payment_case, 'WARNING_AGAINST_PAYMENT');
+  });
+
+  it('Classifies corporate expense reimbursement "The company reimburses training expenses" as POLICY_MENTION_WITHOUT_DEMAND', async () => {
+    const { extractDocumentSignals } = await import('../services/documentService');
+    const res = extractDocumentSignals('The company reimburses training expenses incurred during the probationary period.');
+    assert.strictEqual(res.has_fee_demand, false);
+    assert.strictEqual(res.payment_case, 'POLICY_MENTION_WITHOUT_DEMAND');
+  });
+
+  it('Preserves CONDITIONAL_DEMAND for refundable deposit statement', async () => {
+    const { extractDocumentSignals } = await import('../services/documentService');
+    const res = extractDocumentSignals('A refundable deposit must be paid before joining, refundable upon completion of tenure.');
+    assert.strictEqual(res.has_fee_demand, true);
+    assert.strictEqual(res.payment_case, 'CONDITIONAL_DEMAND');
+  });
+
+  it('Ensures confirmed payment demand triggers PAYMENT_REQUEST_CAP and critical risk in scoringService', async () => {
+    const { calculateDeterministicScore } = await import('../services/scoringService');
+    const score = calculateDeterministicScore({
+      documentData: {
+        payment_case: 'EXPLICIT_DEMAND',
+        has_fee_demand: true,
+        fee_details: [{
+          category: 'UPFRONT_FEE_DEMAND',
+          exact_quote: 'To CONFIRM your enrolment, you are required to pay rs',
+          why_it_matters: 'Fee demand',
+          confidence: 96,
+        }],
+      } as any,
+    });
+    assert.ok(score.trust_score <= 20, `Expected trust score <= 20, got ${score.trust_score}`);
+    assert.ok(score.hard_caps_applied.some(c => c.includes('PAYMENT_REQUEST_CAP')));
+    const fin = score.assessments?.find(a => a.id === 'financial_safety');
+    assert.strictEqual(fin?.risk_band, 'CRITICAL_RISK');
+    assert.ok((fin?.risk_score || 0) >= 76);
+  });
+
+  it('Ensures negative payment case (e.g. WARNING_AGAINST_PAYMENT) does NOT trigger PAYMENT_REQUEST_CAP even if legacy fee_details is present', async () => {
+    const { calculateDeterministicScore } = await import('../services/scoringService');
+    const score = calculateDeterministicScore({
+      documentData: {
+        payment_case: 'WARNING_AGAINST_PAYMENT',
+        has_fee_demand: false,
+        fee_details: [{
+          category: 'UPFRONT_FEE_DEMAND',
+          exact_quote: 'Stale quote',
+          confidence: 50,
+        }],
+      } as any,
+    });
+    assert.ok(!score.hard_caps_applied.some(c => c.includes('PAYMENT_REQUEST_CAP')));
+    const fin = score.assessments?.find(a => a.id === 'financial_safety');
+    assert.notStrictEqual(fin?.risk_band, 'CRITICAL_RISK');
+  });
+});

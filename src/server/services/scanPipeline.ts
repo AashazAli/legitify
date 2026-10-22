@@ -23,7 +23,7 @@ import { lookupCompany, CompanyData } from './companyService';
 import { verifyCompanyRegistry } from './companyRegistryService';
 import { analyzeDomain, DomainData } from './domainService';
 import { analyzeRecruiterEmail, RecruiterData } from './emailService';
-import { processDocument, DocumentExtractionResult } from './documentService';
+import { processDocument, DocumentExtractionResult, extractDocumentSignals } from './documentService';
 import { checkThreatIndicators, ThreatData } from './threatService';
 import { verifyCertificate } from './certificateService';
 import { searchPublicExperiences, investigatePublicExperience, CommunitySearchResult } from './publicExperienceService';
@@ -430,11 +430,32 @@ export async function runScanPipeline(params: ExecuteScanParams): Promise<Legiti
     }
   }
 
-  const hasPaymentDemand = Boolean(
-    docResult?.has_fee_demand ||
-    claimLedger.normalizedEntities.paymentRequests.length > 0 ||
-    (docResult?.fee_details && docResult.fee_details.length > 0)
+  // Validate claim ledger payment requests against their underlying source chunks
+  const validatedLedgerPaymentRequests = (claimLedger.normalizedEntities.paymentRequests || []).filter(req => {
+    if (!req.chunkId) return false;
+    const chunk = chunks.find(c => c.chunkId === req.chunkId);
+    if (!chunk?.text) return false;
+    const chunkSignals = extractDocumentSignals(chunk.text);
+    return Boolean(
+      chunkSignals.has_fee_demand ||
+      chunkSignals.payment_case === 'EXPLICIT_DEMAND' ||
+      chunkSignals.payment_case === 'CONDITIONAL_DEMAND'
+    );
+  });
+
+  const isDocPaymentNegative = docResult?.payment_case === 'WARNING_AGAINST_PAYMENT' ||
+                               docResult?.payment_case === 'POLICY_MENTION_WITHOUT_DEMAND' ||
+                               docResult?.payment_case === 'NO_PAYMENT_EVIDENCE';
+
+  const hasValidatedDocFee = Boolean(
+    docResult?.has_fee_demand &&
+    (docResult.payment_case === 'EXPLICIT_DEMAND' || docResult.payment_case === 'CONDITIONAL_DEMAND' || (docResult.fee_details && docResult.fee_details.some(f => f.exact_quote && f.exact_quote.length > 5)))
   );
+
+  const hasValidatedLedgerFee = validatedLedgerPaymentRequests.length > 0;
+
+  const hasPaymentDemand = (hasValidatedDocFee || hasValidatedLedgerFee) && !isDocPaymentNegative;
+
   if (hasPaymentDemand && docResult) {
     docResult.has_fee_demand = true;
     if (docResult.payment_case !== 'CONDITIONAL_DEMAND') {
@@ -442,10 +463,10 @@ export async function runScanPipeline(params: ExecuteScanParams): Promise<Legiti
     }
 
     if (!docResult.fee_details || docResult.fee_details.length === 0) {
-      if (claimLedger.normalizedEntities.paymentRequests.length > 0) {
-        docResult.fee_details = claimLedger.normalizedEntities.paymentRequests.map(req => {
+      if (validatedLedgerPaymentRequests.length > 0) {
+        docResult.fee_details = validatedLedgerPaymentRequests.map(req => {
           const chunk = chunks.find(c => c.chunkId === req.chunkId);
-          const quote = chunk?.text?.slice(0, 200)?.trim() || `Candidate payment of ${req.amount} requested`;
+          const quote = chunk?.text?.slice(0, 200)?.trim() || `Candidate payment requested`;
           return {
             category: 'UPFRONT_FEE_DEMAND',
             amount: req.amount,
@@ -456,7 +477,7 @@ export async function runScanPipeline(params: ExecuteScanParams): Promise<Legiti
           };
         });
         if (!docResult.fee_amount_detected) {
-          docResult.fee_amount_detected = claimLedger.normalizedEntities.paymentRequests[0]?.amount;
+          docResult.fee_amount_detected = validatedLedgerPaymentRequests[0]?.amount;
         }
       }
     }

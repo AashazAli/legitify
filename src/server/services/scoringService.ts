@@ -830,16 +830,23 @@ export function calculateDeterministicScore(inputs: ScoringInputs): Deterministi
 
   // Constraint 2: Confirmed candidate payment demand cap (max 20)
   const scoringPaymentCase = inputs.documentData?.payment_case;
-  const isExplicitOrConditionalFeeDemand = scoringPaymentCase === 'EXPLICIT_DEMAND' || scoringPaymentCase === 'CONDITIONAL_DEMAND';
+  const isConfirmedDemand = scoringPaymentCase === 'EXPLICIT_DEMAND' || scoringPaymentCase === 'CONDITIONAL_DEMAND';
+  const isConfirmedNegative = scoringPaymentCase === 'WARNING_AGAINST_PAYMENT' ||
+                              scoringPaymentCase === 'POLICY_MENTION_WITHOUT_DEMAND' ||
+                              scoringPaymentCase === 'NO_PAYMENT_EVIDENCE' ||
+                              scoringPaymentCase === 'AMBIGUOUS_EVIDENCE';
 
-  const hasFeeDemand = Boolean(
-    isExplicitOrConditionalFeeDemand ||
+  // For legacy records without payment_case, validate that fee details or has_fee_demand is present
+  const hasLegacyValidatedFee = !scoringPaymentCase && Boolean(
     inputs.documentData?.has_fee_demand ||
     (inputs.documentData?.fee_details && inputs.documentData.fee_details.length > 0) ||
     (inputs.documentData?.requested_fees && inputs.documentData.requested_fees.length > 0) ||
+    Boolean(inputs.documentData?.fee_amount_detected) ||
     inputs.rules_triggered?.some(r => r.rule_id === 'R002' && (r as any).triggered !== false) ||
     evidenceList.some(e => (e.category === 'FINANCIAL' || (e.category as any) === 'PAYMENT') && e.evidence_type === 'FEE_DEMAND' && e.severity === 'CRITICAL')
   );
+
+  const hasFeeDemand = isConfirmedDemand || (hasLegacyValidatedFee && !isConfirmedNegative);
   if (hasFeeDemand) {
     const applied = rawTrust > 20;
     if (applied) rawTrust = 20;
@@ -1116,31 +1123,30 @@ export function buildStandardAssessments(
 
   const rawDocPaymentCase = inputs.documentData?.payment_case;
 
-  const isExplicitDemand = (
-    rawDocPaymentCase === 'EXPLICIT_DEMAND' ||
-    Boolean(inputs.documentData?.has_fee_demand) ||
-    Boolean(feeDetails.length > 0 && !primaryFee?.is_refundable) ||
-    Boolean(inputs.rules_triggered?.some(r => r.rule_id === 'R002' && (r as any).triggered !== false)) ||
-    Boolean(inputs.evidence?.some(e => (e.evidence_type === 'FEE_DEMAND' || e.evidence_type === 'UPFRONT_FEE_DEMAND' || e.evidence_type === 'PAYMENT_REQUEST') && (e.severity === 'CRITICAL' || e.status === 'NEGATIVE'))) ||
-    Boolean(inputs.documentData?.fee_amount_detected)
+  const hasLegacyValidatedFee = !rawDocPaymentCase && Boolean(
+    inputs.documentData?.has_fee_demand ||
+    (feeDetails.length > 0 && feeDetails.some(f => f.exact_quote && f.exact_quote.length > 5)) ||
+    Boolean(inputs.documentData?.fee_amount_detected) ||
+    Boolean(inputs.rules_triggered?.some(r => r.rule_id === 'R002' && (r as any).triggered !== false))
   );
-
-  const isConditionalDemand = (
-    rawDocPaymentCase === 'CONDITIONAL_DEMAND' ||
-    Boolean(primaryFee?.is_refundable || (primaryFee?.refund_terms && primaryFee.refund_terms.length > 5))
-  );
-
-  const hasConcreteFee = isExplicitDemand || isConditionalDemand;
 
   let resolvedPaymentCase: 'EXPLICIT_DEMAND' | 'CONDITIONAL_DEMAND' | 'POLICY_MENTION_WITHOUT_DEMAND' | 'WARNING_AGAINST_PAYMENT' | 'NO_PAYMENT_EVIDENCE' | 'AMBIGUOUS_EVIDENCE';
-  if (hasConcreteFee) {
-    resolvedPaymentCase = (isConditionalDemand && !isExplicitDemand) ? 'CONDITIONAL_DEMAND' : 'EXPLICIT_DEMAND';
+  if (rawDocPaymentCase === 'EXPLICIT_DEMAND') {
+    resolvedPaymentCase = 'EXPLICIT_DEMAND';
+  } else if (rawDocPaymentCase === 'CONDITIONAL_DEMAND') {
+    resolvedPaymentCase = 'CONDITIONAL_DEMAND';
   } else if (rawDocPaymentCase === 'WARNING_AGAINST_PAYMENT') {
     resolvedPaymentCase = 'WARNING_AGAINST_PAYMENT';
   } else if (rawDocPaymentCase === 'POLICY_MENTION_WITHOUT_DEMAND') {
     resolvedPaymentCase = 'POLICY_MENTION_WITHOUT_DEMAND';
   } else if (rawDocPaymentCase === 'AMBIGUOUS_EVIDENCE' || (inputs.documentData?.extracted_text && inputs.documentData.extracted_text.trim().length < 50)) {
     resolvedPaymentCase = 'AMBIGUOUS_EVIDENCE';
+  } else if (rawDocPaymentCase === 'NO_PAYMENT_EVIDENCE') {
+    resolvedPaymentCase = 'NO_PAYMENT_EVIDENCE';
+  } else if (hasLegacyValidatedFee) {
+    resolvedPaymentCase = primaryFee?.is_refundable ? 'CONDITIONAL_DEMAND' : 'EXPLICIT_DEMAND';
+  } else if (hasComp) {
+    resolvedPaymentCase = 'NO_PAYMENT_EVIDENCE';
   } else {
     resolvedPaymentCase = 'NO_PAYMENT_EVIDENCE';
   }
@@ -1206,7 +1212,7 @@ export function buildStandardAssessments(
       ? Math.min(10, Math.max(2, Math.round(Math.log10(Math.max(50, numericAmt)) * 2.4)))
       : 5;
     const refundTerms = primaryFee?.refund_terms || 'conditional upon tenure';
-    financialRisk = Math.max(72, Math.min(94, 70 + amountFactor + (refundTerms.length > 5 ? 4 : 2)));
+    financialRisk = Math.max(80, Math.min(95, 80 + amountFactor + (refundTerms.length > 5 ? 2 : 0)));
 
     financialSummary = primaryFee
       ? `Conditional candidate payment/deposit detected: ${primaryFee.category || 'Security Deposit'}${primaryFee.amount ? ' of ' + primaryFee.amount : ''}. Claimed refundable (${refundTerms}). Exact quote: "${primaryFee.exact_quote}".`

@@ -321,11 +321,13 @@ export async function extractTextFromImageBuffer(buffer: Buffer, mimeType: strin
 
 export function splitTextIntoSentences(raw: string): string[] {
   if (!raw) return [];
-  const protectedText = raw
-    .replace(/\b(Rs|rs|inr|INR)\.\s*(\d)/gi, '$1_DOT_ $2')
+  // Normalize Unicode non-breaking and special spaces
+  const normalized = raw.replace(/[\u00A0\u2000-\u200B\u202F\u205F]/g, ' ');
+  const protectedText = normalized
+    .replace(/\b(Rs|rs|inr|INR)\.\s*(?=[a-z0-9]|$)/gi, '$1_DOT_ ')
     .replace(/\b(Mr|Mrs|Ms|Dr|Prof|Sr|Jr|No|Ltd|Pvt|Ref|eg|ie|approx)\.\s+/gi, '$1_DOT_ ');
   return protectedText
-    .split(/(?<=[.!?\n])\s+/)
+    .split(/(?<=[.!?])\s+|\r?\n\s*\r?\n+/)
     .map(s => s.replace(/_DOT_\s*/g, '. ').trim())
     .filter(s => s.length > 0);
 }
@@ -447,7 +449,7 @@ export function extractDocumentSignals(
 
   const isQuotedOrEducationalSentence = (s: string): boolean => {
     // If a sentence contains an actual candidate fee or booking amount demand, NEVER treat it as educational
-    if (/(?:booking\s*amount|service\s*charge|registration\s*fees?|caution\s*(?:deposit|money)|security\s*deposit|training\s*fees?|placement\s*fees?|panel\s*charges?|(?:interview[- ])?slot\s*booking|transfer\s+to|pay\s+to|pay\s+now|pay\s+first|upi)/i.test(s)) {
+    if (/(?:booking\s*amount|service\s*charge|registration\s*fees?|caution\s*(?:deposit|money)|security\s*deposit|training\s*fees?|placement\s*fees?|panel\s*charges?|(?:interview[- ])?slot\s*booking|transfer\s+to|pay\s+to|pay\s+now|pay\s+first|required\s+to\s+pay|to\s*confirm[^.!?]*?pay|upi)/i.test(s)) {
       return false;
     }
     if (!isGuideDoc) return false;
@@ -459,7 +461,7 @@ export function extractDocumentSignals(
 
   // Helper to detect candidate compensation (stipend/salary paid TO candidate)
   const isCandidateCompensationSentence = (s: string): boolean => {
-    const hasCandidateFeeTerm = /(?:registration\s*fees?|caution\s*(?:deposit|money|amount)|security\s*(?:deposit|amount)|training\s*fees?|laptop\s*deposit|admission\s*fees?|enrolment|enrollment|slot\s*booking|booking\s*amount|service\s*charges?|panel\s*charges?|placement\s*fees?|profile\s*activation|must\s*pay|needs?\s*to\s*pay|(?:is|are|be)\s+required\s+to\s*pay|required\s*to\s*pay|to\s*confirm[^\n]*?pay|transfer\s+(?:the\s+)?(?:small\s+)?booking|pay\s+before|pay\s+now|pay\s+first|pay\s+via\s+upi)/i.test(s);
+    const hasCandidateFeeTerm = /(?:registration\s*fees?|caution\s*(?:deposit|money|amount)|security\s*(?:deposit|amount)|training\s*fees?|laptop\s*deposit|admission\s*fees?|enrolment|enrollment|slot\s*booking|booking\s*amount|service\s*charges?|panel\s*charges?|placement\s*fees?|profile\s*activation|must\s*pay|needs?\s*to\s*pay|(?:is|are|be)\s+required\s+to\s*pay|required\s*to\s*pay|to\s*confirm[^.!?]*?pay|transfer\s+(?:the\s+)?(?:small\s+)?booking|pay\s+before|pay\s+now|pay\s+first|pay\s+via\s+upi)/i.test(s);
     if (hasCandidateFeeTerm) return false;
 
     return /(?:stipend\s*(?:of|is|:)?|salary\s*(?:of|is|:)?|compensation\s*(?:of|is|:)?|remuneration\s*(?:of|is|:)?|ctc\s*(?:of|is|:)?|will\s+(?:receive|be\s+paid|earn)\s+(?:a\s+)?(?:stipend|salary|remuneration)|paid\s+(?:to\s+(?:you|the\s+candidate|the\s+intern|the\s+employee)|monthly|per\s+month|annually|bi-weekly|weekly)|direct\s+deposit\s+(?:of|into)|bank\s+transfer\s+(?:of|into|to\s+(?:your|the\s+account))|credited\s+to\s+(?:your|the\s+account)|account\s+(?:credited|transfer)|per\s+month|\/month|p\.m\.|per\s+annum|\/year|p\.a\.|lpa|basic\s+pay|gross\s+salary|net\s+salary|package\s+of|fixed\s+pay|take[- ]home\s+pay|monthly\s+(?:stipend|salary|payout|allowance|remuneration)|company\s+will\s+pay|employer\s+will\s+pay)/i.test(s);
@@ -467,10 +469,10 @@ export function extractDocumentSignals(
 
   // Helper to detect corporate expense/reimbursement policies
   const isCorporatePolicySentence = (s: string): boolean => {
-    const hasCandidateFeeTerm = /(?:registration\s*fees?|caution\s*(?:deposit|money|amount)|security\s*(?:deposit|amount)|training\s*fees?|laptop\s*deposit|admission\s*fees?|enrolment|enrollment|slot\s*booking|booking\s*amount|service\s*charges?|panel\s*charges?|placement\s*fees?|profile\s*activation|must\s*pay|needs?\s*to\s*pay|(?:is|are|be)\s+required\s+to\s*pay|required\s*to\s*pay|to\s*confirm[^\n]*?pay|transfer\s+(?:the\s+)?(?:small\s+)?booking|pay\s+before|pay\s+now|pay\s+first|pay\s+via\s+upi)/i.test(s);
+    const hasCandidateFeeTerm = /(?:registration\s*fees?|caution\s*(?:deposit|money|amount)|security\s*(?:deposit|amount)|training\s*fees?|laptop\s*deposit|admission\s*fees?|enrolment|enrollment|slot\s*booking|booking\s*amount|service\s*charges?|panel\s*charges?|placement\s*fees?|profile\s*activation|must\s*pay|needs?\s*to\s*pay|(?:is|are|be)\s+required\s+to\s*pay|required\s*to\s*pay|to\s*confirm[^.!?]*?pay|transfer\s+(?:the\s+)?(?:small\s+)?booking|pay\s+before|pay\s+now|pay\s+first|pay\s+via\s+upi)/i.test(s);
     if (hasCandidateFeeTerm) return false;
 
-    return /(?:reimbursement\s+(?:policy|of\s+expenses?)|travel\s+(?:allowance|expenses?|reimbursement)|expenses?\s+(?:incurred\s+will\s+be\s+reimbursed|covered\s+by\s+the\s+company|borne\s+by\s+the\s+company)|provident\s+fund|pf\s+deduction|tax\s+deducted\s+at\s+source|tds|medical\s+insurance|group\s+insurance|health\s+benefits|gratuity|company\s+will\s+(?:reimburse|provide|cover|bear|sponsor)|equipment\s+(?:is|will\s+be)\s+provided|laptop\s+(?:is|will\s+be)\s+provided|training\s+(?:is|will\s+be)\s+(?:provided|free|covered|sponsored)|at\s+no\s+(?:cost|charge)\s+to\s+the\s+candidate)/i.test(s);
+    return /(?:reimbursement\s+(?:policy|of\s+expenses?)|reimburses?\s+(?:training\s+)?expenses?|travel\s+(?:allowance|expenses?|reimbursement)|expenses?\s+(?:incurred\s+will\s+be\s+reimbursed|covered\s+by\s+the\s+company|borne\s+by\s+the\s+company)|provident\s+fund|pf\s+deduction|tax\s+deducted\s+at\s+source|tds|medical\s+insurance|group\s+insurance|health\s+benefits|gratuity|company\s+(?:will\s+)?(?:reimburse|provide|cover|bear|sponsor)|company\s+(?:reimburses?|provides?|covers?|bears?|sponsors?)|equipment\s+(?:is|will\s+be)\s+provided|laptop\s+(?:is|will\s+be)\s+provided|training\s+(?:is|will\s+be)\s+(?:provided|free|covered|sponsored)|at\s+no\s+(?:cost|charge)\s+to\s+the\s+candidate)/i.test(s);
   };
 
   const isNegatedSentence = (s: string): boolean => {
@@ -486,16 +488,18 @@ export function extractDocumentSignals(
     // Genuine candidate fee demands
     return (
       /(?:registration\s*fees?|caution\s*(?:deposit|money|fee|amount)|security\s*(?:deposit|amount)|internship\s*fees?|enrolment\s*fees?|enrollment\s*fees?|laptop\s*(?:deposit|security|fee)|equipment\s*(?:deposit|charge)|onboarding\s*(?:fees?|charges?|deposit)|training\s*(?:fees?|cost|charges?)|kit\s*charges?|uniform\s*(?:deposit|fee)|(?:interview[- ])?slot\s*booking\s*(?:amount|fee|charge)?|booking\s*amount|admission\s*fees?|acceptance\s*fees?|service\s*charges?|panel\s*charges?|placement\s*fees?|profile\s*activation\s*(?:fee|charge)?|document(?:ation)?\s*(?:verification\s*)?(?:charges?|fees?)|portal\s*activation\s*(?:fee|charge))/i.test(s) ||
-      /(?:candidate|student|intern|applicant|you)\s*(?:must|needs?\s+to|(?:is|are|be)\s+required\s+to|have\s+to|has\s+to|shall|will\s+need\s+to)\s*(?:pay|deposit|transfer|remit)/i.test(s) ||
-      /to\s+confirm\s+your\s+(?:enrolment|enrollment|selection|admission|offer|seat|internship|appointment)[^\n]*?(?:pay|deposit|transfer|remit|fee|charge|amount)/i.test(s) ||
+      /(?:refundable|non-refundable)\s+(?:security\s+)?(?:deposit|amount|caution|fee|charge)/i.test(s) ||
+      /(?:deposit|fee|charge|amount)\s+(?:must|needs?\s+to|(?:is|are|be)\s+required\s+to|shall)\s+be\s+paid/i.test(s) ||
+      /(?:candidate|student|intern|applicant|you)\s*(?:must|needs?\s+to|(?:is|are|be)\s+required\s+to|have\s+to|has\s+to|shall|will\s+need\s+to)\s*(?:pay|deposit|transfer|remit)(?:\s+(?:₹|rs\.?|inr|\$|fee|charges?|deposit|amount|online|before|now|[a-z0-9]+))?/i.test(s) ||
+      /to\s+confirm\s+your\s+(?:enrolment|enrollment|selection|admission|offer|seat|internship|appointment)[^.!?]*?(?:is|are|be)?\s*(?:required\s+to\s+pay|must\s+pay|needs?\s+to\s+pay|pay|deposit|transfer|remit|fee|charge|amount)/i.test(s) ||
       /(?:payment|deposit)\s+(?:of[^\n]*)?\s*is\s+(?:mandatory|required)\s+to\s+confirm/i.test(s) ||
-      /(?:enrolment|enrollment|admission|selection)\s*(?:confirmation|formalities)?\s*(?:will\s+be\s+completed\s+after|requires?|is\s+subject\s+to)[^\n]*?(?:pay|fee|charge)/i.test(s) ||
+      /(?:enrolment|enrollment|admission|selection)\s*(?:confirmation|formalities)?\s*(?:will\s+be\s+completed\s+after|requires?|is\s+subject\s+to)[^.!?]*?(?:pay|fee|charge)/i.test(s) ||
       /(?:kindly|please)?\s*(?:deposit|transfer|pay|remit)\s+(?:the\s+stated\s+)?(?:booking\s*amount|fee|charge|deposit|amount|(?:₹|rs\.?|inr|\$)\s*[0-9,]+)/i.test(s) ||
       /(?:transfer|deposit|pay)\s+(?:the\s+)?(?:refundable|non-refundable)\s*(?:deposit|amount|caution|fee|charge)/i.test(s) ||
       /until\s+(?:the\s+)?service\s*charge\s+is\s+cleared/i.test(s) ||
       /pay\s+(?:first|online|immediately|now|before\s*joining|to\s*confirm|to\s*avoid\s*cancellation|via\s*upi|into\s*the\s*account)\s*(?:(?:₹|rs\.?|inr|\$)\s*[0-9,]+|(?:the\s+)?(?:fee|charge|deposit|amount))?/i.test(s) ||
       /(?:transfer|deposit|pay)\s+(?:₹|rs\.?|inr|\$)\s*[0-9,]+(?:\s*\/-)?\s*(?:before\s*joining|to\s*confirm|as\s*(?:a\s*)?(?:fee|deposit|security|caution|registration|charge))/i.test(s) ||
-      /(?:required|need|must|instructed|(?:are|is)\s+required)\s+to\s+pay/i.test(s)
+      /(?:required|need|must|instructed|(?:are|is)\s+required)\s+to\s+pay(?:\s+(?:rs\.?|inr|₹|\$|fee|deposit|charges?|online|[a-z0-9]+))?/i.test(s)
     );
   };
 
@@ -763,7 +767,7 @@ export function extractDocumentSignals(
   );
 
   const hasFinancialPolicyMention = docSentences.some(s =>
-    !isFeeSentence(s) && (isCorporatePolicySentence(s) || /(?:reimbursement\s+policy|travel\s+(?:allowance|expenses?)|medical\s+insurance|provident\s+fund|pf\s+deduction|tax\s+deducted\s+at\s+source|tds|corporate\s+credit\s+card|relocation\s+(?:allowance|expenses?)|gratuity|company\s+will\s+reimburse)/i.test(s))
+    !isFeeSentence(s) && (isCorporatePolicySentence(s) || /(?:reimbursement\s+policy|reimburses?\s+(?:training\s+)?expenses?|travel\s+(?:allowance|expenses?)|medical\s+insurance|provident\s+fund|pf\s+deduction|tax\s+deducted\s+at\s+source|tds|corporate\s+credit\s+card|relocation\s+(?:allowance|expenses?)|gratuity|company\s+(?:will\s+)?reimburse)/i.test(s))
   );
 
   const hasAmbiguousFeeMention = docSentences.some(s =>

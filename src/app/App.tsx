@@ -894,30 +894,26 @@ function UserReportView({
     ? (fSemantics?.detectedCompany || report.document_analysis?.extracted_entities?.detected_company || "Investigated Organization")
     : rawName;
 
-  const serverFee = Boolean(
+  const paymentCase = report.payment_case || report.document_analysis?.payment_case;
+
+  const isConfirmedPaymentDemand = paymentCase === 'EXPLICIT_DEMAND' || paymentCase === 'CONDITIONAL_DEMAND';
+  const isPaymentNegative = paymentCase === 'NO_PAYMENT_EVIDENCE' ||
+                            paymentCase === 'WARNING_AGAINST_PAYMENT' ||
+                            paymentCase === 'POLICY_MENTION_WITHOUT_DEMAND' ||
+                            paymentCase === 'AMBIGUOUS_EVIDENCE';
+
+  const serverFee = isConfirmedPaymentDemand || (!isPaymentNegative && Boolean(
     report.has_fee_demand ||
     (report as any).hasPaymentDemand ||
-    report.payment_case === 'EXPLICIT_DEMAND' ||
-    report.payment_case === 'CONDITIONAL_DEMAND' ||
     report.document_analysis?.has_fee_demand ||
-    (report.document_analysis?.fee_details && report.document_analysis.fee_details.length > 0) ||
-    (report.document_analysis?.extracted_entities?.payment_demands && report.document_analysis.extracted_entities.payment_demands.length > 0) ||
+    (report.document_analysis?.fee_details && report.document_analysis.fee_details.some(f => f.exact_quote && f.exact_quote.length > 5)) ||
     report.rules_triggered?.some(r => r.rule_id === 'R002' && (r as any).triggered !== false) ||
     report.hard_caps_applied?.some(c => c.toLowerCase().includes('payment_request_cap'))
-  );
+  ));
 
-  const clientFee = Boolean(activeForensicReport?.semantics?.hasFeeDemand);
+  const clientFee = !isPaymentNegative && Boolean(activeForensicReport?.semantics?.hasFeeDemand);
 
-  const isExplicitZeroFeeEmployer = Boolean(
-    !serverFee && !clientFee && (
-      report.payment_case === 'POLICY_MENTION_WITHOUT_DEMAND' ||
-      report.payment_case === 'WARNING_AGAINST_PAYMENT' ||
-      report.document_analysis?.payment_case === 'POLICY_MENTION_WITHOUT_DEMAND' ||
-      report.document_analysis?.payment_case === 'WARNING_AGAINST_PAYMENT'
-    )
-  );
-
-  const hasFeeDemand = (serverFee || clientFee) && !isExplicitZeroFeeEmployer;
+  const hasFeeDemand = (serverFee || clientFee) && !isPaymentNegative;
 
   const rawTrustScore = typeof activeForensicReport?.scoring?.authenticityScore === "number"
     ? Math.round(activeForensicReport.scoring.authenticityScore)
@@ -1035,6 +1031,8 @@ function UserReportView({
             ? 'Corporate financial and expense policies discussed; zero candidate fees demanded.'
             : report.payment_case === 'WARNING_AGAINST_PAYMENT'
             ? 'Document includes explicit anti-scam warning affirming recruitment is free of charge.'
+            : report.payment_case === 'AMBIGUOUS_EVIDENCE'
+            ? 'Document mentions financial terminology, but available evidence is insufficient to establish that candidate payment is demanded.'
             : 'Zero candidate fees, training charges, or caution deposits detected in document.',
           why_it_matters: 'Legitimate employers never demand candidate registration fees or caution deposits. Any demand for upfront payment is an immediate scam indicator.',
           evidence_strength: 'High',
