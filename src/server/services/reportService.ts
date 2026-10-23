@@ -206,6 +206,8 @@ export function compileFullReport(params: CompileReportParams): LegitifyReport {
       has_fee_demand: documentData.has_fee_demand,
       payment_case: documentData.payment_case,
       payment_explanation: documentData.payment_explanation,
+      structure_analysis: (documentData as any).structure_analysis,
+      raw_text: (documentData as any).extracted_text || (documentData as any).raw_ocr,
     } : undefined,
     threat_intelligence: {
       matched_iocs_count: threatData?.count || 0,
