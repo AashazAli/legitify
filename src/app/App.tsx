@@ -51,7 +51,8 @@ function getVerdictTheme(verdict?: string, score?: number, hasFeeDemand?: boolea
   const v = (verdict || "").toUpperCase();
   const s = typeof score === "number" ? score : 85;
 
-  if (v.includes("FAKE") || v.includes("SCAM") || v.includes("CRITICAL") || s <= 35) {
+  const isScamOrCritical = hasFeeDemand || v.includes("FAKE") || v.includes("SCAM") || v.includes("CRITICAL") || s < 28;
+  if (isScamOrCritical) {
     const desc = hasFeeDemand
       ? "This opportunity exhibits critical fraud patterns including unauthorized candidate payment or fee demands. Exercise extreme caution."
       : "This opportunity exhibits critical risk indicators such as unverified domain routing, lookalike infrastructure, or unverified entity credentials. Exercise extreme caution.";
@@ -65,7 +66,22 @@ function getVerdictTheme(verdict?: string, score?: number, hasFeeDemand?: boolea
       description: desc,
     };
   }
-  if (v.includes("SUSPICIOUS") || v.includes("MODERATE") || v.includes("HIGH RISK") || s <= 65) {
+
+  const isHighRisk = v === "HIGH RISK" || v.includes("HIGH RISK") || (s >= 28 && s < 45);
+  if (isHighRisk) {
+    return {
+      label: "High Risk · Review Required",
+      shortLabel: "High Risk",
+      emoji: "",
+      color: "#EA580C",
+      glowColor: "rgba(234, 88, 12, 0.12)",
+      badgeClass: "bg-orange-50 text-orange-700 border border-orange-200",
+      description: "Significant risk flags or structural anomalies detected. Independent manual verification strongly advised.",
+    };
+  }
+
+  const isModerateRisk = v.includes("SUSPICIOUS") || v.includes("MODERATE") || v.includes("INSUFFICIENT") || (s >= 45 && s < 65);
+  if (isModerateRisk) {
     return {
       label: "Moderate Risk · Suspicious",
       shortLabel: "Suspicious",
@@ -73,9 +89,23 @@ function getVerdictTheme(verdict?: string, score?: number, hasFeeDemand?: boolea
       color: "#D97706",
       glowColor: "rgba(217, 119, 6, 0.12)",
       badgeClass: "bg-amber-50 text-amber-700 border border-amber-200",
-      description: "Document contains structural anomalies. Independent verification through official corporate channels is advised.",
+      description: "Document contains structural anomalies or unverified elements. Independent verification through official corporate channels is advised.",
     };
   }
+
+  const isLowRisk = v === "LOW RISK" || (s >= 65 && s < 80);
+  if (isLowRisk) {
+    return {
+      label: "Low Risk · Legitimate Profile",
+      shortLabel: "Low Risk",
+      emoji: "",
+      color: "#0D9488",
+      glowColor: "rgba(13, 148, 136, 0.12)",
+      badgeClass: "bg-teal-50 text-teal-700 border border-teal-200",
+      description: "Minor irregularities detected but overall indicators align with legitimate employment practices.",
+    };
+  }
+
   return {
     label: "Low Risk · Likely Genuine",
     shortLabel: "Likely Genuine",
@@ -671,14 +701,8 @@ function UserScanView({
           finalReport.verdict = "LIKELY SCAM";
           finalReport.risk_level = "CRITICAL";
         } else {
-          // If neither detected fee, keep server multi-source deterministic score if available
-          if (finalReport.trust_score !== undefined) {
-            if (fReport.scoring.authenticityScore <= 35 && !finalReport.payment_case) {
-              finalReport.trust_score = Math.min(finalReport.trust_score, fReport.scoring.authenticityScore);
-              finalReport.verdict = "LIKELY SCAM";
-              finalReport.risk_level = "CRITICAL";
-            }
-          } else {
+          // If neither detected fee, server multi-source deterministic score remains authoritative
+          if (finalReport.trust_score === undefined) {
             finalReport.trust_score = fReport.scoring.authenticityScore;
             finalReport.verdict = fReport.scoring.verdict === "AUTHENTIC_VERIFIED" ? "LIKELY LEGITIMATE" : "LIKELY SCAM";
             finalReport.risk_level = fReport.scoring.verdictSeverity === "critical" ? "CRITICAL" : fReport.scoring.verdictSeverity === "moderate" ? "HIGH" : "LOW";
@@ -866,7 +890,13 @@ function UserReportView({
   userName?: string;
 }) {
   const [reportState, setReportState] = useState<LegitifyReport>((rawReport as any)?.report || rawReport || {});
-  const activeForensicReport = forensicReport || (reportState as any)?.forensicAnalysis;
+  const activeForensicReport = (() => {
+    if (!forensicReport) return (reportState as any)?.forensicAnalysis || null;
+    if (reportState?.scan_id && forensicReport.custody?.custodyId && reportState.scan_id !== forensicReport.custody.custodyId) {
+      return (reportState as any)?.forensicAnalysis || null;
+    }
+    return forensicReport;
+  })();
 
   useEffect(() => {
     setReportState((rawReport as any)?.report || rawReport || {});
@@ -915,15 +945,17 @@ function UserReportView({
 
   const hasFeeDemand = (serverFee || clientFee) && !isPaymentNegative;
 
-  const rawTrustScore = typeof activeForensicReport?.scoring?.authenticityScore === "number"
-    ? Math.round(activeForensicReport.scoring.authenticityScore)
-    : typeof report.trust_score === "number"
+  // Authoritative Trust Score: prioritize backend multi-source deterministic score,
+  // falling back to client-side forensic authenticity score only in offline/degraded mode
+  const rawTrustScore = typeof report.trust_score === "number"
     ? Math.round(report.trust_score)
+    : typeof activeForensicReport?.scoring?.authenticityScore === "number"
+    ? Math.round(activeForensicReport.scoring.authenticityScore)
     : typeof (report as any).final_score === "number"
     ? Math.round((report as any).final_score)
     : typeof report.confidence_score === "number"
     ? Math.round(report.confidence_score)
-    : 26;
+    : 80;
 
   const trustScore = hasFeeDemand ? Math.min(rawTrustScore, 20) : rawTrustScore;
 
@@ -1935,7 +1967,7 @@ function UserReportView({
           <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
             <span className="text-slate-500 uppercase tracking-wider text-[10px] font-semibold">Recruiter Channel & Email</span>
             <p className={`font-semibold text-xs truncate ${fSemantics?.isFreeWebmail ? "text-rose-700" : "text-slate-900"}`}>
-              {fSemantics?.recruiterEmail || report.recruiter_analysis?.email || "No contact email listed"}
+              {fSemantics?.recruiterEmail || report.recruiter_analysis?.email || report.document_analysis?.detected_email || (report as any).recruiter_email || "No contact email listed"}
             </p>
             <span className={`text-[10px] font-medium block ${
               fSemantics?.isFreeWebmail ? "text-rose-600" : "text-emerald-700"
@@ -1946,9 +1978,11 @@ function UserReportView({
 
           <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
             <span className="text-slate-500 uppercase tracking-wider text-[10px] font-semibold">Opportunity Title / Role</span>
-            <p className="font-semibold text-slate-900 text-xs truncate">{fSemantics?.detectedRole || "Internship / Employment"}</p>
+            <p className="font-semibold text-slate-900 text-xs truncate">
+              {fSemantics?.detectedRole || report.document_analysis?.job_role || (report as any).job_role || (report.document_analysis?.extracted_entities as any)?.role || "Internship / Employment"}
+            </p>
             <span className="text-[10px] text-slate-500 block">
-              Stipend: {fSemantics?.detectedStipend || "Unstated / Disclosed in separate terms"}
+              Stipend: {fSemantics?.detectedStipend || (report as any).stipend || report.document_analysis?.extracted_entities?.detected_stipend || "Unstated / Disclosed in separate terms"}
             </span>
           </div>
 
@@ -3717,6 +3751,7 @@ export function App() {
 
   const handleSelectScan = async (scanId: string) => {
     try {
+      setForensicReport(null);
       const rep = await getScanReport(scanId, session?.access_token);
       if (rep) {
         const finalReport: LegitifyReport = (rep as any)?.report || rep;
@@ -3797,7 +3832,10 @@ export function App() {
                 <UserReportView
                   report={currentReport}
                   forensicReport={forensicReport}
-                  onNewScan={() => setUserView("user_scan")}
+                  onNewScan={() => {
+                    setForensicReport(null);
+                    setUserView("user_scan");
+                  }}
                   onUpdateReport={(newReport) => setCurrentReport(newReport)}
                   userToken={session?.access_token}
                   userName={user?.user_metadata?.full_name || "Sanjay Kumar. V"}

@@ -135,6 +135,7 @@ export interface DocumentStructureResult {
   status: 'STANDARD_COMPLIANT' | 'STRUCTURAL_ANOMALIES' | 'NON_STANDARD_FORMAT';
   hasCorporateHeader: boolean;
   hasRegisteredAddress: boolean;
+  registeredAddress?: string;
   hasOfficialReferenceNumber: boolean;
   referenceNumber?: string;
   hasFormalDate: boolean;
@@ -156,6 +157,8 @@ export interface DocumentStructureResult {
   signatureDetected?: boolean;
   identityState?: string;
   hasAcceptanceProcedure: boolean;
+  hasContactInformation?: boolean;
+  contactInformation?: string;
   passedChecksCount: number;
   totalChecksCount: number;
   structureChecks: DocumentStructureItem[];
