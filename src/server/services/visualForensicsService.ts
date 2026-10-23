@@ -1,4 +1,3 @@
-import { GoogleGenAI } from '@google/genai';
 import * as crypto from 'crypto';
 import type {
   VisualRegion,
@@ -9,6 +8,10 @@ import type {
   EvidenceItem,
 } from '../../types';
 import { inspectPdfCryptographicSignature } from '../utils/pdfSignature';
+import {
+  generateContentWithFallback,
+  isGeminiConfigured,
+} from './geminiClient';
 
 export interface VisualForensicResult {
   regions: VisualRegion[];
@@ -26,14 +29,6 @@ export interface VisualForensicResult {
   detectionMethod: 'GEMINI_VISION' | 'TEXT_PATTERN' | 'PDF_METADATA' | 'NONE';
   analysisVersion: string;
 }
-
-const getGeminiClient = (): GoogleGenAI | null => {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY;
-  if (!apiKey) {
-    return null;
-  }
-  return new GoogleGenAI({ apiKey });
-};
 
 export function generateVisualEvidenceId(scanId: string, page: number, type: string): string {
   const hash = crypto.createHash('sha256')
@@ -55,7 +50,6 @@ export async function detectVisualRegions(
   scanId: string,
   ocrText?: string
 ): Promise<VisualForensicResult> {
-  const aiClient = getGeminiClient();
   let regions: VisualRegion[] = [];
   let detectionMethod: 'GEMINI_VISION' | 'TEXT_PATTERN' | 'PDF_METADATA' | 'NONE' = 'NONE';
 
@@ -78,7 +72,7 @@ export async function detectVisualRegions(
   }
 
   // Tier 1: Gemini Multimodal Vision analysis
-  if (aiClient && (mimeType.startsWith('image/') || mimeType === 'application/pdf')) {
+  if (isGeminiConfigured() && (mimeType.startsWith('image/') || mimeType === 'application/pdf')) {
     try {
       const base64Data = buffer.toString('base64');
       const prompt = `
@@ -104,12 +98,12 @@ For each region provide:
 Return ONLY valid JSON: [{"type": "...", "page": 1, "confidence": 0.9, "nearbyText": "..."}]
 `;
 
-      const response = await aiClient.models.generateContent({
-        model: process.env.GEMINI_MODEL || 'gemini-3.6-flash',
+      const response = await generateContentWithFallback({
         contents: [
           prompt,
           { inlineData: { data: base64Data, mimeType } }
-        ]
+        ],
+        responseMimeType: 'application/json',
       });
 
       const text = response.text || '';

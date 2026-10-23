@@ -8,6 +8,11 @@ import { EvidenceItem, RuleEvaluation, MLPredictionResult } from '../../types';
 import { isFilenameOrPlaceholder } from '../utils/normalizer';
 import { callHuggingFaceChat, HfChatMessage } from './huggingfaceService';
 import { splitTextIntoSentences } from './documentService';
+import {
+  generateContentWithFallback,
+  generateJsonWithFallback,
+  isGeminiConfigured,
+} from './geminiClient';
 
 export interface AISynthesisInput {
   entityName: string;
@@ -1367,34 +1372,12 @@ export function formatExternalResearchForPrompt(research: any): string {
 // GEMINI FLASH AI PROVIDER (DYNAMIC ADAPTIVE COPILOT WITH EVIDENCE GROUNDING)
 // ----------------------------------------------------------------------------
 export class GeminiFlashProvider implements IAIProvider {
-  private ai: GoogleGenAI | null = null;
-  private model: string;
-
-  constructor() {
-    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY || process.env.VITE_GEMINI_API_KEY;
-    if (apiKey) {
-      this.ai = new GoogleGenAI({ apiKey });
-    }
-    this.model = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
-  }
-
   async isAvailable(): Promise<boolean> {
-    return !!(this.ai && (process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY || process.env.VITE_GEMINI_API_KEY));
-  }
-
-  private async generateWithFallback(generateFn: (modelName: string) => Promise<any>): Promise<any> {
-    const primary = this.model;
-    const fallback = primary === 'gemini-3.6-flash' ? 'gemini-3.5-flash' : 'gemini-3.6-flash';
-    try {
-      return await generateFn(primary);
-    } catch (primaryErr: any) {
-      console.warn(`[GeminiFlashProvider] Primary model ${primary} request notice: ${primaryErr?.message || primaryErr}. Retrying with ${fallback}...`);
-      return await generateFn(fallback);
-    }
+    return isGeminiConfigured();
   }
 
   async generateSynthesis(input: AISynthesisInput): Promise<AISynthesisOutput> {
-    if (!this.ai) {
+    if (!isGeminiConfigured()) {
       return new LocalAIProvider().generateSynthesis(input);
     }
 
@@ -1419,17 +1402,13 @@ Return strictly a JSON object matching this schema:
   "limitations": [string]
 }`;
 
-      const response = await this.generateWithFallback((model) =>
-        this.ai!.models.generateContent({
-          model,
-          contents: prompt,
-          config: { responseMimeType: 'application/json' },
-        })
-      );
+      const res = await generateJsonWithFallback({
+        contents: prompt,
+        temperature: 0.1,
+      });
 
-      const parsed = JSON.parse(response.text || '{}');
       return {
-        ...parsed,
+        ...res.data,
         provider_used: "GEMINI_FLASH",
       };
     } catch {
@@ -1458,7 +1437,7 @@ Return strictly a JSON object matching this schema:
     const extChunks = context.external_chunks || [];
     const evidenceCitations = locker.map(e => `[${e.id}] (${e.type}): ${e.claim}`).slice(0, 15).join('\n');
 
-    if (!this.ai) {
+    if (!isGeminiConfigured()) {
       return generateEvidenceGroundedAnswer(question, context);
     }
 
@@ -1517,12 +1496,10 @@ ${historyContext}
 9. Include practical verification actions: checking the official company careers portal, calling the registered reception boardline, and reporting fraud to the 1930 National Cybercrime Helpline if money was transferred.
 10. Format response cleanly using concise bullet points and bold key terms. Avoid repeating boilerplate document audit profiles on every turn.`;
 
-      const response = await this.generateWithFallback((model) =>
-        this.ai!.models.generateContent({
-          model,
-          contents: `${systemPrompt}\n\nUser Question: "${question}"`,
-        })
-      );
+      const response = await generateContentWithFallback({
+        contents: `${systemPrompt}\n\nUser Question: "${question}"`,
+        temperature: 0.2,
+      });
 
       let text = response.text?.trim();
       if (text) {
@@ -1939,8 +1916,7 @@ export function getActiveAIProvider(): IAIProvider {
   if (hfToken) {
     return new HuggingFaceProvider();
   }
-  const geminiKey = (process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY || process.env.VITE_GEMINI_API_KEY || '').trim();
-  if (geminiKey) {
+  if (isGeminiConfigured()) {
     return new GeminiFlashProvider();
   }
   const openaiKey = (process.env.OPENAI_API_KEY || '').trim();

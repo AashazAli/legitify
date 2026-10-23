@@ -85,6 +85,15 @@ function getArtifact(): any | null {
   return null;
 }
 
+export const FRAUD_STOPWORDS = new Set([
+  'per', 'company', 'your', 'is', 'are', 'the', 'and', 'to', 'of', 'in', 'for',
+  'on', 'with', 'at', 'by', 'from', 'this', 'that', 'an', 'be', 'as', 'it', 'or',
+  'we', 'our', 'you', 'will', 'all', 'any', 'have', 'has', 'not', 'but', 'can',
+  'into', 'over', 'more', 'about', 'out', 'up', 'so', 'if', 'what', 'who', 'which',
+  'their', 'his', 'her', 'its', 'my', 'me', 'us', 'them', 'they', 'he', 'she',
+  'been', 'being', 'having', 'do', 'does', 'did', 'done', 'also', 'just', 'how'
+]);
+
 export function getMLModelMetrics(): MLModelMetrics {
   const art = getArtifact();
   if (!art) {
@@ -113,8 +122,8 @@ export function getMLModelMetrics(): MLModelMetrics {
     modelLoaded: true,
     featureCount: Object.keys(art.featureWeights || {}).length,
     evaluationMetrics: art.evaluationMetrics || {},
-    topFraudFeatures: art.topFraudFeatures || [],
-    topLegitFeatures: art.topLegitFeatures || [],
+    topFraudFeatures: (art.topFraudFeatures || []).filter((f: any) => !FRAUD_STOPWORDS.has(f.feature)),
+    topLegitFeatures: (art.topLegitFeatures || []).filter((f: any) => !FRAUD_STOPWORDS.has(f.feature)),
   };
 }
 
@@ -204,6 +213,13 @@ export function predictJobOfferRisk(params: {
   }
 
   for (const [term, count] of Object.entries(termCounts)) {
+    // Exclude generic stopword unigrams so ordinary words (e.g., 'per', 'company', 'your')
+    // are not treated as definitive fraud indicators or skew the score.
+    const isUnigram = !term.includes(' ');
+    if (isUnigram && FRAUD_STOPWORDS.has(term)) {
+      continue;
+    }
+
     if (weights[term] !== undefined) {
       const weight = weights[term];
       const tf = Math.log(1 + count);

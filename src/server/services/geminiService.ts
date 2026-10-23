@@ -1,9 +1,14 @@
 // ==============================================================================
 // GOOGLE GEMINI REASONING & SYNTHESIS SERVICE (Server-Side Only)
+// Modernized with centralized Gemini client and resilient model cascade.
 // ==============================================================================
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { z } from 'zod';
 import { DeterministicScoreResult, EvidenceItem, LegitifyReport } from '../../types';
+import {
+  generateContentWithFallback,
+  generateJsonWithFallback,
+  isGeminiConfigured,
+} from './geminiClient';
 
 const GeminiReportSchema = z.object({
   executive_summary: z.string(),
@@ -35,8 +40,6 @@ export async function synthesizeWithGemini(
   scoreResult: DeterministicScoreResult,
   untrustedContext: string = ""
 ): Promise<z.infer<typeof GeminiReportSchema>> {
-  const apiKey = process.env.GEMINI_API_KEY;
-
   // Fallback synthesis if Gemini API key is missing or offline
   const fallbackResult: z.infer<typeof GeminiReportSchema> = {
     executive_summary: `Based on automated deterministic evaluation for ${entityName} (${entityType}), the overall trust assessment is ${scoreResult.verdict} with a Trust Score of ${scoreResult.trust_score}/100 (Confidence: ${scoreResult.confidence_score}%). ${
@@ -62,21 +65,11 @@ export async function synthesizeWithGemini(
     ],
   };
 
-  if (!apiKey || apiKey.includes('your-')) {
+  if (!isGeminiConfigured()) {
     return fallbackResult;
   }
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-3.6-flash',
-      systemInstruction: SYSTEM_PROMPT,
-      generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: 0.2,
-      },
-    });
-
     const prompt = `
 [TRUSTED STRUCTURED DATA]
 Entity: ${entityName} (Type: ${entityType})
@@ -102,11 +95,13 @@ Synthesize this data into the required JSON schema:
 }
 `;
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
-    const parsed = JSON.parse(text);
-    const validated = GeminiReportSchema.safeParse(parsed);
+    const result = await generateJsonWithFallback({
+      contents: prompt,
+      systemInstruction: SYSTEM_PROMPT,
+      temperature: 0.2,
+    });
 
+    const validated = GeminiReportSchema.safeParse(result.data);
     if (validated.success) {
       return validated.data;
     }
@@ -124,20 +119,11 @@ export async function askReportCopilot(
   report: LegitifyReport,
   question: string
 ): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY;
-
-  if (!apiKey || apiKey.includes('your-')) {
+  if (!isGeminiConfigured()) {
     return `Based on the evidence for ${report.entity_name}, the calculated Trust Score is ${report.trust_score}/100 with a verdict of ${report.verdict}. Key factors: ${report.warning_signals.join(', ') || report.positive_signals.join(', ') || 'No further indicators.'}`;
   }
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-3.6-flash',
-      systemInstruction: 'You are an AI Trust Intelligence Copilot for LEGITIFY. Answer questions strictly based on the provided investigation report without hallucinating external details.',
-      generationConfig: { temperature: 0.2 },
-    });
-
     const prompt = `
 [INVESTIGATION REPORT]
 Entity: ${report.entity_name} (${report.entity_type})
@@ -156,8 +142,13 @@ ${question}
 Answer concisely and accurately:
 `;
 
-    const result = await model.generateContent(prompt);
-    return result.response.text().trim();
+    const result = await generateContentWithFallback({
+      contents: prompt,
+      systemInstruction: 'You are an AI Trust Intelligence Copilot for LEGITIFY. Answer questions strictly based on the provided investigation report without hallucinating external details.',
+      temperature: 0.2,
+    });
+
+    return result.text.trim();
   } catch (err: any) {
     return `Copilot Error: Unable to query Gemini (${err?.message || 'timeout'}). Deterministic report summary: ${report.executive_summary}`;
   }

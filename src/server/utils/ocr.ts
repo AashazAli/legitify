@@ -1,9 +1,13 @@
 // ==============================================================================
 // MULTI-TIER DEEP FORENSIC OCR & VISUAL ANALYZER
 // ==============================================================================
-import { GoogleGenAI } from '@google/genai';
 import { createWorker } from 'tesseract.js';
 import { VisualForensicsData } from '../../types';
+import {
+  generateContentWithFallback,
+  isGeminiConfigured,
+  parseSafeJson,
+} from '../services/geminiClient';
 
 let tesseractWorker: any = null;
 
@@ -58,36 +62,23 @@ export async function analyzeDocumentDeepForensics(
   let detectedCompany: string | undefined;
   let detectedSignatory: string | undefined;
 
-  // Tier 1: Gemini 3.6 Flash Multimodal Deep Forensic Analysis
-  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY || process.env.VITE_GEMINI_API_KEY;
-  if (apiKey && !apiKey.includes('your-')) {
+  // Tier 1: Gemini Multimodal Deep Forensic Analysis
+  if (isGeminiConfigured()) {
     try {
-      const client = new GoogleGenAI({ apiKey });
       const base64Data = buffer.toString('base64');
-
-      let response: any;
-      const candidateModels = [
-        process.env.GEMINI_MODEL || 'gemini-3.6-flash',
-        'gemini-2.5-flash',
-        'gemini-1.5-flash'
-      ];
-
-      for (const m of candidateModels) {
-        try {
-          response = await client.models.generateContent({
-            model: m,
-            contents: [
+      const response = await generateContentWithFallback({
+        contents: [
+          {
+            role: 'user',
+            parts: [
               {
-                role: 'user',
-                parts: [
-                  {
-                    inlineData: {
-                      mimeType: normalizedMime || 'application/pdf',
-                      data: base64Data,
-                    },
-                  },
-                  {
-                    text: `You are an elite forensic document analyst. Deeply inspect this document image/PDF.
+                inlineData: {
+                  mimeType: normalizedMime || 'application/pdf',
+                  data: base64Data,
+                },
+              },
+              {
+                text: `You are an elite forensic document analyst. Deeply inspect this document image/PDF.
 Extract:
 1. Complete verbatim transcription of every single line, word, number, date, and character.
 2. Visual forensics: Is there a signature? (digital/handwritten/printed), Signatory name & designation, Is there an official company seal/stamp? Is there a letterhead logo?
@@ -107,22 +98,17 @@ Return JSON format:
   "emails": ["..."],
   "fees_detected": ["..."]
 }`,
-                  },
-                ],
               },
             ],
-          });
-          if (response?.text) break;
-        } catch (mErr: any) {
-          console.warn(`[Forensics] Gemini model ${m} failed, trying next:`, mErr?.message || mErr);
-        }
-      }
+          },
+        ],
+        responseMimeType: 'application/json',
+      });
 
       const responseText = response?.text?.trim() || '';
       try {
-        const jsonMatch = responseText.match(/\{.*\}/s);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
+        const parsed = parseSafeJson<any>(responseText);
+        if (parsed) {
           rawText = parsed.transcription || responseText;
           visualForensics.signature_detected = parsed.signature_detected ?? (responseText.toLowerCase().includes("signature") || responseText.toLowerCase().includes("signatory"));
           visualForensics.signature_type = parsed.signature_type || (visualForensics.signature_detected ? "HANDWRITTEN_IMAGE" : "ABSENT");
@@ -155,6 +141,9 @@ Return JSON format:
             });
             detectedFees.push(...genuineFees);
           }
+          if (Array.isArray(parsed.emails)) {
+            detectedEmails.push(...parsed.emails.filter((e: any) => typeof e === 'string' && e.includes('@')));
+          }
         } else {
           rawText = responseText;
         }
@@ -162,7 +151,7 @@ Return JSON format:
         rawText = responseText;
       }
     } catch (err) {
-      console.warn('[Forensics] Gemini Flash deep analysis failed, falling back to local extractor...', err);
+      console.warn('[Forensics] Gemini deep analysis cascade notice, falling back to local extractor...', err);
     }
   }
 

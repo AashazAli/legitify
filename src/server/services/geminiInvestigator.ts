@@ -12,8 +12,13 @@ import {
   GeminiSignal,
   GeminiStructuredDossier,
 } from '../../types/forensicTypes';
+import {
+  getGeminiClient,
+  getGeminiModelCascade,
+  parseSafeJson,
+  isGeminiConfigured,
+} from './geminiClient';
 
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.6-flash';
 const GEMINI_TIMEOUT_MS = parseInt(process.env.GEMINI_TIMEOUT_MS || '30000', 10);
 
 export interface GeminiInvestigationInput {
@@ -72,15 +77,16 @@ export async function runGeminiInvestigation(
 ): Promise<GeminiInvestigationResult> {
   const timestamp = new Date().toISOString();
   
-  // Check API key
-  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_KEY;
-  if (!apiKey) {
+  if (!isGeminiConfigured()) {
     return createUnavailableResult(timestamp, 'NOT_CONFIGURED', 'Gemini API key not configured.');
+  }
+
+  const client = getGeminiClient();
+  if (!client) {
+    return createUnavailableResult(timestamp, 'NOT_CONFIGURED', 'Gemini API client could not be initialized.');
   }
   
   try {
-    const genAI = new GoogleGenAI({ apiKey });
-    
     // Build the investigation prompt
     // SECURITY: Document text is sandboxed as data, not instructions
     const systemInstruction = buildSystemInstruction();
@@ -88,7 +94,7 @@ export async function runGeminiInvestigation(
     
     // Run with timeout
     const result = await Promise.race([
-      runGeminiRequest(genAI, systemInstruction, userPrompt),
+      runGeminiRequest(client, systemInstruction, userPrompt),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('GEMINI_TIMEOUT')), GEMINI_TIMEOUT_MS)
       ),
@@ -116,49 +122,49 @@ async function runGeminiRequest(
   userPrompt: string
 ): Promise<GeminiInvestigationResult> {
   const timestamp = new Date().toISOString();
-  
-  let response: any;
-  try {
-    response = await genAI.models.generateContent({
-      model: GEMINI_MODEL,
-      contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-      config: {
-        systemInstruction,
-        tools: [{ googleSearch: {} }],
-        temperature: 0.1,
-      },
-    });
-  } catch (searchErr: any) {
-    console.warn('[GeminiInvestigator] googleSearch tool failed or not supported by key, retrying without tool:', searchErr?.message || searchErr);
-    response = await genAI.models.generateContent({
-      model: GEMINI_MODEL,
-      contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-      config: {
-        systemInstruction,
-        temperature: 0.1,
-      },
-    });
-  }
-  
-  const text = response.text || '';
-  
-  let parsed: any;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
+  const models = getGeminiModelCascade();
+  let lastError: any = null;
+
+  for (const model of models) {
+    try {
+      let response: any;
       try {
-        parsed = JSON.parse(jsonMatch[0]);
-      } catch {
-        return createUnavailableResult(timestamp, 'INVALID_RESPONSE', 'Gemini returned non-JSON response.');
+        response = await genAI.models.generateContent({
+          model,
+          contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+          config: {
+            systemInstruction,
+            tools: [{ googleSearch: {} }],
+            temperature: 0.1,
+          },
+        });
+      } catch (searchErr: any) {
+        console.warn(`[GeminiInvestigator] googleSearch tool on ${model} notice: ${searchErr?.message || searchErr}. Retrying without tool...`);
+        response = await genAI.models.generateContent({
+          model,
+          contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+          config: {
+            systemInstruction,
+            temperature: 0.1,
+          },
+        });
       }
-    } else {
-      return createUnavailableResult(timestamp, 'INVALID_RESPONSE', 'Gemini returned unparseable response.');
+
+      const text = response.text || '';
+      const parsed = parseSafeJson(text);
+      if (!parsed) {
+        return createUnavailableResult(timestamp, 'INVALID_RESPONSE', 'Gemini returned unparseable response.');
+      }
+
+      return normalizeGeminiResponse(parsed, timestamp, model);
+    } catch (err: any) {
+      lastError = err;
+      const errMsg = err?.message || String(err);
+      console.warn(`[GeminiInvestigator] Cascade attempt on model ${model} notice: ${errMsg.slice(0, 160)}`);
     }
   }
-  
-  return normalizeGeminiResponse(parsed, timestamp);
+
+  throw lastError || new Error('All candidate models exhausted');
 }
 
 function buildSystemInstruction(): string {
@@ -295,7 +301,7 @@ Return ONLY the JSON object. No other text.`;
   return prompt;
 }
 
-function normalizeGeminiResponse(parsed: any, timestamp: string): GeminiInvestigationResult {
+function normalizeGeminiResponse(parsed: any, timestamp: string, modelUsed?: string): GeminiInvestigationResult {
   let evidenceCounter = 0;
   const nextEvidenceId = () => `GEM-E-${String(++evidenceCounter).padStart(3, '0')}`;
   
@@ -356,7 +362,7 @@ function normalizeGeminiResponse(parsed: any, timestamp: string): GeminiInvestig
   
   return {
     engine: 'GEMINI',
-    geminiModel: GEMINI_MODEL,
+    geminiModel: modelUsed || 'gemini-3.5-flash-lite',
     investigationStatus: 'COMPLETED',
     investigationTimestamp: timestamp,
     verdict: sanitizeVerdict(parsed.verdict),
