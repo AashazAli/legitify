@@ -1105,44 +1105,94 @@ export function analyzeDocumentSemantics(
     }
   }
 
-  // 2. Extract Company Name
+  // 2. Extract Company Name (Dynamic Entity Extraction with Strict Fallback)
   let detectedCompany: string | undefined;
-  const companyKeywords = [
-    'tata consultancy services', 'tcs', 'infosys', 'wipro', 'cognizant', 'accenture',
-    'microsoft', 'google', 'amazon', 'meta', 'ibm', 'hcl tech', 'hcl', 'tech mahindra',
-    'deloitte', 'ey', 'ernst & young', 'pwc', 'kpmg', 'capgemini', 'oracle', 'cisco',
-    'samsung', 'intel', 'adobe', 'zoho corporation', 'swiggy', 'zomato', 'flipkart',
-    'clinchsoft technologies', 'clinchsoft'
-  ];
 
-  for (const ck of companyKeywords) {
-    if (lower.includes(ck)) {
-      detectedCompany = ck.toUpperCase();
-      break;
+  // A. Explicit letterhead or document header prefixes
+  const prefixMatch = text.match(/(?:Offer\s*Letter\s*(?:from|for|by)|Welcome\s*to|Employment\s*Offer\s*-\s*|Sub:\s*Appointment\s*(?:at|in|with)|Company\s*Name\s*:\s*|Organisation\s*:\s*|Organization\s*:\s*|Employer\s*:\s*)([A-Z0-9][A-Za-z0-9\s&.,'-]{2,50}(?:Group\s+of\s+Companies|Pvt\s*Ltd|Private\s*Limited|Limited|Ltd|LLC|Inc|Corp|Technologies|Solutions|Enterprises|Infotech|Services|Global|Aviation|Motors|Consultancy|Systems)?)/i);
+  if (prefixMatch && prefixMatch[1]?.trim()) {
+    const cand = prefixMatch[1].split(/[\r\n,]/)[0].trim();
+    if (!isClientFilenameOrPlaceholder(cand) && !cand.startsWith('(')) {
+      detectedCompany = cand;
     }
   }
 
+  // B. Program engagement at/with company
   if (!detectedCompany) {
-    const prefixMatch = text.match(/(?:Offer\s*Letter\s*(?:from|for|by)|Welcome\s*to|Employment\s*Offer\s*-\s*|Sub:\s*Appointment\s*(?:at|in|with)|Company\s*Name\s*:\s*|Organisation\s*:\s*|Organization\s*:\s*|Employer\s*:\s*)([A-Z0-9][A-Za-z0-9\s&.,'-]{2,50}(?:Pvt\s*Ltd|Private\s*Limited|Limited|Ltd|LLC|Inc|Corp|Technologies|Solutions|Enterprises|Infotech|Services|Global|Aviation|Motors|Consultancy|Systems)?)/i);
-    if (prefixMatch && prefixMatch[1]?.trim()) {
-      const cand = prefixMatch[1].trim();
-      if (!isClientFilenameOrPlaceholder(cand) && !cand.startsWith('(')) {
+    const programMatch = text.match(/(?:internship\s+(?:for\s+the\s+global\s+processes\s+)?(?:at|with)|employment\s+(?:with|at)|position\s+at|welcome\s+to|journey\s+with|association\s+with)\s+([A-Z0-9][A-Za-z0-9&.' -]{2,45}\b(?:Group\s+of\s+Companies|Private\s+Limited|Pvt\s+Ltd|Limited|LLP|LLC|Corporation|Corp|Inc|Technologies|Solutions|Services|Global|Holdings)?)/i);
+    if (programMatch && programMatch[1]) {
+      const cand = programMatch[1].split(/[\r\n,]/)[0].trim().replace(/,\s*commencing.*$/i, '');
+      if (!isClientFilenameOrPlaceholder(cand)) {
         detectedCompany = cand;
       }
     }
   }
 
+  // C. Legal entity markers in document
   if (!detectedCompany) {
-    const legalMatch = text.match(/\b([A-Z][A-Za-z0-9 &.,'-]{1,45}\s+(?:Private\s+Limited|Pvt\s+Ltd|Limited|LLP|LLC|Corporation|Corp|Inc|GmbH|Technologies|Solutions|Enterprises|Infotech|Services|Global|Consultancy))\b/i);
-    if (legalMatch) detectedCompany = legalMatch[1].trim();
+    const legalMatch = text.match(/\b([A-Z][A-Za-z0-9 &.,'-]{1,45}\s+(?:Group\s+of\s+Companies|Private\s+Limited|Pvt\s+Ltd|Limited|LLP|LLC|Corporation|Corp|Inc|GmbH|Technologies|Solutions|Enterprises|Infotech|Services|Global|Consultancy))\b/i);
+    if (legalMatch) {
+      const cand = legalMatch[1].split(/[\r\n,]/)[0].trim();
+      if (!isClientFilenameOrPlaceholder(cand)) {
+        detectedCompany = cand;
+      }
+    }
   }
 
+  // D. Executive sign-off block entity
   if (!detectedCompany) {
-    const compMatch = text.match(/(?:Company|Organization|Employer|At|For)\s*[:\-]?\s*([A-Z][A-Za-z0-9&.,\s]{2,35})/);
+    const signoffCompany = text.match(/(?:Founder\s*&?\s*CEO|Managing\s+Director|Director|HR\s+Manager|Chief\s+Executive\s+Officer)[,\s\n]+([A-Z][A-Za-z0-9&.,' -]{2,40})/i);
+    if (signoffCompany && signoffCompany[1] && !/(?:India|Kolkata|Delhi|Mumbai|Bangalore|Pune|Chennai|Regards|Yours)/i.test(signoffCompany[1])) {
+      const cand = signoffCompany[1].split(/[\r\n,]/)[0].trim();
+      if (!isClientFilenameOrPlaceholder(cand)) {
+        detectedCompany = cand;
+      }
+    }
+  }
+
+  // E. Labeled Company field
+  if (!detectedCompany) {
+    const compMatch = text.match(/(?:Company|Organization|Employer)\s*[:\-]?\s*([A-Z][A-Za-z0-9&.,\s]{2,35})/i);
     if (compMatch && compMatch[1]) {
-      const candidate = compMatch[1].trim();
+      const candidate = compMatch[1].split(/[\r\n,]/)[0].trim();
       if (!isClientFilenameOrPlaceholder(candidate)) {
         detectedCompany = candidate;
+      }
+    }
+  }
+
+  // F. Letterhead candidates from top lines
+  if (!detectedCompany) {
+    const headerLines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean).slice(0, 5);
+    for (const l of headerLines) {
+      if (
+        l.length >= 3 &&
+        l.length <= 45 &&
+        !/(?:offer|internship|appointment|letter|date|dear|sub|ref|subject|page|candidate|confidential|copy|regards|section|to)/i.test(l) &&
+        /^[A-Z0-9][A-Za-z0-9\s&.,'-]+$/.test(l) &&
+        !isClientFilenameOrPlaceholder(l)
+      ) {
+        detectedCompany = l;
+        break;
+      }
+    }
+  }
+
+  // G. Fallback known corporate keywords using strict word boundaries (no false substring hits)
+  if (!detectedCompany) {
+    const companyKeywords = [
+      'tata consultancy services', 'tcs', 'infosys', 'wipro', 'cognizant', 'accenture',
+      'microsoft', 'google', 'amazon', 'meta', 'ibm', 'hcl tech', 'hcl', 'tech mahindra',
+      'deloitte', 'ey', 'ernst & young', 'pwc', 'kpmg', 'capgemini', 'oracle', 'cisco',
+      'samsung', 'intel', 'adobe', 'zoho corporation', 'swiggy', 'zomato', 'flipkart',
+      'clinchsoft technologies', 'clinchsoft'
+    ];
+
+    for (const ck of companyKeywords) {
+      const wordBoundaryRegex = new RegExp(`\\b${ck}\\b`, 'i');
+      if (wordBoundaryRegex.test(text)) {
+        detectedCompany = ck.toUpperCase();
+        break;
       }
     }
   }
@@ -1153,7 +1203,9 @@ export function analyzeDocumentSemantics(
 
   // 3. Extract Role & Opportunity Title
   let detectedRole = 'Internship / Employment Opportunity';
-  const roleMatch = text.match(/(?:Role|Position|Designation|Job Title|Opportunity|Internship as|Post of)\s*[:\-]?\s*([A-Za-z0-9\s/&()\-]{3,40})/i);
+  const roleMatch = text.match(/(?:Role|Position|Designation|Job Title|Opportunity|Internship as|Post of)\s*[:\-]?\s*([A-Za-z0-9\s/&()\-]{3,60})/i)
+    || text.match(/(?:confirm|offer)\s+(?:your\s+)?(?:internship|appointment|employment).*?,\s*as\s+(?:a|an)?\s+([A-Za-z0-9\s/&()\-]{3,80}?)(?:,\s*effective|\.\s*|;\s*|\n|$)/i)
+    || text.match(/(?:association|appointment|employment|tenure)\s+as\s+(?:an?\b|the\b)?\s*([A-Za-z0-9\s/&()\-]+?\b(?:Intern|Associate|Engineer|Developer|Analyst|Trainee|Executive|Lead|Manager|Specialist|Officer|Assistant|Consultant|Designer))\b/i);
   if (roleMatch && roleMatch[1]) {
     detectedRole = roleMatch[1].trim();
   } else if (lower.includes('intern') || lower.includes('internship')) {
@@ -1448,6 +1500,9 @@ export function analyzeDocumentSemantics(
 
   // 12. Standard Organizational Structure & Format Analysis
   const structure = analyzeDocumentStructureAndFormat(text, detectedCompany);
+  if (structure.jobRole && structure.jobRole !== 'Professional Role' && structure.hasSpecificRole) {
+    detectedRole = structure.jobRole;
+  }
 
   return {
     detectedCompany,
@@ -1500,43 +1555,65 @@ export function analyzeDocumentStructureAndFormat(
   const missingElements: string[] = [];
 
   const isCorporateName = (str: string): boolean =>
-    /\b(?:limited|ltd|private|pvt|company|corp|inc|llp|solutions|technologies|systems|enterprises|holdings|services|infotech|group|foundation)\b/i.test(str);
+    /\b(?:limited|ltd|private|pvt|company|corp|inc|llp|solutions|technologies|systems|enterprises|holdings|services|infotech|group|foundation|aviation|airlines?|motors|consultancy)\b/i.test(str);
 
   const isGreetingOrPreamble = (str: string): boolean =>
-    /^(?:dear|to|hi\b|hello\b|attn|attention|subject|sub|date|ref|offer|internship|appointment|letter\s+of)/i.test(str.trim());
+    /^(?:dear|to\b|hi\b|hello\b|attn|attention|subject|sub|date|ref|offer|internship|appointment|letter\s+of|we\s+are|congratulat)/i.test(str.trim());
 
+  // ==========================================================================
   // 1. SEMANTIC CRITERION 1: Employer Identity
-  // Organization issuing the offer identified from content (brand name, header, or legal entity)
+  // Organization issuing the offer identified from content
+  // ==========================================================================
   let companyName: string | undefined = detectedCompany && detectedCompany !== 'Corporate Entity' && detectedCompany !== 'Investigated Organization' && detectedCompany.length > 3
     ? detectedCompany
     : undefined;
 
   if (!companyName) {
     const compIntroMatch = text.match(/(?:welcome\s+to|offer\s+(?:from|by)|at|joining|team\s+at)\s+([A-Z0-9][A-Za-z0-9\s&.,'-]{2,45})/i);
-    if (compIntroMatch && !isClientFilenameOrPlaceholder(compIntroMatch[1].trim())) {
-      companyName = compIntroMatch[1].trim();
+    if (compIntroMatch && !compIntroMatch[1].toLowerCase().includes('upcoming') && !compIntroMatch[1].toLowerCase().includes('internship') && !compIntroMatch[1].toLowerCase().includes('the team')) {
+      const cand = compIntroMatch[1].trim();
+      if (!isClientFilenameOrPlaceholder(cand)) {
+        companyName = cand;
+      }
     }
   }
 
   if (!companyName) {
-    const headerLines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean).slice(0, 5);
+    const headerLines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean).slice(0, 8);
     for (const line of headerLines) {
       if (
         line.length >= 4 &&
         line.length <= 55 &&
-        !isClientFilenameOrPlaceholder(line) &&
         !isGreetingOrPreamble(line) &&
-        /^[A-Z0-9][A-Za-z0-9\s&.,'-]+$/.test(line) &&
-        /[a-zA-Z]/.test(line)
+        !/(?:internship\s+program|welcome\s+letter|offer\s+letter|confirmation\s+letter)/i.test(line) &&
+        /^[A-Z0-9][A-Za-z0-9\s&.,'()-]+$/.test(line) &&
+        /[a-zA-Z]/.test(line) &&
+        isCorporateName(line)
       ) {
         companyName = line;
         break;
       }
     }
+    if (!companyName) {
+      for (const line of headerLines) {
+        if (
+          line.length >= 4 &&
+          line.length <= 45 &&
+          !isGreetingOrPreamble(line) &&
+          !/(?:internship\s+program|welcome\s+letter|offer\s+letter|confirmation\s+letter)/i.test(line) &&
+          /^[A-Z0-9][A-Za-z0-9\s&.,'()-]+$/.test(line) &&
+          /[a-zA-Z]/.test(line) &&
+          !isClientFilenameOrPlaceholder(line)
+        ) {
+          companyName = line;
+          break;
+        }
+      }
+    }
   }
 
   const hasEmployerIdentity = Boolean(companyName) ||
-    /(?:private\s+limited|pvt\s*ltd|limited|ltd\b|corporation|corp\b|technologies|solutions|services|enterprises|systems|holdings|llc|inc\b)/i.test(lower);
+    /(?:private\s+limited|pvt\s*ltd|limited|ltd\b|corporation|corp\b|technologies|solutions|services|enterprises|systems|holdings|llc|inc\b|aviation|airlines?|motors)/i.test(lower);
 
   structureChecks.push({
     id: 'SEM-01',
@@ -1551,8 +1628,11 @@ export function analyzeDocumentStructureAndFormat(
   });
   if (!hasEmployerIdentity) missingElements.push('Employer Organization Identity');
 
+  // ==========================================================================
   // 2. SEMANTIC CRITERION 2: Offer or Employment Intent
-  const offerIntentRegex = /(?:offer\s*(?:of\s+employment|letter|of\s+internship)?|letter\s+of\s+(?:intent|offer|appointment)|appointment\s*(?:letter|order)?|internship\s*(?:offer|agreement|letter|program)?|pleased\s+to\s+(?:offer|appoint|extend|invite|inform)|thrilled\s+to\s+offer|welcome\s+to\s+(?:the\s+team|our\s+team)|congratulations\s+on\s+your\s+selection|selected\s+for\s+(?:the\s+position|internship|role)|terms\s+of\s+(?:employment|appointment|internship)|employment\s+agreement|contract\s+of\s+employment)/i;
+  // Clear declaration of appointment, offer, selection, or engagement intent
+  // ==========================================================================
+  const offerIntentRegex = /(?:offer\s*(?:of\s+employment|letter|of\s+internship|for\s+employment)?|letter\s+of\s+(?:intent|offer|appointment|selection)|appointment\s*(?:letter|order)?|confirmation\s+letter|welcome\s+letter|internship\s*(?:offer|agreement|letter|program)?|pleased\s+to\s+(?:offer|appoint|extend|invite|inform)|delighted\s+to\s+(?:offer|appoint|extend|welcome)|thrilled\s+to\s+(?:offer|extend|welcome)|excited\s+to\s+(?:offer|extend)|glad\s+to\s+offer|proud\s+to\s+offer|happy\s+to\s+offer|welcome\s+to\s+(?:the\s+team|our\s+team|[A-Za-z0-9\s&.,'-]+)|welcome\s+you\s+to|congratulat(?:ions?|e)\s+on\s+your\s+selection|selected\s+for\s+(?:the\s+position|internship|role|upcoming|program|the\s+internship)|selected\s+as\s+(?:a|an)?|terms\s+of\s+(?:employment|appointment|internship|service)|employment\s+agreement|contract\s+of\s+(?:employment|service)|appoint\s+you\s+as|offer\s+you\s+the\s+role|delighted\s+to\s+welcome|application\s+for\s+employment|confirm\s+your\s+(?:enrolment|enrollment|appointment|employment|selection)|confirmation\s+of\s+permanent|permanent\s+employment)/i;
   const hasOfferIntent = offerIntentRegex.test(text);
 
   structureChecks.push({
@@ -1568,16 +1648,67 @@ export function analyzeDocumentStructureAndFormat(
   });
   if (!hasOfferIntent) missingElements.push('Clear Employment / Offer Intent');
 
+  // ==========================================================================
   // 3. SEMANTIC CRITERION 3: Candidate Identification
+  // Specific named addressee versus anonymous salutation
+  // ==========================================================================
   let candidateName: string | undefined = externalContext?.candidateName;
   if (!candidateName) {
-    const candidateMatch = text.match(/\b(?:dear|to|candidate(?:\s*name)?|applicant(?:\s*name)?|name|mr\.?|ms\.?|mrs\.?|shri|hi)\b\s*[:\-]?\s*([A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+){0,3})/i)
-      || text.match(/(?:pleased\s+to\s+offer|appointment\s+of)\s+(?:(?:Mr\.?|Ms\.?|Mrs\.?|Dr\.?)\s*)?([A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+){0,3})/i);
+    const isNonCandidateWord = (cand: string) => {
+      return /(?:Candidate|Applicant|Student|Intern|Sir|Madam|Whom|Limited|Pvt|Corp|Company|Team|Offer|All|Concern|October|November|December|January|February|March|April|May|June|July|August|September|Upcoming|Letter|This\s+has|College|University|School|Institute|Academy|Polytechnic|Vidyalaya|Campus|Department|Hospital|Technologies|Solutions|Services)/i.test(cand);
+    };
 
-    if (candidateMatch) {
-      const cand = candidateMatch[1].trim().replace(/[,\s]+$/, '');
-      if (cand.length >= 2 && !/(?:Candidate|Applicant|Student|Intern|Sir|Madam|Whom|Limited|Pvt|Corp|Company|Team|Offer|All|Concern|October|November|December|January|February|March|April|May|June|July|August|September)/i.test(cand)) {
-        candidateName = cand;
+    // 1. Formal 'To' addressee block (e.g. "To,\nDipannita Dey" or "To: Dipannita Dey")
+    const toLineMatch = text.match(/(?:^|[\r\n])\s*To\s*[:\-,]?\s*[\r\n]+\s*(?:(?:Mr\.?|Ms\.?|Mrs\.?|Dr\.?|Shri)\s+)?([A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+)*)/i)
+      || text.match(/(?:^|[\r\n])\s*To\s*[:\-]\s*(?:(?:Mr\.?|Ms\.?|Mrs\.?|Dr\.?|Shri)\s+)?([A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+)*)/i);
+    if (toLineMatch) {
+      const raw = toLineMatch[1].split(/[\r\n]/)[0].trim().replace(/[,\s:]+$/, '');
+      if (raw.length >= 2 && !isNonCandidateWord(raw)) {
+        candidateName = raw;
+      }
+    }
+
+    // 2. Direct personal salutation: "Dear <Name>" or "Dear Mr./Ms. <Name>"
+    if (!candidateName) {
+      const dearMatch = text.match(/(?:^|[\r\n])\s*(?:Dear|Hi\b|Hello\b)\s+(?:(?:Mr\.?|Ms\.?|Mrs\.?|Dr\.?|Shri)\s+)?([A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+)*)/i);
+      if (dearMatch) {
+        const raw = dearMatch[1].split(/[\r\n]/)[0].trim().replace(/[,\s:]+$/, '');
+        if (raw.length >= 2 && !isNonCandidateWord(raw)) {
+          candidateName = raw;
+        }
+      }
+    }
+
+    // 3. Explicit Candidate/Applicant field: e.g. "Candidate Name: ..."
+    if (!candidateName) {
+      const candidateFieldMatch = text.match(/(?:candidate(?:\s*name)?|applicant(?:\s*name)?|name\s*of\s*candidate|applicant)\s*[:\-]\s*(?:(?:Mr\.?|Ms\.?|Mrs\.?|Dr\.?|Shri)\s+)?([A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+)*)/i);
+      if (candidateFieldMatch) {
+        const raw = candidateFieldMatch[1].split(/[\r\n]/)[0].trim().replace(/[,\s:]+$/, '');
+        if (raw.length >= 2 && !isNonCandidateWord(raw)) {
+          candidateName = raw;
+        }
+      }
+    }
+
+    // 4. Welcome letter / Offer letter prefix
+    if (!candidateName) {
+      const welcomeMatch = text.match(/(?:Welcome\s+Letter|Offer\s+Letter)\s*[\r\n]+\s*(?:Dear\s+)?(?:Shri|Mr\.?|Ms\.?|Mrs\.?)?\s*([A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+)*)/i);
+      if (welcomeMatch) {
+        const raw = welcomeMatch[1].split(/[\r\n]/)[0].trim().replace(/[,\s:]+$/, '');
+        if (raw.length >= 2 && !isNonCandidateWord(raw)) {
+          candidateName = raw;
+        }
+      }
+    }
+
+    // 5. Salutation prefix on its own line: e.g. "Mr. Sanjaykumar V"
+    if (!candidateName) {
+      const titleRegexMatch = text.match(/(?:^|[\r\n])\s*(?:Mr\.?\s*\/Ms\.?\s*\/Mrs\.?|Mr\.\/Ms\.|Mr\.?|Ms\.?|Mrs\.?|Dr\.?|Shri)\s+([A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+)*)/i);
+      if (titleRegexMatch) {
+        const raw = titleRegexMatch[1].split(/[\r\n]/)[0].trim().replace(/[,\s:]+$/, '');
+        if (raw.length >= 2 && !isNonCandidateWord(raw)) {
+          candidateName = raw;
+        }
       }
     }
   }
@@ -1602,16 +1733,58 @@ export function analyzeDocumentStructureAndFormat(
     missingElements.push('Named Candidate Addressee');
   }
 
+  // ==========================================================================
   // 4. SEMANTIC CRITERION 4: Role / Position Specification
+  // Operational designation defined
+  // ==========================================================================
   let jobRole: string | undefined = externalContext?.jobRole;
   if (!jobRole) {
-    const roleMatch = text.match(/(?:role|position|designation|job\s*title|post\s*of|profile)\s*[:\-]?\s*([A-Za-z0-9\s/&()\-]{3,45})/i)
-      || text.match(/(?:appointed\s+as\s+(?:a|an)?|joining\s+as\s+(?:a|an)?|as\s+(?:a|an)?|role\s+of\s+(?:a|an)?)\s*([A-Za-z0-9\s/&()\-]{3,40}\s+(?:engineer|developer|intern|analyst|designer|manager|associate|consultant|specialist|lead|officer|executive|trainee|architect|scientist|coordinator|strategist|writer|representative))/i);
+    // 1. Explicit Role/Designation field
+    const fieldRoleMatch = text.match(/(?:role|position|designation|job\s*title|post\s*of|profile|domain|internship\s*domain|internship\s*role)\s*[:\-]\s*([A-Za-z0-9\s/&()\-]{2,50})/i);
+    if (fieldRoleMatch) {
+      const raw = fieldRoleMatch[1].split(/[\r\n]/)[0].trim().replace(/[,\s]+$/, '');
+      if (raw.length >= 2 && !/(?:with\s+compensation|under\s+annexure|in\s+our\s+organization|terms\s+and\s+conditions)/i.test(raw)) {
+        jobRole = raw;
+      }
+    }
 
-    if (roleMatch) {
-      jobRole = roleMatch[1].trim().replace(/[\r\n].*$/, '').replace(/[,\s]+$/, '');
-    } else {
-      const genericRoleMatch = text.match(/\b(Software\s+Engineer|Frontend\s+Developer|Backend\s+Developer|Full\s*Stack\s+Developer|Data\s+Analyst|Data\s+Scientist|Product\s+Manager|UI\/UX\s+Designer|Graphic\s+Designer|Marketing\s+Intern|Sales\s+Executive|Business\s+Analyst|Research\s+Intern|HR\s+Intern|Operations\s+Intern|Cloud\s+Architect|Site\s+Reliability\s+Engineer|QA\s+Tester|Quality\s+Assurance\s+Engineer|Machine\s+Learning\s+Intern|Mechanical\s+Engineer|Data\s+Engineer)\b/i);
+    // 2. Subject line role (e.g. Subject: Software Developer Internship)
+    if (!jobRole) {
+      const subjectRoleMatch = text.match(/(?:subject|sub)\s*[:\-]\s*(?:offer\s*(?:letter|of\s+employment|for)?\s*[-–:]?\s*)?([A-Za-z0-9\s/&()\-]{3,50})/i);
+      if (subjectRoleMatch) {
+        const rawSub = subjectRoleMatch[1].split(/[\r\n]/)[0].trim().replace(/[,\s]+$/, '');
+        if (/(?:engineer|developer|analyst|intern|designer|manager|associate|consultant|specialist|lead|officer|executive|trainee|architect|scientist|coordinator|strategist|writer|representative|internship)/i.test(rawSub)) {
+          jobRole = rawSub;
+        }
+      }
+    }
+
+    // 3. Appointment / Engagement phrase (e.g. appoint you as Junior Engineer, confirm your internship... as a Marketing...)
+    if (!jobRole) {
+      const appointRoleMatch = text.match(/(?:confirm|offer)\s+(?:your\s+)?(?:internship|appointment|employment).*?,\s*as\s+(?:a|an)?\s+([A-Za-z0-9\s/&()\-]{3,80}?)(?:,\s*effective|\.\s*|;\s*|\n|$)/i)
+        || text.match(/(?:appoint(?:ed)?\s+you\s+as\s+(?:a|an)?|appoint(?:ed)?\s+as\s+(?:a|an)?|joining\s+as\s+(?:a|an)?|role\s+as\s+(?:a|an)?|hired\s+as\s+(?:a|an)?|work\s+as\s+(?:a|an)?|association\s+as\s+(?:an?\b|the\b)?|internship\s+as\s+(?:an?\b|the\b)?)\s*([A-Za-z0-9\s/&()\-]{2,60})/i);
+      if (appointRoleMatch) {
+        const rawApp = (appointRoleMatch[1] || appointRoleMatch[2] || '').split(/[\r\n]/)[0].replace(/\b(?:in\s+admin|at\s+the|for\s+a\s+period|commencing|under|with)\b.*$/i, '').trim().replace(/[,\s]+$/, '');
+        if (rawApp.length >= 3 && !/(?:our\s+company|the\s+team)/i.test(rawApp)) {
+          jobRole = rawApp;
+        }
+      }
+    }
+
+    // 4. Inline designation sentence (e.g. designation will be Data Analyst)
+    if (!jobRole) {
+      const designationInline = text.match(/(?:designation\s+(?:will\s+be|is)\s+[:\-]?\s*|role\s+(?:will\s+be|is)\s+[:\-]?\s*)([A-Za-z0-9\s/&()\-]{2,40})/i);
+      if (designationInline) {
+        const rawDes = designationInline[1].split(/[\r\n]/)[0].replace(/\b(?:at\s+the|in\s+the|with|for)\b.*$/i, '').trim().replace(/[,\s]+$/, '');
+        if (rawDes.length >= 3) {
+          jobRole = rawDes;
+        }
+      }
+    }
+
+    // 5. Standard professional role dictionary match anywhere in text
+    if (!jobRole) {
+      const genericRoleMatch = text.match(/\b(Software\s+(?:Engineer|Developer)|Frontend\s+Developer|Backend\s+Developer|Full\s*Stack\s+Developer|Web\s+Developer|Python\s+Developer|Java\s+Developer|Data\s+Analyst|Data\s+Scientist|Data\s+Engineer|Product\s+Manager|UI\/UX\s+Designer|Graphic\s+Designer|Marketing\s+(?:Intern|Associate|Executive)|Sales\s+Executive|Business\s+Analyst|Research\s+Intern|HR\s+(?:Intern|Manager|Executive)|Operations\s+(?:Intern|Manager|Executive)|Cloud\s+Architect|DevOps\s+Engineer|Site\s+Reliability\s+Engineer|QA\s+(?:Tester|Engineer)|Quality\s+Assurance\s+Engineer|Machine\s+Learning\s+(?:Intern|Engineer)|Mechanical\s+Engineer|Junior\s+Engineer|Systems\s+Engineer|Security\s+Researcher|Lead\s+Architect)\b/i);
       if (genericRoleMatch) {
         jobRole = genericRoleMatch[0].trim();
       }
@@ -1634,9 +1807,12 @@ export function analyzeDocumentStructureAndFormat(
   });
   if (!hasSpecificRole) missingElements.push('Specific Job / Internship Designation');
 
+  // ==========================================================================
   // 5. SEMANTIC CRITERION 5: Employment & Internship Terms
+  // Compensation breakdown, duration, schedule, and work arrangement
+  // ==========================================================================
   const hasStipendOrCompensationTerms = /(?:stipend|salary|ctc|remuneration|compensation|per\s+month|\/month|p\.m\.|per\s+annum|\/year|p\.a\.|lpa|fixed\s+pay|package\s+of|monthly\s+(?:payout|stipend|allowance)|base\s+salary|inr|₹|rs\.?|usd|\$)/i.test(text);
-  const hasDurationOrTimeline = /(?:duration\s+of|period\s+of|tenure\s+of|\d+\s*(?:months?|weeks?)|joining\s+date|start\s+date|commencing\s+on|effective\s+(?:joining\s+)?date|reporting\s+date)/i.test(text);
+  const hasDurationOrTimeline = /(?:duration\s+of|period\s+of|tenure\s+of|\d+\s*(?:months?|weeks?)|joining\s+date|start\s+date|commencing\s+on|effective\s+(?:joining\s+)?date|reporting\s+date|date\s+of\s+joining|date\s+of\s+appointment)/i.test(text);
   const hasWorkArrangement = /(?:work\s+from\s+home|remote|hybrid|in-office|on-site|full\s*time|part\s*time)/i.test(text);
 
   const hasEmploymentTerms = hasStipendOrCompensationTerms || hasDurationOrTimeline || hasWorkArrangement;
@@ -1654,14 +1830,46 @@ export function analyzeDocumentStructureAndFormat(
   });
   if (!hasEmploymentTerms) missingElements.push('Employment Terms & Timeline');
 
+  // ==========================================================================
   // 6. SEMANTIC CRITERION 6: Issuance Context & Date
+  // Document date / issuance timeline
+  // ==========================================================================
   let documentDate: string | undefined = externalContext?.documentDate;
   if (!documentDate) {
-    const textDateMatch = text.match(/\b(?:(?:0?[1-9]|[12][0-9]|3[01])(?:st|nd|rd|th)?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[\s,]+(?:20\d{2}|19\d{2})|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(?:0?[1-9]|[12][0-9]|3[01])(?:st|nd|rd|th)?[\s,]+(?:20\d{2}|19\d{2})|(?:20\d{2}|19\d{2})[\/\-\.](?:0?[1-9]|1[0-2])[\/\-\.](?:0?[1-9]|[12][0-9]|3[01])|\d{1,2}[\/\-\.]\d{1,2}[\/\-\.](?:20\d{2}|\d{2}))\b/i);
-    const dateKeywordMatch = text.match(/(?:date(?:\s+of\s+(?:issue|issuance|offer))?|dated|issued\s+on|valid\s+until)\s*[:\-]?\s*([0-9A-Za-z\s,\/\-\.]{4,30})/i);
+    // 1. Explicit Date field anywhere in document
+    const explicitDateMatch = text.match(/(?:date(?:\s+of\s+(?:issue|issuance|offer|joining|appointment|letter))?|dated|issued\s+on|cohort\s+date|start\s+date|joining\s+date|effective\s+(?:start\s+)?date|date\s*[:\-])\s*[:\-]?\s*([0-9A-Za-z\s,\/\-\.]{4,30})/i);
+    if (explicitDateMatch) {
+      const candDate = explicitDateMatch[1].split(/[\r\n]/)[0].trim().replace(/[,\s:]+$/, '').replace(/^[:\-\s]+/, '');
+      if (/[0-9]/.test(candDate) && (/\d{2,4}/.test(candDate) || /(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i.test(candDate))) {
+        documentDate = candDate;
+      }
+    }
 
-    documentDate = textDateMatch ? textDateMatch[0].trim() : (dateKeywordMatch ? dateKeywordMatch[1].trim() : undefined);
+    // 2. Numeric date formats (DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD, DD/MM/YY)
+    if (!documentDate) {
+      const numDateMatch = text.match(/\b(?:(?:0?[1-9]|[12][0-9]|3[01])[\/\-\.](?:0?[1-9]|1[0-2])[\/\-\.](?:20\d{2}|19\d{2}|\d{2})|(?:20\d{2}|19\d{2})[\/\-\.](?:0?[1-9]|1[0-2])[\/\-\.](?:0?[1-9]|[12][0-9]|3[01]))\b/);
+      if (numDateMatch) {
+        documentDate = numDateMatch[0].trim();
+      }
+    }
+
+    // 3. Word-based date formats (01-April-2026, 17th March 2026, October 20, 2026)
+    if (!documentDate) {
+      const wordDateMatch = text.match(/\b(?:(?:0?[1-9]|[12][0-9]|3[01])(?:st|nd|rd|th)?[\s\-_]+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)[\s\-_,]+(?:20\d{2}|19\d{2}|\d{2})|(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(?:0?[1-9]|[12][0-9]|3[01])(?:st|nd|rd|th)?[\s,]+(?:20\d{2}|19\d{2}))\b/i);
+      if (wordDateMatch) {
+        documentDate = wordDateMatch[0].trim();
+      }
+    }
+
+    // 4. Month Year: e.g. October 2026, March 2026
+    if (!documentDate) {
+      const monthYearMatch = text.match(/\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(?:20\d{2}|19\d{2})\b/i);
+      if (monthYearMatch) {
+        documentDate = monthYearMatch[0].trim();
+      }
+    }
   }
+
   const hasFormalDate = Boolean(documentDate);
 
   structureChecks.push({
@@ -1672,34 +1880,35 @@ export function analyzeDocumentStructureAndFormat(
       ? `Document date / issuance timeline documented: "${documentDate}".`
       : 'Document lacks an explicit date stamp or issuance timeline.',
     weight: 16,
-    status: hasFormalDate ? 'PRESENT' : 'OPTIONAL_ABSENT',
+    status: hasFormalDate ? 'PRESENT' : 'ABSENT',
     isApplicable: true,
   });
   if (!hasFormalDate) missingElements.push('Document Date / Timeline Stamp');
 
+  // ==========================================================================
   // 7. SEMANTIC CRITERION 7: Issuer & Authorization Context (Signatory)
+  // Authorizing executive, signature, or department block
+  // ==========================================================================
   let signatoryName: string | undefined = externalContext?.signatoryName;
   let signatoryTitle: string | undefined = externalContext?.signatoryTitle;
   const hasVisualSignatureMark = Boolean(externalContext?.hasVisualSignatureMark) ||
     (/(?:signature|signed|sd\/-|\[signature)/i.test(lower) && !lower.includes('no signature'));
 
-  const sigTitleRegex = /(?:(?:Global\s+)?Head\s+(?:of\s+)?[-–\s]?\s*(?:Human\s+Resources|HR|Talent\s+Acquisition|Engineering(?:\s+Talent)?|People|Operations|Product|Design)|Chief\s+(?:Executive|Operating|Technology|People|Human\s+Resources|Financial|Revenue)\s+Officer|Vice\s+President(?:\s*[-–\s]\s*[A-Za-z\s]+)?|Managing\s+Director|Director(?:\s*[-–\s]\s*[A-Za-z\s]+)?|Founder(?:\s*(?:&|and)\s*Managing\s+Director)?|Co-Founder|Partner|Proprietor|Lead\s+AI\s+Scientist|Senior\s+(?:HR\s+Manager|Recruiter|Systems\s+Engineer)|HR\s+Manager|HR\s+Director|Talent\s+Acquisition(?:\s+(?:Partner|Lead|Specialist|Manager))?|Lead\s+Recruiter|Placement\s+Officer|Authorized\s+Signatory|VP\s+of\s+[A-Za-z\s]+)/i;
+  const sigTitleRegex = /(?:(?:Global\s+)?Head\s+(?:of\s+)?[-–\s]?\s*(?:Human\s+Resources|HR|Talent\s+Acquisition|Engineering(?:\s+Talent)?|People|Operations|Product|Design)|Chief\s+(?:Executive|Operating|Technology|People|Human\s+Resources|Financial|Revenue)\s+Officer|CEO\b|Vice\s+President(?:\s*[-–\s]\s*[A-Za-z\s]+)?|Managing\s+Director|Director(?:\s*[-–\s]\s*[A-Za-z\s]+)?|Founder(?:\s*(?:&|and)\s*(?:CEO|Managing\s+Director|Director|Co-Founder))?|Co-Founder|Partner|Proprietor|Lead\s+AI\s+Scientist|Senior\s+(?:HR\s+Manager|Recruiter|Systems\s+Engineer)|HR\s+Manager|HR\s+Director|HR\s+Head|Talent\s+Acquisition(?:\s+(?:Partner|Lead|Specialist|Manager))?|Lead\s+Recruiter|Placement\s+Officer|Authorized\s+Signatory|VP\s+of\s+[A-Za-z\s]+)/i;
 
   const isAddressOrLocation = (str: string): boolean =>
     /\b(?:road|street|lane|avenue|cross|layout|nagar|block|sector|plot|tower|building|house|campus|hub|city|floor|suite|pincode|postal|zip|registered\s+office|head\s+office|corporate\s+office|mumbai|delhi|bangalore|bengaluru|chennai|hyderabad|pune|gurgaon|gurugram|noida)\b/i.test(str) ||
     /\b[1-9][0-9]{5}\b/.test(str);
 
   const isDepartmentOrEntity = (str: string): boolean =>
-    /(?:human\s+resources|hr|talent\s+acquisition|placement|operations|department|team|office|solutions|services|limited|ltd|pvt|corporation|systems|technologies|company|enterprise)/i.test(str);
+    /(?:human\s+resources|hr|talent\s+acquisition|placement|operations|department|team|office|solutions|services|limited|ltd|pvt|corporation|systems|technologies|company|enterprise|airline|aviation)/i.test(str);
 
   const isClosingLine = (str: string): boolean =>
-    /^(?:yours\s+)?(?:sincerely|faithfully|regards|warm\s+regards|best\s+regards|with\s+regards|authorized\s+signatory|signed\s+by|accepted\s+(?:and\s+agreed)?)/i.test(str.trim()) ||
+    /^(?:yours\s+)?(?:sincerely|faithfully|truly|regards|warm\s+regards|best\s+regards|with\s+regards|authorized\s+signatory|signed\s+by|accepted\s+(?:and\s+agreed)?)/i.test(str.trim()) ||
     /^\s*for\s+[A-Za-z0-9\s&.,'-]+$/i.test(str.trim()) ||
-    /(?:sincerely|faithfully|warm\s+regards|best\s+regards|with\s+regards)[,:\s]*$/i.test(str.trim());
+    /(?:sincerely|faithfully|truly|warm\s+regards|best\s+regards|with\s+regards)[,:\s]*$/i.test(str.trim());
 
   const docLines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-
-  // Identify all closing / signoff anchor indices (supports multi-page signoff on page 1, 2, or 3)
   const closingIndices: number[] = [];
   for (let i = 0; i < docLines.length; i++) {
     if (isClosingLine(docLines[i])) {
@@ -1710,12 +1919,12 @@ export function analyzeDocumentStructureAndFormat(
   const candidateIndices = new Set<number>();
   if (closingIndices.length > 0) {
     for (const idx of closingIndices) {
-      for (let j = idx; j < Math.min(docLines.length, idx + 8); j++) {
+      for (let j = idx; j < Math.min(docLines.length, idx + 10); j++) {
         candidateIndices.add(j);
       }
     }
   } else {
-    for (let j = Math.max(0, docLines.length - 12); j < docLines.length; j++) {
+    for (let j = Math.max(0, docLines.length - 15); j < docLines.length; j++) {
       candidateIndices.add(j);
     }
   }
@@ -1723,12 +1932,12 @@ export function analyzeDocumentStructureAndFormat(
   const candidateLines = Array.from(candidateIndices).sort((a, b) => a - b).map(idx => docLines[idx]);
 
   for (let i = 0; i < candidateLines.length; i++) {
-    const line = candidateLines[i];
+    const rawLine = candidateLines[i];
+    const line = rawLine.replace(/^\((.+)\)$/, '$1').trim();
     if (isCorporateName(line) || isGreetingOrPreamble(line) || isAddressOrLocation(line)) continue;
 
-    // Check inline dash/hyphen: e.g. "Sudip Das — Founder & Managing Director", "Gaurav Mehta — VP of Engineering"
+    // Check inline dash/hyphen: e.g. "Sudip Das — Founder & Managing Director"
     const inlineDash = line.match(/^([A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+){1,3})\s*(?:[—–\-])\s*(.+)$/);
-
     if (inlineDash && !signatoryName) {
       const cand = inlineDash[1].trim();
       const candTitle = inlineDash[2].trim();
@@ -1741,14 +1950,30 @@ export function analyzeDocumentStructureAndFormat(
       }
     }
 
-    // Check standalone name
-    const nameMatch = line.match(/^([A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+){1,3})$/);
-    if (nameMatch && !signatoryName && !sigTitleRegex.test(line) && !isDepartmentOrEntity(line) && !isAddressOrLocation(line)) {
-      signatoryName = nameMatch[1].trim();
-      continue;
+    // Check name with title in parens: e.g. "Radhika (HR Head)"
+    const nameWithParenTitle = line.match(/^([A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+){0,3})\s*\(([^)]+)\)$/);
+    if (nameWithParenTitle && !signatoryName) {
+      const cand = nameWithParenTitle[1].trim();
+      const candTitle = nameWithParenTitle[2].trim();
+      if (!isCorporateName(cand) && !isGreetingOrPreamble(cand) && !isAddressOrLocation(cand)) {
+        signatoryName = cand;
+        if (sigTitleRegex.test(candTitle)) {
+          signatoryTitle = candTitle;
+        }
+        continue;
+      }
     }
 
-    // Check title line (prefer specific role over generic 'Authorized Signatory')
+    // Check standalone name
+    const nameMatch = line.match(/^([A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+){0,3})$/);
+    if (nameMatch && !signatoryName && !sigTitleRegex.test(line) && !isDepartmentOrEntity(line) && !isAddressOrLocation(line) && line.length >= 3) {
+      if (!/(?:Annexure|Candidate|Subject|Salary|Basic|Gross|Performance|Training|Website|LinkedIn|Notice|Please|Email|Contact|Batch)/i.test(line)) {
+        signatoryName = nameMatch[1].trim();
+        continue;
+      }
+    }
+
+    // Check title line
     if (sigTitleRegex.test(line) && (!signatoryTitle || signatoryTitle === 'Authorized Signatory')) {
       const titleMatch = line.match(sigTitleRegex);
       if (titleMatch) {
@@ -1802,47 +2027,105 @@ export function analyzeDocumentStructureAndFormat(
   });
   if (!hasAuthorizedSignatoryBlock) missingElements.push('Issuing Authority / Signatory Block');
 
+  // ==========================================================================
   // CONTEXTUAL ELEMENT 1: Corporate Physical Address
-  const addressMatch = text.match(/(?:registered\s+office|corporate\s+office|head\s+office|campus|tower|building|plot|sector|road|street|suite|pincode|postal\s+code|zip)\s*[:\-]?\s*([A-Za-z0-9\s,.-]{5,80})/i);
-  const registeredAddress = externalContext?.registeredAddress || (addressMatch ? addressMatch[1].trim() : undefined);
+  // Registered office, corporate headquarters, campus, or facility address
+  // ==========================================================================
+  let registeredAddress: string | undefined = externalContext?.registeredAddress;
+  if (!registeredAddress) {
+    // 1. Explicit Address Label
+    const labeledAddrMatch = text.match(/(?:registered\s+(?:office|address)|corporate\s+(?:office|address)|head\s+office|office\s+address|work\s+location|address|addr|add\.?)\s*[:\-]?\s*([^\r\n]{5,100})/i);
+    if (labeledAddrMatch) {
+      const cand = labeledAddrMatch[1].trim().replace(/[:\s]+$/, '');
+      if (cand.length >= 4 && !/(?:selection|internship|overview|offer|compensation)/i.test(cand) && !cand.endsWith('...')) {
+        registeredAddress = cand;
+      }
+    }
+
+    // 2. Multi-line labeled address: e.g. "Add. Registered Offic...\nBombay House 24 Home Mody Street Mumbai (MH) 400001"
+    if (!registeredAddress) {
+      const multiLineAddrMatch = text.match(/(?:registered\s+office|add\.\s*registered\s*offic|corporate\s+office|head\s+office|office\s+address|address|add\.)[^\r\n]*[\r\n]+\s*([^\r\n]{5,100})/i);
+      if (multiLineAddrMatch) {
+        const nextLine = multiLineAddrMatch[1].trim();
+        if (/(?:road|street|mody|building|house|tower|floor|plot|sector|block|campus|mumbai|delhi|bangalore|bengaluru|pune|hyderabad|chennai|gurgaon|gurugram|noida|\d{5,6})/i.test(nextLine)) {
+          registeredAddress = nextLine;
+        }
+      }
+    }
+
+    // 3. Physical street / building / floor / pin code line anywhere in document
+    if (!registeredAddress) {
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      for (const l of lines) {
+        if (/(?:floor|tower|building|plot|sector|block|road|street|avenue|lane|marg|nagar|campus|cyber\s*city|tech\s*park|hub|suite)/i.test(l) &&
+            /(?:\d{5,6}|mumbai|delhi|bangalore|bengaluru|hyderabad|pune|chennai|noida|gurugram|gurgaon|kolkata|patna|ahmedabad|san\s+francisco|london|singapore|new\s+york|seattle|austin|chicago|boston)/i.test(l) &&
+            !/(?:project\s+opportunities|training\s+program|assessment|allocation\s+will|candidates\s+may)/i.test(l)) {
+          registeredAddress = l;
+          break;
+        }
+      }
+    }
+
+    // 4. Indian PIN code or US Zip code pattern line
+    if (!registeredAddress) {
+      const pinLineMatch = text.match(/([^\r\n]+(?:\b[1-9][0-9]{5}\b|\bCA\s+\d{5}\b|\bNY\s+\d{5}\b|\bWA\s+\d{5}\b)[^\r\n]*)/i);
+      if (pinLineMatch && !/(?:ref|order|id|registration\s*charge)/i.test(pinLineMatch[0])) {
+        registeredAddress = pinLineMatch[0].trim();
+      }
+    }
+  }
+
   const hasAddress = Boolean(registeredAddress) ||
-    /(?:registered\s+office|corporate\s+office|head\s+office|campus|tower|building|plot|sector|road|street|suite|pincode|postal\s+code|zip|\b[1-9][0-9]{5}\b|mumbai|delhi|bengaluru|bangalore|hyderabad|pune|chennai|noida|gurugram|gurgaon|kolkata|san\s+francisco|london|singapore|new\s+york|seattle|austin)/i.test(lower);
+    /(?:registered\s+office|corporate\s+office|head\s+office|campus|tower|building|plot|sector|road|street|suite|pincode|postal\s+code|zip|\b[1-9][0-9]{5}\b|mumbai|delhi|bengaluru|bangalore|hyderabad|pune|chennai|noida|gurugram|gurgaon|kolkata|patna|san\s+francisco|london|singapore|new\s+york|seattle|austin)/i.test(lower);
 
-  if (hasAddress) {
-    structureChecks.push({
-      id: 'CTX-01',
-      name: 'Corporate Physical Address',
-      passed: true,
-      details: registeredAddress
-        ? `Physical corporate address or campus location observed: "${registeredAddress}".`
-        : 'Physical corporate address or campus location observed in document layout.',
-      weight: 6,
-      status: 'PRESENT',
-      isApplicable: true,
-    });
+  structureChecks.push({
+    id: 'CTX-01',
+    name: 'Corporate Physical Address',
+    passed: hasAddress,
+    details: hasAddress
+      ? `Physical corporate address or campus location observed: "${registeredAddress || 'Corporate Office Location'}".`
+      : 'No physical corporate address, registered office, or official location identified in document.',
+    weight: 6,
+    status: hasAddress ? 'PRESENT' : 'OPTIONAL_ABSENT',
+    isApplicable: true,
+  });
+
+  // ==========================================================================
+  // CONTEXTUAL ELEMENT 2: Contact Information Channels
+  // Email / Phone / Web / Official Channels
+  // ==========================================================================
+  let contactInformation: string | undefined = externalContext?.contactInfo;
+  if (!contactInformation) {
+    const contactEmailMatch = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+    const contactPhoneMatch = text.match(/(?:(?:\+91[\s.-]?)?[6-9]\d{9}|(?:\+?\d{1,3}[-.s]?)?\(?\d{2,4}\)?[-.s]?\d{3,4}[-.s]?\d{4}|\b[6-9]\d{9}\b)/);
+    const contactUrlMatch = text.match(/https?:\/\/[^\s<>"]+|www\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/i);
+    const labeledContactMatch = text.match(/(?:website|web|portal|linkedin|contact|email\s*id|email|tel|phone|mobile)\s*[:\-]\s*([^\r\n]{3,60})/i);
+
+    contactInformation = contactEmailMatch?.[0] || contactPhoneMatch?.[0] || contactUrlMatch?.[0] || (labeledContactMatch ? labeledContactMatch[0].trim() : undefined);
   }
 
-  // CONTEXTUAL ELEMENT 2: Contact Information Channels (Email / Phone / Web)
-  const contactEmailMatch = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
-  const contactPhoneMatch = text.match(/(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}|\b[6-9]\d{9}\b/);
-  const contactUrlMatch = text.match(/https?:\/\/[^\s<>"]+|www\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/i);
-  const contactInformation = externalContext?.contactInfo || contactEmailMatch?.[0] || contactPhoneMatch?.[0] || contactUrlMatch?.[0];
-  const hasContactInfo = Boolean(contactInformation) || Boolean(contactEmailMatch) || Boolean(contactPhoneMatch) || Boolean(contactUrlMatch);
+  const hasContactInfo = Boolean(contactInformation) ||
+    Boolean(text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/)) ||
+    Boolean(text.match(/(?:(?:\+91[\s.-]?)?[6-9]\d{9}|\b[6-9]\d{9}\b|\+91[-.\s]?\d{2,4}[-.\s]?\d{6,8})/)) ||
+    Boolean(text.match(/https?:\/\/[^\s<>"]+|www\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/i)) ||
+    /(?:website|linkedin|email\s*id|contact\s+miss|contact\s+mr|toll\s*free|helpline)\s*[:\-]/i.test(text);
 
-  if (hasContactInfo) {
-    structureChecks.push({
-      id: 'CTX-04',
-      name: 'Corporate Contact Information',
-      passed: true,
-      details: `Employer contact channel identified: "${contactInformation || 'Corporate Channel'}".`,
-      weight: 6,
-      status: 'PRESENT',
-      isApplicable: true,
-    });
-  }
+  structureChecks.push({
+    id: 'CTX-04',
+    name: 'Corporate Contact Information',
+    passed: hasContactInfo,
+    details: hasContactInfo
+      ? `Employer contact channel identified: "${contactInformation || 'Corporate Channel'}".`
+      : 'No official corporate contact channel (email, telephone, or web portal) identified in document.',
+    weight: 6,
+    status: hasContactInfo ? 'PRESENT' : 'OPTIONAL_ABSENT',
+    isApplicable: true,
+  });
 
+  // ==========================================================================
   // CONTEXTUAL ELEMENT 3: Reference Tracking ID
-  const refMatch = text.match(/(?:ref(?:erence)?(?:\s*(?:no|num|\.))?|offer\s*(?:id|ref|letter\s*id|code)|requisition\s*(?:id|no)|job\s*(?:id|code)|doc(?:ument)?(?:\s*(?:id|no))|case\s*(?:id|no))\s*[:#-]?\s*([A-Za-z0-9\/-]{3,})/i);
+  // ==========================================================================
+  const refMatch = text.match(/(?:ref(?:erence)?(?:\s*(?:no|num|\.))?|offer\s*(?:id|ref|letter\s*id|code)|requisition\s*(?:id|no)|job\s*(?:id|code)|doc(?:ument)?(?:\s*(?:id|no))|case\s*(?:id|no)|batch\s*code)\s*[:#-]?\s*([A-Za-z0-9\/-]{3,})/i);
   const referenceNumber = refMatch ? refMatch[1].trim() : undefined;
   if (referenceNumber) {
     structureChecks.push({
@@ -1856,8 +2139,10 @@ export function analyzeDocumentStructureAndFormat(
     });
   }
 
+  // ==========================================================================
   // CONTEXTUAL ELEMENT 4: Governance, Acceptance & Legal Terms
-  const hasConfidentialityOrIP = /(?:confidential|non-disclosure|nda|proprietary|code\s+of\s+conduct|terms\s+and\s+conditions|governing\s+law|jurisdiction|acceptance)/i.test(lower);
+  // ==========================================================================
+  const hasConfidentialityOrIP = /(?:confidential|non-disclosure|nda|proprietary|code\s+of\s+conduct|terms\s+and\s+conditions|governing\s+law|jurisdiction|acceptance|intellectual\s+property|annexure)/i.test(lower);
   if (hasConfidentialityOrIP) {
     structureChecks.push({
       id: 'CTX-03',
@@ -1873,10 +2158,11 @@ export function analyzeDocumentStructureAndFormat(
   // Calculate Verified Standards Count
   const essentialChecks = structureChecks.filter(c => c.id.startsWith('SEM-'));
   const essentialPassed = essentialChecks.filter(c => c.passed).length;
-  const optionalPassed = structureChecks.filter(c => c.id.startsWith('CTX-') && c.passed).length;
+  const optionalChecks = structureChecks.filter(c => c.id.startsWith('CTX-'));
+  const optionalPassed = optionalChecks.filter(c => c.passed).length;
 
   const passedChecksCount = essentialPassed + optionalPassed;
-  const totalChecksCount = essentialChecks.length + optionalPassed;
+  const totalChecksCount = essentialChecks.length + optionalChecks.length;
 
   // Calibrate Structure Score based on essential offer completeness
   let structureScore: number;
@@ -1888,13 +2174,15 @@ export function analyzeDocumentStructureAndFormat(
     structureScore = 68 + Math.min(6, optionalPassed * 2);
   } else if (essentialPassed === 4) {
     structureScore = 54 + Math.min(6, optionalPassed * 2);
+  } else if (essentialPassed === 3) {
+    structureScore = 40 + Math.min(6, optionalPassed * 2);
   } else {
     structureScore = Math.max(15, essentialPassed * 12 + optionalPassed * 3);
   }
 
-  structureScore = Math.max(10, Math.min(98, Math.round(structureScore)));
+  structureScore = Math.min(98, Math.max(10, structureScore));
 
-  const status: import('./types').DocumentStructureResult['status'] =
+  const status =
     structureScore >= 75
       ? 'STANDARD_COMPLIANT'
       : structureScore >= 50

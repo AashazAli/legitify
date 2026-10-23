@@ -425,7 +425,7 @@ function createUnavailableResult(
 ): GeminiInvestigationResult {
   return {
     engine: 'GEMINI',
-    geminiModel: GEMINI_MODEL,
+    geminiModel: getGeminiModelCascade()[0] || 'gemini-3.5-flash-lite',
     investigationStatus: status,
     investigationTimestamp: timestamp,
     summary: message,

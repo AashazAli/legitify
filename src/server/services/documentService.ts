@@ -366,14 +366,14 @@ export function extractDocumentSignals(
 
   // Pattern B: Legal entity markers (e.g. Acme Corp Ltd, Tech Solutions Private Limited, Clinchsoft Technologies)
   if (!detectedCompanyName) {
-    const legalMatch = text.match(/\b([A-Z][A-Za-z0-9 &.,'-]{1,45}\s+(?:Private\s+Limited|Pvt\s+Ltd|Limited|LLP|LLC|Corporation|Corp|Inc|GmbH|Technologies|Solutions|Enterprises|Infotech|Services|Global|Consultancy))\b/i);
+    const legalMatch = text.match(/\b([A-Z][A-Za-z0-9 &.,'-]{1,45}\s+(?:Group\s+of\s+Companies|Private\s+Limited|Pvt\s+Ltd|Limited|LLP|LLC|Corporation|Corp|Inc|GmbH|Technologies|Solutions|Enterprises|Infotech|Services|Global|Consultancy))\b/i);
     if (legalMatch) detectedCompanyName = legalMatch[1].trim();
   }
 
   // Pattern C: Internship / employment program at company
   if (!detectedCompanyName) {
-    const programMatch = text.match(/(?:Internship\s+Program\s+(?:at|with)|employment\s+with|position\s+at)\s+([A-Z0-9][A-Za-z0-9&.,' -]{2,45})/i);
-    if (programMatch) detectedCompanyName = programMatch[1].trim().replace(/,\s*commencing.*$/i, '');
+    const programMatch = text.match(/(?:internship\s+(?:for\s+the\s+global\s+processes\s+)?(?:at|with)|Internship\s+Program\s+(?:at|with)|employment\s+with|position\s+at)\s+([A-Z0-9][A-Za-z0-9&.,' -]{2,45})/i);
+    if (programMatch) detectedCompanyName = programMatch[1].split(/[\r\n,]/)[0].trim().replace(/,\s*commencing.*$/i, '');
   }
 
   // Pattern D: Formal sign-off entity (Yours truly Clinchsoft Technologies)
@@ -570,7 +570,7 @@ export function extractDocumentSignals(
   let detectedSignatory: string | undefined;
   let detectedSignatoryTitle: string | undefined;
 
-  const titleRegex = /(?:Chief\s+(?:Executive|Operating|Technology|People|Human\s+Resources)\s+Officer|Vice\s+President(?:\s*-\s*[A-Za-z\s]+)?|Managing\s+Director|Director(?:\s*[-–]\s*[A-Za-z\s]+)?|Head\s*[-–]\s*(?:Human\s+Resources|HR|Talent\s+Acquisition|People|Operations)|Founder|Co-Founder|Partner|Proprietor|Senior\s+HR\s+Manager|HR\s+Manager|Talent\s+Acquisition(?:\s+Lead)?|Lead\s+Recruiter|Senior\s+Recruiter|Placement\s+Officer|Authorized\s+Signatory)/i;
+  const titleRegex = /(?:Chief\s+(?:Executive|Operating|Technology|People|Human\s+Resources)\s+Officer|CEO\b|Vice\s+President(?:\s*-\s*[A-Za-z\s]+)?|Managing\s+Director|Director(?:\s*[-–]\s*[A-Za-z\s]+)?|Head\s*[-–]\s*(?:Human\s+Resources|HR|Talent\s+Acquisition|People|Operations)|Founder(?:\s*(?:&|and)\s*(?:CEO|Managing\s+Director|Director|Co-Founder))?|Co-Founder|Partner|Proprietor|Senior\s+HR\s+Manager|HR\s+Manager|Talent\s+Acquisition(?:\s+Lead)?|Lead\s+Recruiter|Senior\s+Recruiter|Placement\s+Officer|Authorized\s+Signatory)/i;
 
   // Check inline dash/hyphen/comma format: e.g. "Sudip Das — Founder"
   const dashMatch = text.match(/(?:(?:sincerely|regards|faithfully|authorized\s+signatory|signed\s+by)[:\s,]*)?\n?\s*([A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+){1,3})\s*(?:[—–\-]|,)\s*([A-Za-z\s&/-]{3,40})/i);
@@ -620,16 +620,17 @@ export function extractDocumentSignals(
   }
 
   const hasCorporateEmail = emails.some(e => !PERSONAL_EMAIL_DOMAINS.has(e.split('@')[1]?.toLowerCase() || ''));
+  const hasWebChannel = urls.length > 0 || /(?:website|web|portal|linkedin)\s*[:\-]\s*[A-Za-z0-9]/i.test(text);
   let contactCheck = 0.0;
   if (hasCorporateEmail && phones.length > 0) contactCheck = 1.0;
   else if (hasCorporateEmail) contactCheck = 0.8;
   else if (emails.length > 0 && phones.length > 0) contactCheck = 0.5;
-  else if (emails.length > 0 || phones.length > 0) contactCheck = 0.3;
+  else if (emails.length > 0 || phones.length > 0 || hasWebChannel) contactCheck = 0.4;
   else {
     flags.push({
       rule: "ner_contact",
       severity: "high",
-      message: "No contact information (email or phone) found in the letter.",
+      message: "No contact information (email, phone, or web portal) found in the letter.",
       score: 0.0,
     });
   }
@@ -646,7 +647,7 @@ export function extractDocumentSignals(
   }
 
   // Robust date extraction supporting numeric, written month, and standard formats
-  const textDates = text.match(/\b(?:(?:0?[1-9]|[12][0-9]|3[01])(?:st|nd|rd|th)?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[\s,]+(?:20\d{2}|19\d{2})|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(?:0?[1-9]|[12][0-9]|3[01])(?:st|nd|rd|th)?[\s,]+(?:20\d{2}|19\d{2})|\d{1,2}[\/\-\.]\d{1,2}[\/\-\.](?:20\d{2}|\d{2}))\b/gi) || [];
+  const textDates = text.match(/\b(?:(?:0?[1-9]|[12][0-9]|3[01])(?:st|nd|rd|th)?[\s\-_]+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[\s\-_,]+(?:20\d{2}|19\d{2}|\d{2})|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(?:0?[1-9]|[12][0-9]|3[01])(?:st|nd|rd|th)?[\s,]+(?:20\d{2}|19\d{2})|\d{1,2}[\/\-\.]\d{1,2}[\/\-\.](?:20\d{2}|\d{2})|(?:20\d{2}|19\d{2})[\/\-\.]\d{1,2}[\/\-\.]\d{1,2})\b/gi) || [];
   const dates = Array.from(new Set(textDates));
   const dateCheck = dates.length >= 2 ? 1.0 : (dates.length === 1 ? 0.7 : 0.3);
 
@@ -1001,10 +1002,17 @@ export function extractDocumentSignals(
   }
 
   // Construct Normalized Document Evidence
-  const selectionMatch = text.match(/(?:We are pleased to (?:offer|inform|extend)|Congratulations(?:!|,)? (?:You have been selected|on your selection)|offer of appointment|selected for the position of|offer of internship|pleased to offer you)[^\n.]{0,160}/i);
-  const candidateMatch = text.match(/(?:Dear|To,?\s*Candidate|Candidate Name\s*:|Name\s*:|Mr\.|Ms\.|Shri)\s*([A-Z][a-zA-Z\s.]{2,40})/i);
-  const normRoleMatch = text.match(/(?:position of|role of|as an?|designation\s*:)\s*([A-Z][A-Za-z0-9\s-]{2,40}(?:Intern|Trainee|Engineer|Developer|Analyst|Associate|Designer|Manager)?)/i);
-  const joiningMatch = text.match(/(?:joining date|date of joining|commencing from|start date|report on)\s*(?:is|:)?\s*([0-9]{1,2}(?:st|nd|rd|th)?\s+[A-Za-z]+\s+[0-9]{4}|[0-9]{1,2}[-/][0-9]{1,2}[-/][0-9]{2,4})/i);
+  const selectionMatch = text.match(/(?:We are pleased to (?:offer|inform|extend|appoint)|delighted to (?:offer|welcome|appoint)|Congratulations(?:!|,)? (?:You have been selected|on your selection)|offer of appointment|selected for the position of|offer of internship|pleased to offer you|confirmation letter|welcome letter|permanent employment|selected for the upcoming internship)[^\n.]{0,160}/i);
+  const candidateMatch = text.match(/(?:Dear|Hi\b|Hello\b|To,?\s*Candidate|Candidate Name\s*:|Name\s*:|Mr\.|Ms\.|Mrs\.|Shri)\s*([A-Z][a-zA-Z\s.]{2,40})/i);
+  let normRole = text.match(/(?:position of|role of|as an?|designation\s*[:\-]|job\s*title\s*[:\-]|role\s*[:\-]|position\s*[:\-]|internship\s*(?:role|domain)\s*[:\-])\s*([A-Za-z0-9\s/&()\-]{2,40})/i)?.[1]?.trim();
+  if (!normRole) {
+    const subMatch = text.match(/(?:subject|sub)\s*[:\-]\s*(?:offer\s*(?:letter|of\s+employment|for)?\s*[-–:]?\s*)?([A-Za-z0-9\s/&()\-]{3,40})/i);
+    if (subMatch && /(?:engineer|developer|analyst|intern|designer|manager|associate|consultant|specialist|lead|officer|executive|trainee|architect|scientist|coordinator|strategist|writer|representative|internship)/i.test(subMatch[1])) {
+      normRole = subMatch[1].trim();
+    }
+  }
+  const normRoleMatch = normRole ? [normRole, normRole] : null;
+  const joiningMatch = text.match(/(?:joining date|date of joining|commencing from|start date|cohort date|report on|effective date)\s*(?:is|:)?\s*([0-9]{1,2}(?:st|nd|rd|th)?[\s\-_]+[A-Za-z]+[\s\-_]+[0-9]{2,4}|[0-9]{1,2}[-/][0-9]{1,2}[-/][0-9]{2,4}|[A-Za-z]+\s+[0-9]{1,2}(?:st|nd|rd|th)?,?\s+[0-9]{4})/i);
 
   const matchedClauses: string[] = [];
   for (const [pattern, _boost, desc] of GENUINE_INDICATORS) {

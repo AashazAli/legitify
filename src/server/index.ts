@@ -22,7 +22,9 @@ import { logAuditEvent } from './services/auditService';
 import { isFilenameOrPlaceholder } from './utils/normalizer';
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = parseInt(process.env.PORT || '4001', 10);
+const CLIENT_PORT = parseInt(process.env.VITE_PORT || process.env.CLIENT_PORT || '4002', 10);
+const FRONTEND_URL = process.env.FRONTEND_URL || `http://localhost:${CLIENT_PORT}`;
 
 app.use(cors());
 app.use(express.json({ limit: '15mb' }));
@@ -76,7 +78,7 @@ function renderNav(activePath: string): string {
     <div class="header">
       <a href="/" class="logo-badge">LEGITIFY INTELLIGENCE ENGINE</a>
       <div class="nav-links">
-        <a href="http://localhost:3002" class="nav-link" target="_blank">Web UI (3002)</a>
+        <a href="${FRONTEND_URL}" class="nav-link" target="_blank">Web UI (${CLIENT_PORT})</a>
         <a href="/api/health" class="nav-link ${activePath === 'health' ? 'active' : ''}">System Health</a>
         <a href="/api/providers/status" class="nav-link ${activePath === 'providers' ? 'active' : ''}">Providers</a>
         <a href="/api/ml/metrics" class="nav-link ${activePath === 'ml' ? 'active' : ''}">ML Metrics</a>
@@ -103,7 +105,7 @@ function renderHtmlDashboard(uptime: number, dbStatus: string): string {
       <p style="margin: 0 0 12px 0; font-size: 12.5px; color: #94A3B8;">
         Real-time multi-factor verification engine evaluating corporate registries, live DNS, recruiter emails, supervised Kaggle ML patterns, and multimodal OCR anomalies.
       </p>
-      <a href="http://localhost:3002" class="btn" target="_blank">Open Web Dashboard (Port 3002) ↗</a>
+      <a href="${FRONTEND_URL}" class="btn" target="_blank">Open Web Dashboard (Port ${CLIENT_PORT}) ↗</a>
       <a href="/api/ml/metrics" class="btn btn-secondary">View ML Model Metrics ↗</a>
       <a href="/api/health" class="btn btn-secondary">API Health Status ↗</a>
     </div>
@@ -156,7 +158,7 @@ app.get('/', async (req, res) => {
   res.json({
     name: "LEGITIFY Evidence-First Trust Intelligence API",
     status: "online",
-    frontend_url: "http://localhost:3002",
+    frontend_url: FRONTEND_URL,
     docs: {
       health: "/api/health",
       ml_health: "/api/ml/health",

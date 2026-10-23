@@ -257,7 +257,7 @@ function CandidateLoginPage({
     setError(null);
 
     const configuredUrl = (import.meta as any).env?.VITE_SUPABASE_URL || "";
-    const isUnconfiguredOrMock = !configuredUrl || configuredUrl.includes("nsvcphlhezykbbducxip");
+    const isUnconfiguredOrMock = !configuredUrl || configuredUrl.includes("nsvcphlhezykbbducxip") || configuredUrl.includes("your-project-ref") || configuredUrl.includes("your-project") || configuredUrl.includes("placeholder");
 
     if (isUnconfiguredOrMock) {
       setTimeout(() => {
