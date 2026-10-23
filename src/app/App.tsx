@@ -22,7 +22,7 @@ import { LegitifyReport, ScanRecord } from "../types";
 import { PublicExperiencePanel } from "./components/PublicExperiencePanel";
 import { ForensicExplanationPanel } from "./components/ForensicExplanationPanel";
 import { SecureDropzone } from "./components/forensics/SecureDropzone";
-import { runCompleteForensicAnalysis } from "../lib/forensics/AnalysisEngine";
+import { runCompleteForensicAnalysis, isClientFilenameOrPlaceholder } from "../lib/forensics/AnalysisEngine";
 import { CompleteForensicReport, MagicValidationResult } from "../lib/forensics/types";
 
 // ================================================================
@@ -638,6 +638,9 @@ function UserScanView({
       setProcessingStage("Cross-referencing corporate registry & intelligence feeds...");
 
       let rawDetected = fReport?.semantics?.detectedCompany;
+      if (isClientFilenameOrPlaceholder(rawDetected)) {
+        rawDetected = undefined;
+      }
       if (/^AI\s+EdTech\s+Services$/i.test(rawDetected || '')) {
         rawDetected = 'Ementora Group of Companies';
       }
@@ -715,9 +718,13 @@ function UserScanView({
 
         finalReport.confidence = finalReport.confidence || fReport.scoring.confidenceMetric;
         finalReport.confidence_score = finalReport.confidence_score || finalReport.trust_score;
-        let canonicalCompany = effectiveCompany;
-        if (canonicalCompany === "Investigated Organization" && finalReport.document_analysis?.detected_company_name) {
-          canonicalCompany = finalReport.document_analysis.detected_company_name;
+        let canonicalCompany = (finalReport.document_analysis?.detected_company_name && !isClientFilenameOrPlaceholder(finalReport.document_analysis.detected_company_name))
+          ? finalReport.document_analysis.detected_company_name
+          : effectiveCompany;
+        if (canonicalCompany === "Investigated Organization" || isClientFilenameOrPlaceholder(canonicalCompany)) {
+          canonicalCompany = (finalReport.document_analysis?.detected_company_name && !isClientFilenameOrPlaceholder(finalReport.document_analysis.detected_company_name))
+            ? finalReport.document_analysis.detected_company_name
+            : "Investigated Organization";
         }
         if (/^AI\s+EdTech\s+Services$/i.test(canonicalCompany || '')) {
           canonicalCompany = 'Ementora Group of Companies';
@@ -940,14 +947,19 @@ function UserReportView({
   const fSemantics = activeForensicReport?.semantics;
   const fScoring = activeForensicReport?.scoring;
 
-  let rawName = fSemantics?.detectedCompany || report.company_name || report.entity_name || report.entity_value || "Investigated Offer";
-  let cleanCompany = (rawName.match(/(\.(png|jpg|jpeg|pdf)$|^offer_letter|^images|^image\s*\(|^screenshot)/i))
-    ? (fSemantics?.detectedCompany || report.document_analysis?.extracted_entities?.detected_company || "Investigated Organization")
+  let rawName = (!isClientFilenameOrPlaceholder(report.document_analysis?.detected_company_name) && report.document_analysis?.detected_company_name)
+    || (!isClientFilenameOrPlaceholder(report.company_name) && report.company_name)
+    || (!isClientFilenameOrPlaceholder(report.entity_name) && report.entity_name)
+    || (!isClientFilenameOrPlaceholder(fSemantics?.detectedCompany) && fSemantics?.detectedCompany)
+    || (!isClientFilenameOrPlaceholder(report.entity_value) && report.entity_value)
+    || "Investigated Offer";
+  let cleanCompany = (rawName.match(/(\.(png|jpg|jpeg|pdf)$|^offer_letter|^images|^image\s*\(|^screenshot)/i) || isClientFilenameOrPlaceholder(rawName))
+    ? (report.document_analysis?.detected_company_name || fSemantics?.detectedCompany || report.company_verification?.legal_name || "Investigated Organization")
     : rawName;
 
   if (/^AI\s+EdTech\s+Services$/i.test(cleanCompany)) {
     const betterName = fSemantics?.detectedCompany || report.document_analysis?.detected_company_name;
-    cleanCompany = (betterName && !/^AI\s+EdTech\s+Services$/i.test(betterName)) ? betterName : "Ementora Group of Companies";
+    cleanCompany = (betterName && !/^AI\s+EdTech\s+Services$/i.test(betterName) && !isClientFilenameOrPlaceholder(betterName)) ? betterName : "Ementora Group of Companies";
   }
 
   const card1Struct = activeForensicReport?.scoring?.structureAnalysis || fSemantics?.structure || (report?.document_analysis as any)?.structure_analysis;

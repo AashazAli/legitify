@@ -367,12 +367,15 @@ export function extractDocumentSignals(
   }
 
   // Pattern A: Explicit letterhead or document header prefixes
+  if (!detectedCompanyName) {
   const prefixMatch = text.match(/(?:Offer\s*Letter\s*(?:from|for|by)|Welcome\s*to|Employment\s*Offer\s*-\s*|Sub:\s*Appointment\s*(?:at|in|with)|Company\s*Name\s*:\s*|Organisation\s*:\s*|Organization\s*:\s*|Employer\s*:\s*)([A-Z0-9][A-Za-z0-9\s&.,'-]{2,50}(?:Pvt\s*Ltd|Private\s*Limited|Limited|Ltd|LLC|Inc|Corp|Technologies|Solutions|Enterprises|Infotech|Services|Global|Aviation|Motors|Consultancy|Systems)?)/i);
   if (prefixMatch && prefixMatch[1]?.trim()) {
     const cand = prefixMatch[1].trim();
     if (!isFilenameOrPlaceholder(cand) && !cand.startsWith('(')) {
       detectedCompanyName = cand;
     }
+  }
+
   }
 
   // Pattern B: Legal entity markers (e.g. Acme Corp Ltd, Tech Solutions Private Limited, Clinchsoft Technologies)

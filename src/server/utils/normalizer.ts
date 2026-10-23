@@ -359,6 +359,17 @@ export function isFilenameOrPlaceholder(name?: string): boolean {
   if (/^\(?\s*[^a-zA-Z0-9]*\s*\)?$/.test(s)) return true;
   if (!/[a-zA-Z]/.test(s)) return true;
 
+  // PDF binary stream & object syntax (e.g. "2 0 obj", "1 0 obj", "xref", "endobj")
+  if (/^\d+\s+\d+\s+obj\b/i.test(s) || /\b\d+\s+\d+\s+obj\b/i.test(s)) return true;
+  if (/^(?:xref|trailer|startxref|endobj|stream|endstream|flatedecode|linearized)\b/i.test(s)) return true;
+  if (/%pdf|<<|>>/i.test(s)) return true;
+
+  // Sentence fragments, policy clauses, or conversational text (e.g. "policy. The", "the company. You are requested to")
+  if (/\.\s+[A-Z]/.test(name.trim())) return true;
+  if (/\b(?:you\s+are|we\s+are|are\s+requested|is\s+requested|requested\s+to|required\s+to|directed\s+to|pleased\s+to|hereby|herein)\b/i.test(s)) return true;
+  if (/^(?:the\s+company|the\s+firm|the\s+organization|company\s+policy|policy|terms|condition|clause)\b/i.test(s)) return true;
+  if (/\b(?:to|with|for|at|in|on|by|from|of|is|are|and|or|you|your|we|our|the)\s*$/i.test(s)) return true;
+
   return false;
 }
 

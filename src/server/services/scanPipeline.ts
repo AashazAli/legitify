@@ -866,9 +866,9 @@ export async function runScanPipeline(params: ExecuteScanParams): Promise<Legiti
   };
 
   // Stage 19: 26-Section Hierarchy Report Compilation & Persistence
-  const resolvedEntityName = !isFilenameOrPlaceholder(entityValue)
+  const resolvedEntityName = (docResult?.detected_company_name && !isFilenameOrPlaceholder(docResult.detected_company_name)) ? docResult.detected_company_name : (!isFilenameOrPlaceholder(entityValue) && entityValue !== 'Investigated Organization')
     ? entityValue
-    : (targetCompany || (docResult?.detected_company_name && !isFilenameOrPlaceholder(docResult.detected_company_name) ? docResult.detected_company_name : undefined) || 'Organization Not Confidently Identified');
+    : (targetCompany || 'Organization Not Confidently Identified');
 
   const aiProvider = await getActiveAIProvider();
   const aiSynthesis = await aiProvider.generateSynthesis({
