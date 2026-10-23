@@ -2061,6 +2061,7 @@ function UserReportView({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Card 1: Document Authenticity & Visual Forensics */}
           {(() => {
+            const activeStruct = card1Struct;
 
             const card1Score = Math.round(
               activeStruct?.structureScore ??
@@ -2125,13 +2126,13 @@ function UserReportView({
                         <span
                           key={chk.id}
                           className={`text-[10px] font-sans px-2 py-0.5 rounded-md border flex items-center gap-1 ${
-                            chk.passed
+                            (chk.passed ?? (chk.status === 'VERIFIED' || chk.status === 'PRESENT'))
                               ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                               : "bg-rose-50 text-rose-700 border border-rose-200"
                           }`}
-                          title={chk.details}
+                          title={chk.details || chk.detail}
                         >
-                          {chk.passed ? <Check className="w-3 h-3 inline mr-1" /> : <X className="w-3 h-3 inline mr-1" />}
+                          {(chk.passed ?? (chk.status === 'VERIFIED' || chk.status === 'PRESENT')) ? <Check className="w-3 h-3 inline mr-1" /> : <X className="w-3 h-3 inline mr-1" />}
                           <span>{chk.name}</span>
                         </span>
                       ))}
