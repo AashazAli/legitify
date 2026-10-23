@@ -1308,19 +1308,20 @@ export function buildStandardAssessments(
     (() => {
       let docRisk = 7;
       const flags = inputs.documentData?.triggered_flags || [];
+      const criticalOrHighFlags = flags.filter(f => f.severity === 'critical' || f.severity === 'high');
       const urgencyPhrases = (inputs.documentData as any)?.suspicious_pressure_phrases || [];
       if (inputs.documentData?.is_confirmed_impersonation) {
-        docRisk = 84 + Math.min(12, flags.length * 3);
-      } else if (inputs.documentData?.is_suspicious_offer_letter) {
-        docRisk = 38 + Math.min(22, flags.length * 4);
+        docRisk = 84 + Math.min(12, criticalOrHighFlags.length * 3);
+      } else if (inputs.documentData?.is_suspicious_offer_letter && criticalOrHighFlags.length > 0) {
+        docRisk = 35 + Math.min(20, criticalOrHighFlags.length * 5);
       }
-      docRisk += Math.min(20, flags.length * 4.5);
-      docRisk += Math.min(15, urgencyPhrases.length * 3.5);
+      docRisk += Math.min(16, criticalOrHighFlags.length * 4);
+      docRisk += Math.min(10, urgencyPhrases.length * 2.5);
       if (!inputs.documentData?.detected_signatory && !inputs.certificateData?.has_digital_signature) {
-        docRisk += 7;
+        docRisk += 4;
       }
       if (!inputs.documentData?.detected_dates || inputs.documentData.detected_dates.length === 0) {
-        docRisk += 5;
+        docRisk += 3;
       }
       if (inputs.documentData?.detected_signatory && inputs.documentData?.detected_company_name && inputs.documentData?.detected_dates?.length) {
         docRisk = Math.max(4, docRisk - 6);
@@ -1331,7 +1332,7 @@ export function buildStandardAssessments(
         'Document Authenticity & Structural Integrity',
         finalDocRisk,
         finalDocRisk >= 60
-          ? `Document layout exhibits irregular structure with ${flags.length} anomalous flags and high urgency pressure phrasing.`
+          ? `Document layout exhibits irregular structure with ${criticalOrHighFlags.length} anomalous flags and high urgency pressure phrasing.`
           : finalDocRisk >= 30
           ? `Document layout exhibits minor structural variations (${flags.length} notes) but adheres to core business appointment format.`
           : 'Document structure adheres to standard corporate appointment conventions with verified layout elements.',

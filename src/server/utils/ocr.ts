@@ -187,21 +187,33 @@ Return JSON format:
 
     if (!visualForensics.signature_detected && (hasDigitalSig || hasSignatory)) {
       visualForensics.signature_detected = true;
-      visualForensics.signature_type = hasDigitalSig ? "CRYPTOGRAPHIC_SIGNATURE" : "PRINTED_SIGNATURE";
+      visualForensics.signature_type = "PRINTED_SIGNATURE";
       visualForensics.signatory_state = "SIGNATORY_OBSERVED";
     }
 
     if (!visualForensics.signatory_name || !detectedSignatory) {
-      const sigPattern = /(?:digitally\s+signed\s+by[:\s]*|signed\s+by[:\s]*|sd\/-?\s*|yours\s+(?:sincerely|faithfully|truly)[,\s]*\n*|authorized\s+signatory[,\s]*\n*)([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i;
-      const sigMatch = rawText.match(sigPattern);
-      if (sigMatch && sigMatch[1] && !/(?:limited|ltd|pvt|private|corporation|technologies|solutions)/i.test(sigMatch[1])) {
-        visualForensics.signatory_name = sigMatch[1].trim();
-        detectedSignatory = sigMatch[1].trim();
+      // Check for inline name - title: e.g. "Sudip Das — Founder"
+      const dashMatch = rawText.match(/(?:(?:sincerely|regards|faithfully|authorized\s+signatory|signed\s+by)[:\s,]*)?\n?\s*([A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+){1,3})\s*(?:[—–\-]|,)\s*([A-Za-z\s&/-]{3,40})/i);
+      if (dashMatch && !/(?:limited|ltd|pvt|private|corporation|technologies|solutions)/i.test(dashMatch[1])) {
+        visualForensics.signatory_name = dashMatch[1].trim();
+        detectedSignatory = dashMatch[1].trim();
+        if (!visualForensics.signatory_title && /(?:founder|co-founder|director|managing\s+director|ceo|cto|manager|head|lead|officer|partner|signatory)/i.test(dashMatch[2])) {
+          visualForensics.signatory_title = dashMatch[2].trim();
+        }
+      }
+
+      if (!visualForensics.signatory_name || !detectedSignatory) {
+        const sigPattern = /(?:digitally\s+signed\s+by[:\s]*|signed\s+by[:\s]*|sd\/-?\s*|yours\s+(?:sincerely|faithfully|truly)[,\s]*\n*|authorized\s+signatory[,\s]*\n*)([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i;
+        const sigMatch = rawText.match(sigPattern);
+        if (sigMatch && sigMatch[1] && !/(?:limited|ltd|pvt|private|corporation|technologies|solutions)/i.test(sigMatch[1])) {
+          visualForensics.signatory_name = sigMatch[1].trim();
+          detectedSignatory = sigMatch[1].trim();
+        }
       }
     }
 
     if (!visualForensics.signatory_title) {
-      const titleMatch = rawText.match(/(?:director|vice\s+president|head\s+of\s+hr|hr\s+manager|talent\s+acquisition\s+lead|authorized\s+signatory)/i);
+      const titleMatch = rawText.match(/(?:founder|co-founder|managing\s+director|director|vice\s+president|head\s+of\s+hr|head\s*[-–]\s*hr|hr\s+manager|talent\s+acquisition\s+lead|lead\s+recruiter|placement\s+officer|authorized\s+signatory)/i);
       if (titleMatch) {
         visualForensics.signatory_title = titleMatch[0].trim();
       }
@@ -218,6 +230,7 @@ Return JSON format:
     detected_company: detectedCompany,
     detected_emails: detectedEmails,
     detected_signatory: detectedSignatory,
+    detected_signatory_title: visualForensics.signatory_title,
     detected_fees: detectedFees,
     has_seal: visualForensics.official_seal_detected,
     has_signature: visualForensics.signature_detected,

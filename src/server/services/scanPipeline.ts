@@ -894,17 +894,44 @@ export async function runScanPipeline(params: ExecuteScanParams): Promise<Legiti
     totalDurationMs: Date.now() - scanStartTime,
   };
 
+  const sigName = visualForensicsResult?.signatoryName || docResult?.detected_signatory;
+  const sigTitle = visualForensicsResult?.signatoryTitle || (docResult as any)?.detected_signatory_title;
+
   const signatoryForensics = visualForensicsResult ? {
-    signature_detected: visualForensicsResult.signatureType !== 'ABSENT',
-    signature_type: visualForensicsResult.signatureType,
-    signatory_name: visualForensicsResult.signatoryName,
-    signatory_title: visualForensicsResult.signatoryTitle,
+    signature_detected: visualForensicsResult.hasVisualSignatureMark || visualForensicsResult.hasSignatoryBlock || Boolean(sigName),
+    has_visual_signature_mark: visualForensicsResult.hasVisualSignatureMark,
+    has_signatory_block: visualForensicsResult.hasSignatoryBlock,
+    has_signatory_identity: Boolean(sigName || sigTitle),
+    has_cryptographic_signature: visualForensicsResult.hasCryptographicSignature,
+    is_cryptographic_verified: visualForensicsResult.isCryptographicVerified,
+    signature_type: (visualForensicsResult.signatureType === 'ABSENT' && (sigName || visualForensicsResult.hasSignatoryBlock))
+      ? 'PRINTED_SIGNATORY' as const
+      : visualForensicsResult.signatureType,
+    signatory_name: sigName,
+    signatory_title: sigTitle,
     signatory_department: visualForensicsResult.signatoryDepartment,
-    identity_state: visualForensicsResult.signatoryState,
+    identity_state: (visualForensicsResult.signatoryState === 'NO_SIGNATURE_DETECTED' && sigName)
+      ? 'SIGNATORY_OBSERVED' as const
+      : (visualForensicsResult.signatoryState === 'NO_SIGNATURE_DETECTED' && visualForensicsResult.hasSignatoryBlock)
+      ? 'SIGNATORY_BLOCK_OBSERVED' as const
+      : visualForensicsResult.signatoryState,
     page: visualForensicsResult.regions.find(r => r.type === 'SIGNATURE' || r.type === 'SIGNATORY_BLOCK')?.page || 1,
     evidence_ids: visualForensicsResult.evidence.map(e => e.id).filter(Boolean) as string[],
     detection_method: visualForensicsResult.detectionMethod,
-  } : undefined;
+  } : (docResult?.detected_signatory ? {
+    signature_detected: true,
+    has_visual_signature_mark: false,
+    has_signatory_block: true,
+    has_signatory_identity: true,
+    has_cryptographic_signature: false,
+    is_cryptographic_verified: false,
+    signature_type: 'PRINTED_SIGNATORY' as const,
+    signatory_name: docResult.detected_signatory,
+    signatory_title: (docResult as any).detected_signatory_title,
+    identity_state: 'SIGNATORY_OBSERVED' as const,
+    evidence_ids: [],
+    detection_method: 'TEXT_PATTERN',
+  } : undefined);
 
   const finalReport = compileFullReport({
     scanId,

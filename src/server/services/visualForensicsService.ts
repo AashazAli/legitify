@@ -8,6 +8,7 @@ import type {
   VisualForensicsData,
   EvidenceItem,
 } from '../../types';
+import { inspectPdfCryptographicSignature } from '../utils/pdfSignature';
 
 export interface VisualForensicResult {
   regions: VisualRegion[];
@@ -16,8 +17,13 @@ export interface VisualForensicResult {
   signatoryTitle?: string;
   signatoryDepartment?: string;
   signatureType: VisualSignatureType;
+  hasVisualSignatureMark: boolean;
+  hasSignatoryBlock: boolean;
+  hasSignatoryIdentity: boolean;
+  hasCryptographicSignature: boolean;
+  isCryptographicVerified: boolean;
   evidence: EvidenceItem[];
-  detectionMethod: 'GEMINI_VISION' | 'TEXT_PATTERN' | 'NONE';
+  detectionMethod: 'GEMINI_VISION' | 'TEXT_PATTERN' | 'PDF_METADATA' | 'NONE';
   analysisVersion: string;
 }
 
@@ -51,7 +57,25 @@ export async function detectVisualRegions(
 ): Promise<VisualForensicResult> {
   const aiClient = getGeminiClient();
   let regions: VisualRegion[] = [];
-  let detectionMethod: 'GEMINI_VISION' | 'TEXT_PATTERN' | 'NONE' = 'NONE';
+  let detectionMethod: 'GEMINI_VISION' | 'TEXT_PATTERN' | 'PDF_METADATA' | 'NONE' = 'NONE';
+
+  // Check authentic PDF cryptographic signature metadata
+  const pdfInspection = inspectPdfCryptographicSignature(buffer);
+  const hasCryptographicSignature = pdfInspection.hasEmbeddedSignature;
+  const isCryptographicVerified = pdfInspection.isCryptographicVerified;
+
+  if (hasCryptographicSignature) {
+    const evidenceId = generateVisualEvidenceId(scanId, 1, 'CRYPTO_SIG');
+    regions.push({
+      type: 'DIGITAL_SIGNATURE',
+      page: 1,
+      confidence: 0.95,
+      nearbyText: pdfInspection.details,
+      evidenceId,
+      detectionMethod: 'OCR_LAYOUT',
+    });
+    detectionMethod = 'PDF_METADATA';
+  }
 
   // Tier 1: Gemini Multimodal Vision analysis
   if (aiClient && (mimeType.startsWith('image/') || mimeType === 'application/pdf')) {
@@ -60,7 +84,7 @@ export async function detectVisualRegions(
       const prompt = `
 You are a forensic visual document examiner. Inspect this document and return a JSON array of visual regions.
 Do NOT transcribe the document. Only identify structural visual regions:
-- SIGNATURE (handwritten signature, signature image, or visual signoff block)
+- SIGNATURE (handwritten signature, signature image, or pen-mark signoff)
 - STAMP (ink stamp, rubber stamp, corporate seal)
 - SEAL (embossed or digital seal)
 - LOGO (corporate logo mark)
@@ -93,7 +117,7 @@ Return ONLY valid JSON: [{"type": "...", "page": 1, "confidence": 0.9, "nearbyTe
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
         if (Array.isArray(parsed)) {
-          regions = parsed.map((p: any) => ({
+          const visionRegions = parsed.map((p: any) => ({
             type: (p.type as VisualRegionType) || 'SIGNATURE',
             page: Number(p.page) || 1,
             confidence: typeof p.confidence === 'number' ? Math.min(1.0, Math.max(0.1, p.confidence)) : 0.75,
@@ -101,26 +125,27 @@ Return ONLY valid JSON: [{"type": "...", "page": 1, "confidence": 0.9, "nearbyTe
             evidenceId: generateVisualEvidenceId(scanId, Number(p.page) || 1, p.type || 'VIS'),
             detectionMethod: 'GEMINI_VISION' as const,
           }));
-          if (regions.length > 0) {
+          if (visionRegions.length > 0) {
+            regions.push(...visionRegions);
             detectionMethod = 'GEMINI_VISION';
           }
         }
       }
-    } catch (err) {
+    } catch {
       // Vision model fallback to text pattern
     }
   }
 
   // Tier 2: OCR text pattern fallback if vision produced no signature regions
   if (!regions.some(r => r.type === 'SIGNATURE' || r.type === 'SIGNATORY_BLOCK' || r.type === 'DIGITAL_SIGNATURE') && ocrText) {
-    const signaturePatterns = /(?:digitally\s+signed|docusign|adobe\s+sign|signature\s+valid|esign|e-sign|authorized\s+signatory|authorized\s+sign|yours\s+(?:sincerely|faithfully|truly|warmly|regards)|hr\s+manager|head\s+-?\s*hr|director|talent\s+acquisition)[\s\S]{0,180}/i;
+    const signaturePatterns = /(?:digitally\s+signed|docusign|adobe\s+sign|signature\s+valid|esign|e-sign|authorized\s+signatory|authorized\s+sign|yours\s+(?:sincerely|faithfully|truly|warmly|regards)|with\s+regards|warm\s+regards|hr\s+manager|head\s+-?\s*hr|director|founder|talent\s+acquisition)[\s\S]{0,220}/i;
     const match = ocrText.match(signaturePatterns);
     if (match) {
       const nearbyText = match[0].trim();
-      const isDigital = /(?:digitally\s+signed|docusign|adobe\s+sign|signature\s+valid|esign|e-sign|cryptographic)/i.test(nearbyText);
-      const evidenceId = generateVisualEvidenceId(scanId, 1, isDigital ? 'DIGSIG' : 'SIG');
+      const isClaimedDigital = /(?:digitally\s+signed|docusign|adobe\s+sign|signature\s+valid|esign|e-sign)/i.test(nearbyText);
+      const evidenceId = generateVisualEvidenceId(scanId, 1, isClaimedDigital ? 'DIGSIG' : 'SIG');
       regions.push({
-        type: isDigital ? 'DIGITAL_SIGNATURE' : 'SIGNATORY_BLOCK',
+        type: isClaimedDigital ? 'SIGNATORY_BLOCK' : 'SIGNATORY_BLOCK',
         page: 1,
         confidence: 0.85,
         nearbyText,
@@ -133,47 +158,151 @@ Return ONLY valid JSON: [{"type": "...", "page": 1, "confidence": 0.9, "nearbyTe
     }
   }
 
-  // Determine signature type: Separate visual signature from cryptographic digital signature
-  let signatureType: VisualSignatureType = 'ABSENT';
+  // Determine signature-related elements independently
+  const hasVisualSignatureMark = regions.some(r => r.type === 'SIGNATURE' || (r.type === 'HANDWRITING' && r.confidence >= 0.7));
+  const hasStampOrSeal = regions.some(r => r.type === 'STAMP' || r.type === 'SEAL');
+  const hasExplicitSignatoryBlock = regions.some(r => r.type === 'SIGNATORY_BLOCK' || r.type === 'DIGITAL_SIGNATURE') ||
+    Boolean(ocrText && /(?:authorized\s+signatory|sincerely|faithfully|warm\s+regards|best\s+regards|with\s+regards|regards|for\s+[A-Za-z0-9\s&.,'-]+|human\s+resources\s+department)/i.test(ocrText));
+
   let signatoryName: string | undefined;
   let signatoryTitle: string | undefined;
   let signatoryDepartment: string | undefined;
 
+  // Search text blocks across all closing sections and nearby visual regions
   const sigRegion = regions.find(r => r.type === 'SIGNATURE' || r.type === 'SIGNATORY_BLOCK' || r.type === 'DIGITAL_SIGNATURE');
-  const stampRegion = regions.find(r => r.type === 'STAMP' || r.type === 'SEAL');
+  const searchBlocks = [
+    sigRegion?.nearbyText,
+    ocrText ? ocrText.slice(-800) : '',
+    ocrText || '',
+  ].filter(Boolean) as string[];
 
-  if (sigRegion) {
-    const isDigital = sigRegion.type === 'DIGITAL_SIGNATURE' ||
-      Boolean(sigRegion.nearbyText && /(?:digitally\s+signed|docusign|adobe\s+sign|signature\s+valid|esign|e-sign|cryptographic)/i.test(sigRegion.nearbyText));
-    signatureType = isDigital ? 'CRYPTOGRAPHIC_SIGNATURE' : 'VISUAL_SIGNATURE';
+  const titleRegex = /(?:(?:Global\s+)?Head\s+(?:of\s+)?[-–\s]?\s*(?:Human\s+Resources|HR|Talent\s+Acquisition|Engineering(?:\s+Talent)?|People|Operations|Product|Design)|Chief\s+(?:Executive|Operating|Technology|People|Human\s+Resources|Financial|Revenue)\s+Officer|Vice\s+President(?:\s*[-–\s]\s*[A-Za-z\s]+)?|Managing\s+Director|Director(?:\s*[-–\s]\s*[A-Za-z\s]+)?|Founder(?:\s*(?:&|and)\s*Managing\s+Director)?|Co-Founder|Partner|Proprietor|Lead\s+AI\s+Scientist|Senior\s+(?:HR\s+Manager|Recruiter|Systems\s+Engineer)|HR\s+Manager|Talent\s+Acquisition(?:\s+(?:Partner|Lead|Specialist|Manager))?|Lead\s+Recruiter|Placement\s+Officer|Authorized\s+Signatory|VP\s+of\s+[A-Za-z\s]+)/i;
 
-    const searchBlock = sigRegion.nearbyText || (ocrText ? ocrText.slice(-600) : '');
-    if (searchBlock) {
-      const cleaned = searchBlock
-        .replace(/authorized\s+signatory|authorized\s+sign|yours\s+(?:sincerely|faithfully|truly|warmly)|digitally\s+signed(\s+by)?/gi, '')
-        .trim();
-      const lines = cleaned.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-      for (const line of lines) {
-        const isCorporate = /(?:limited|ltd|private|pvt|company|corp|solutions|technologies|systems|enterprises|holdings|group)/i.test(line);
-        const nameMatch = line.match(/^([A-Z](?:\.[A-Z]\.|\.|[a-z]+)?(?:\s+[A-Z]\.?)?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/);
-        if (nameMatch && !signatoryName && !isCorporate && nameMatch[1].length > 3 && !/signature|digitally|manager|director|date|regards/i.test(nameMatch[1])) {
-          signatoryName = nameMatch[1];
-        } else if (/(?:manager|director|lead|head|officer|partner|executive|acquisition|signatory)/i.test(line) && !signatoryTitle) {
-          signatoryTitle = line;
-        } else if (/(?:human\s+resources|hr|talent|operations|engineering)/i.test(line) && !signatoryDepartment) {
-          signatoryDepartment = line;
+  const isGreetingOrPreamble = (str: string): boolean =>
+    /^(?:dear|to|hi\b|hello\b|attn|attention|subject|sub|date|ref|offer|internship|appointment|letter\s+of)/i.test(str.trim());
+
+  // Search candidate closing lines
+  const docLines = (ocrText || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  let closingIndex = -1;
+  for (let i = docLines.length - 1; i >= 0; i--) {
+    if (/(?:sincerely|faithfully|regards|warm\s+regards|best\s+regards|with\s+regards|authorized\s+signatory|for\s+[A-Za-z0-9\s&.,'-]+|accepted\s+(?:and\s+agreed)?|signed\s+by)/i.test(docLines[i])) {
+      closingIndex = i;
+      break;
+    }
+  }
+
+  const candidateLines = closingIndex >= 0 ? docLines.slice(closingIndex) : docLines.slice(-10);
+
+  for (let i = 0; i < candidateLines.length; i++) {
+    const line = candidateLines[i];
+    if (isCorporateName(line) || isGreetingOrPreamble(line)) continue;
+
+    // Check inline dash/hyphen: e.g. "Sudip Das — Founder", "Anita Roy - Head of HR"
+    const inlineDash = line.match(/^([A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+){1,3})\s*(?:[—–\-]|,)\s*(.+)$/);
+    if (inlineDash && !signatoryName) {
+      const cand = inlineDash[1].trim();
+      const candTitle = inlineDash[2].trim();
+      if (!isCorporateName(cand) && !isGreetingOrPreamble(cand)) {
+        signatoryName = cand;
+        if (titleRegex.test(candTitle)) {
+          signatoryTitle = candTitle;
         }
+        continue;
       }
     }
-  } else if (stampRegion) {
+
+    // Check standalone name
+    const nameCand = line.match(/^([A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+){1,3})$/);
+    if (nameCand && !signatoryName && !titleRegex.test(line) && !/department|resources|services|solutions|team|office/i.test(line)) {
+      signatoryName = nameCand[1].trim();
+      continue;
+    }
+
+    // Check standalone title (prefer specific role over generic 'Authorized Signatory')
+    if (titleRegex.test(line) && (!signatoryTitle || signatoryTitle === 'Authorized Signatory')) {
+      const titleMatch = line.match(titleRegex);
+      if (titleMatch) {
+        signatoryTitle = titleMatch[0].trim();
+        continue;
+      }
+    }
+
+    // Check department
+    if (/(?:human\s+resources|talent\s+acquisition|people\s+operations|hiring\s+team)/i.test(line) && !signatoryDepartment) {
+      signatoryDepartment = line.trim();
+    }
+  }
+
+  // Also check nearby visual regions if provided
+  for (const block of searchBlocks) {
+    if (signatoryName && signatoryTitle) break;
+
+    // Pattern B: Explicit labels: Name: Sudip Das, Designation: Founder
+    if (!signatoryName) {
+      const explicitMatch = block.match(/(?:Name|Signatory(?:\s*Name)?|Signed\s+By|Sd\/?-?)\s*[:\-]\s*(?:(?:Mr\.?|Ms\.?|Mrs\.?|Dr\.?)\s*)?([A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+){1,3})/i);
+      if (explicitMatch && !isCorporateName(explicitMatch[1].trim()) && !isGreetingOrPreamble(explicitMatch[1].trim())) {
+        signatoryName = explicitMatch[1].trim();
+      }
+    }
+    if (!signatoryTitle) {
+      const titleLabelMatch = block.match(/(?:Designation|Title|Role|Position)\s*[:\-]\s*([A-Za-z\s&/-]{3,40})/i);
+      if (titleLabelMatch && titleRegex.test(titleLabelMatch[1].trim())) {
+        signatoryTitle = titleLabelMatch[1].trim();
+      }
+    }
+  }
+
+  // Fallback title detection if name found but title unextracted
+  if (signatoryName && !signatoryTitle && ocrText) {
+    const rawTitleMatch = ocrText.match(titleRegex);
+    if (rawTitleMatch) {
+      signatoryTitle = rawTitleMatch[0].trim();
+    }
+  }
+
+  // Department fallback detection
+  if (!signatoryDepartment && ocrText) {
+    const deptMatch = ocrText.match(/(?:Human\s+Resources(?:\s*&\s*Talent\s+Acquisition)?|Talent\s+Acquisition|People\s+Operations|Recruitment\s+Division)/i);
+    if (deptMatch) {
+      signatoryDepartment = deptMatch[0].trim();
+    }
+  }
+
+  const hasSignatoryBlock = hasExplicitSignatoryBlock || Boolean(signatoryName) || Boolean(signatoryTitle) || Boolean(signatoryDepartment);
+  const hasSignatoryIdentity = Boolean(signatoryName || signatoryTitle);
+
+  // Determine signature format
+  let signatureType: VisualSignatureType = 'ABSENT';
+  if (hasCryptographicSignature) {
+    signatureType = 'CRYPTOGRAPHIC_SIGNATURE';
+  } else if (hasVisualSignatureMark) {
+    signatureType = 'VISUAL_SIGNATURE';
+  } else if (hasStampOrSeal) {
     signatureType = 'STAMP';
+  } else if (signatoryName) {
+    signatureType = 'PRINTED_SIGNATORY';
+  } else if (hasSignatoryBlock) {
+    signatureType = 'SIGNATORY_BLOCK';
+  } else if (ocrText && ocrText.trim().length < 40) {
+    signatureType = 'UNCERTAIN';
+  } else {
+    signatureType = 'ABSENT';
   }
 
   // Determine state machine
-  const signatoryState = determineSignatoryState(regions, signatoryName);
+  const signatoryState = determineSignatoryState(regions, signatoryName, hasSignatoryBlock, hasVisualSignatureMark);
 
   // Generate non-boosting evidence items
-  const evidence = generateEvidenceItems(regions, signatoryState, signatureType, signatoryName, signatoryTitle, scanId);
+  const evidence = generateEvidenceItems(
+    regions,
+    signatoryState,
+    signatureType,
+    signatoryName,
+    signatoryTitle,
+    scanId,
+    hasVisualSignatureMark,
+    hasCryptographicSignature
+  );
 
   return {
     regions,
@@ -182,29 +311,44 @@ Return ONLY valid JSON: [{"type": "...", "page": 1, "confidence": 0.9, "nearbyTe
     signatoryTitle,
     signatoryDepartment,
     signatureType,
+    hasVisualSignatureMark,
+    hasSignatoryBlock,
+    hasSignatoryIdentity,
+    hasCryptographicSignature,
+    isCryptographicVerified,
     evidence,
     detectionMethod,
-    analysisVersion: 'LEGITIFY-VISUAL-FORENSICS-v2.0',
+    analysisVersion: 'LEGITIFY-VISUAL-FORENSICS-v2.1',
   };
+}
+
+function isCorporateName(str: string): boolean {
+  return /(?:limited|ltd|private|pvt|company|corp|inc|llp|solutions|technologies|systems|enterprises|holdings|services|infotech|group|foundation)/i.test(str);
 }
 
 export function determineSignatoryState(
   regions: VisualRegion[],
-  signatoryName?: string
+  signatoryName?: string,
+  hasSignatoryBlock?: boolean,
+  hasVisualSignatureMark?: boolean
 ): SignatoryVerificationState {
-  const hasSignature = regions.some(r => r.type === 'SIGNATURE' || r.type === 'SIGNATORY_BLOCK' || r.type === 'STAMP');
+  const hasSignatureRegion = regions.some(r => r.type === 'SIGNATURE' || r.type === 'SIGNATORY_BLOCK' || r.type === 'STAMP' || r.type === 'DIGITAL_SIGNATURE');
 
-  if (!hasSignature) {
+  if (!hasSignatureRegion && !hasSignatoryBlock && !signatoryName && !hasVisualSignatureMark) {
     return 'NO_SIGNATURE_DETECTED';
   }
 
-  if (hasSignature && signatoryName) {
-    // Observed in document, but NOT independently verified against corporate signatory roll
+  if (signatoryName) {
+    // Signatory identity observed in document; visual presence does not verify against internal corporate registry
     return 'SIGNATORY_OBSERVED';
   }
 
-  if (hasSignature && !signatoryName) {
+  if (hasVisualSignatureMark || hasSignatureRegion) {
     return 'SIGNATURE_PRESENT_UNIDENTIFIED';
+  }
+
+  if (hasSignatoryBlock) {
+    return 'SIGNATORY_BLOCK_OBSERVED';
   }
 
   return 'NO_SIGNATURE_DETECTED';
@@ -221,26 +365,40 @@ export function generateEvidenceItems(
   signatureType: VisualSignatureType,
   signatoryName: string | undefined,
   signatoryTitle: string | undefined,
-  scanId: string
+  scanId: string,
+  hasVisualSignatureMark?: boolean,
+  hasCryptographicSignature?: boolean
 ): EvidenceItem[] {
   const items: EvidenceItem[] = [];
 
   for (const r of regions) {
-    const isSig = r.type === 'SIGNATURE' || r.type === 'SIGNATORY_BLOCK';
+    const isSig = r.type === 'SIGNATURE' || r.type === 'SIGNATORY_BLOCK' || r.type === 'DIGITAL_SIGNATURE';
     const isSeal = r.type === 'STAMP' || r.type === 'SEAL';
     const isLogo = r.type === 'LOGO' || r.type === 'LETTERHEAD';
 
     let title = `Visual Element Detected: ${r.type}`;
     let snippet = `Detected ${r.type} on page ${r.page} (${Math.round(r.confidence * 100)}% visual confidence).`;
-    let evidenceText = `Visual examination identified ${r.type} on page ${r.page}. Detection method: ${r.detectionMethod}.`;
+    let evidenceText = `Visual document examination identified ${r.type} on page ${r.page}. Detection method: ${r.detectionMethod}.`;
 
     if (isSig) {
-      title = `Visual Signature Observed (Page ${r.page})`;
-      snippet = signatoryName
-        ? `Visual signature observed with signatory reference: ${signatoryName}${signatoryTitle ? ` (${signatoryTitle})` : ''}.`
-        : `Visual signature mark observed without clear printed signatory name.`;
-      evidenceText = `Visual document forensics identified a ${signatureType.toLowerCase().replace('_', ' ')} on page ${r.page}. ` +
-        `Signatory status: ${signatoryState}. Note: Visual presence of a signature mark is an observational artifact and does not independently prove corporate authorization or authenticity.`;
+      if (hasCryptographicSignature) {
+        title = `Embedded Cryptographic Signature Object (Page ${r.page})`;
+        snippet = `PDF document contains embedded digital signature dictionary. Validated structure against ISO 32000.`;
+        evidenceText = `Cryptographic PDF dictionary inspection detected embedded /ByteRange signature. Observational analysis only.`;
+      } else if (hasVisualSignatureMark) {
+        title = `Visual Signature Mark Observed (Page ${r.page})`;
+        snippet = signatoryName
+          ? `Visual signature mark observed with signatory reference: ${signatoryName}${signatoryTitle ? ` (${signatoryTitle})` : ''}.`
+          : `Visual signature mark observed without printed signatory name.`;
+        evidenceText = `Visual document forensics identified a signature mark on page ${r.page}. ` +
+          `Signatory status: ${signatoryState}. Note: Visual presence of a signature mark is an observational artifact and does not independently prove corporate authorization or authenticity.`;
+      } else {
+        title = `Printed Signatory Block Observed (Page ${r.page})`;
+        snippet = signatoryName
+          ? `Printed signatory authority designated: ${signatoryName}${signatoryTitle ? ` (${signatoryTitle})` : ''}.`
+          : `Corporate signing authority block observed.`;
+        evidenceText = `Sign-off authority block present on page ${r.page}. No visual handwritten or digital graphic signature mark detected.`;
+      }
     } else if (isSeal) {
       title = `Corporate Stamp/Seal Observed (Page ${r.page})`;
       snippet = `Official seal or stamp graphic observed on page ${r.page}.`;
@@ -275,6 +433,8 @@ export function generateEvidenceItems(
         signatoryTitle,
         signatoryState,
         signatureType,
+        hasVisualSignatureMark: Boolean(hasVisualSignatureMark),
+        hasCryptographicSignature: Boolean(hasCryptographicSignature),
       },
     });
   }

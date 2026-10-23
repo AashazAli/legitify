@@ -946,22 +946,36 @@ function UserReportView({
 
   const isSigDetected = Boolean(
     report.signatory_forensics?.signature_detected ||
+    report.signatory_forensics?.has_visual_signature_mark ||
+    report.signatory_forensics?.has_signatory_block ||
     report.document_analysis?.visual_forensics?.signature_detected ||
+    report.document_analysis?.visual_forensics?.has_visual_signature_mark ||
+    report.document_analysis?.visual_forensics?.has_signatory_block ||
     (report as any).visual_forensics?.signature_detected ||
     activeForensicReport?.semantics?.structure?.signatureDetected ||
     activeForensicReport?.semantics?.structure?.hasAuthorizedSignatoryBlock ||
     activeForensicReport?.visualForensics?.signature_detected ||
     (report as any).detected_signatory ||
     report.document_analysis?.detected_signatory ||
-    fSemantics?.structure?.signatoryTitle
+    report.document_analysis?.detected_signatory_title ||
+    fSemantics?.structure?.signatoryTitle ||
+    fSemantics?.structure?.signatoryName
   );
 
-  const detectedSigType =
+  const rawSigType =
     report.signatory_forensics?.signature_type ||
     report.document_analysis?.visual_forensics?.signature_type ||
     activeForensicReport?.semantics?.structure?.signatureType ||
-    activeForensicReport?.visualForensics?.signature_type ||
-    (isSigDetected ? "DIGITAL_SIGNATURE" : "ABSENT");
+    activeForensicReport?.visualForensics?.signature_type;
+
+  const detectedSigType =
+    (rawSigType && rawSigType !== 'ABSENT')
+      ? rawSigType
+      : (report.signatory_forensics?.has_visual_signature_mark || report.document_analysis?.visual_forensics?.has_visual_signature_mark
+          ? "VISUAL_SIGNATURE"
+          : (report.signatory_forensics?.has_signatory_block || (report as any).detected_signatory || report.document_analysis?.detected_signatory
+              ? "PRINTED_SIGNATORY"
+              : (isSigDetected ? "SIGNATORY_BLOCK" : "ABSENT")));
 
   const detectedSigName =
     report.signatory_forensics?.signatory_name ||
@@ -977,12 +991,16 @@ function UserReportView({
     report.document_analysis?.visual_forensics?.signatory_title ||
     activeForensicReport?.semantics?.structure?.signatoryTitle ||
     activeForensicReport?.visualForensics?.signatory_title ||
-    "Human Resources & Talent Acquisition";
+    report.document_analysis?.detected_signatory_title ||
+    (report as any).detected_signatory_title ||
+    "";
 
   const detectedIdentityState =
     report.signatory_forensics?.identity_state ||
     activeForensicReport?.semantics?.structure?.identityState ||
-    (isSigDetected ? (detectedSigName ? "SIGNATORY_OBSERVED" : "SIGNATURE_PRESENT_UNIDENTIFIED") : "NO_SIGNATURE_DETECTED");
+    (isSigDetected
+      ? (detectedSigName ? "SIGNATORY_OBSERVED" : "SIGNATORY_BLOCK_OBSERVED")
+      : "NO_SIGNATURE_DETECTED");
 
   const evaluatedMlProb: number | undefined =
     report.ml_prediction?.fraud_probability ??
@@ -1854,8 +1872,14 @@ function UserReportView({
             <p className="text-[10px] text-slate-500 mt-0.5">
               {detectedSigType === 'CRYPTOGRAPHIC_SIGNATURE' || detectedSigType === 'DIGITAL_SIGNATURE'
                 ? "Digital signature certificate detected"
+                : detectedSigType === 'VISUAL_SIGNATURE' || detectedSigType === 'HANDWRITTEN_SIGNATURE'
+                ? "Visual signature mark detected"
+                : detectedSigType === 'PRINTED_SIGNATORY'
+                ? "Printed signatory name / title present"
+                : detectedSigType === 'SIGNATORY_BLOCK'
+                ? "Authorized signatory block present"
                 : isSigDetected
-                ? "Visual signature block present"
+                ? "Signatory or signature block present"
                 : "No signature detected"}
             </p>
           </div>
@@ -1866,7 +1890,7 @@ function UserReportView({
               {detectedSigName || (isSigDetected ? "Signatory Identified" : "Not Stated in Document")}
             </p>
             <p className="text-[10px] text-slate-500 mt-0.5">
-              {detectedSigTitle || (isSigDetected ? "Authorized Authority" : "No Signatory Listed")}
+              {detectedSigTitle || (detectedSigName ? "Authorized Signatory" : (isSigDetected ? "Authorized Authority" : "No Signatory Listed"))}
             </p>
           </div>
 
@@ -2681,25 +2705,43 @@ function AdminReportView({
 
   const isSigDetected = Boolean(
     report.signatory_forensics?.signature_detected ||
+    report.signatory_forensics?.has_visual_signature_mark ||
+    report.signatory_forensics?.has_signatory_block ||
     report.document_analysis?.visual_forensics?.signature_detected ||
+    report.document_analysis?.visual_forensics?.has_visual_signature_mark ||
+    report.document_analysis?.visual_forensics?.has_signatory_block ||
     (report as any).visual_forensics?.signature_detected ||
     (report as any).detected_signatory ||
-    report.document_analysis?.detected_signatory
+    report.document_analysis?.detected_signatory ||
+    report.document_analysis?.detected_signatory_title
   );
-  const detectedSigType =
+
+  const rawSigType =
     report.signatory_forensics?.signature_type ||
-    report.document_analysis?.visual_forensics?.signature_type ||
-    (isSigDetected ? "VISUAL_SIGNATURE" : "ABSENT");
+    report.document_analysis?.visual_forensics?.signature_type;
+
+  const detectedSigType =
+    (rawSigType && rawSigType !== 'ABSENT')
+      ? rawSigType
+      : (report.signatory_forensics?.has_visual_signature_mark || report.document_analysis?.visual_forensics?.has_visual_signature_mark
+          ? "VISUAL_SIGNATURE"
+          : (report.signatory_forensics?.has_signatory_block || (report as any).detected_signatory || report.document_analysis?.detected_signatory
+              ? "PRINTED_SIGNATORY"
+              : (isSigDetected ? "SIGNATORY_BLOCK" : "ABSENT")));
+
   const detectedSigName =
     report.signatory_forensics?.signatory_name ||
     report.document_analysis?.visual_forensics?.signatory_name ||
     (report as any).detected_signatory ||
     report.document_analysis?.detected_signatory ||
-    "Authorized HR Authority";
+    "";
+
   const detectedSigTitle =
     report.signatory_forensics?.signatory_title ||
     report.document_analysis?.visual_forensics?.signatory_title ||
-    "Placement Authority";
+    report.document_analysis?.detected_signatory_title ||
+    (report as any).detected_signatory_title ||
+    "";
 
   const theme = getVerdictTheme(report.verdict, report.trust_score);
   const cleanCompany = report.entity_name || report.company_name || "Offer Letter";
@@ -3072,10 +3114,10 @@ function AdminReportView({
               <div className="p-4 rounded-2xl bg-[#131822] border border-[#1E2838]">
                 <p className="text-[11px] font-mono text-slate-400 uppercase">Identified Signatory</p>
                 <p className="text-sm font-bold text-slate-100 mt-1">
-                  {detectedSigName || "Authorized HR Authority"}
+                  {detectedSigName || (isSigDetected ? "Signatory Identified" : "Not Stated in Document")}
                 </p>
                 <p className="text-[10px] text-slate-400 mt-0.5">
-                  {detectedSigTitle || "Placement Authority"}
+                  {detectedSigTitle || (detectedSigName ? "Authorized Signatory" : (isSigDetected ? "Authorized Authority" : "No Signatory Listed"))}
                 </p>
               </div>
               <div className="p-4 rounded-2xl bg-[#131822] border border-[#1E2838]">

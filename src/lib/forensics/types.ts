@@ -126,6 +126,8 @@ export interface DocumentStructureItem {
   passed: boolean;
   details: string;
   weight: number;
+  status?: 'VERIFIED' | 'PRESENT' | 'OPTIONAL_ABSENT' | 'ABSENT' | 'UNCERTAIN' | 'NOT_APPLICABLE';
+  isApplicable?: boolean;
 }
 
 export interface DocumentStructureResult {
@@ -146,6 +148,8 @@ export interface DocumentStructureResult {
   hasStipendOrCompensationTerms: boolean;
   hasConfidentialityOrIP: boolean;
   hasAuthorizedSignatoryBlock: boolean;
+  hasVisualSignatureMark?: boolean;
+  hasSignatoryIdentity?: boolean;
   signatoryTitle?: string;
   signatoryName?: string;
   signatureType?: string;

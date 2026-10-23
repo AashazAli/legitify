@@ -1,18 +1,23 @@
 export type VisualSignatureType =
-  | 'VISUAL_SIGNATURE'      // Something that looks like a signature (visual analysis only)
-  | 'HANDWRITTEN_SIGNATURE'  // Appears handwritten (visual analysis only)
-  | 'PRINTED_SIGNATURE'      // Printed name in signature position
-  | 'STAMP'                  // Rubber stamp or similar
+  | 'VISUAL_SIGNATURE'       // Something that looks like a signature (visual analysis only)
+  | 'HANDWRITTEN_SIGNATURE'   // Appears handwritten (visual analysis only)
+  | 'PRINTED_SIGNATURE'       // Printed name in signature position
+  | 'PRINTED_SIGNATORY'       // Formal printed signatory block with authority
+  | 'SIGNATORY_BLOCK'         // Designated sign-off section / closing block
+  | 'STAMP'                   // Rubber stamp or similar
   | 'CRYPTOGRAPHIC_SIGNATURE' // ONLY when PDF digital signature metadata validates
-  | 'ABSENT';                // No signature detected
+  | 'UNCERTAIN'               // Image quality or OCR prevents conclusive verification
+  | 'ABSENT';                 // No signature or signatory detected
 
 export type SignatoryVerificationState =
   | 'NO_SIGNATURE_DETECTED'
   | 'SIGNATURE_PRESENT_UNIDENTIFIED'
+  | 'SIGNATORY_BLOCK_OBSERVED'
   | 'SIGNATORY_OBSERVED'
   | 'SIGNATORY_CORROBORATED'
   | 'SIGNATORY_VERIFIED'
-  | 'SIGNATORY_CONTRADICTED';
+  | 'SIGNATORY_CONTRADICTED'
+  | 'UNCERTAIN';
 
 export type VisualRegionType =
   | 'SIGNATURE' | 'STAMP' | 'SEAL' | 'LOGO' | 'LETTERHEAD'
@@ -31,6 +36,10 @@ export interface VisualRegion {
 
 export interface VisualForensicsData {
   signature_detected: boolean;
+  has_visual_signature_mark?: boolean;
+  has_signatory_block?: boolean;
+  has_cryptographic_signature?: boolean;
+  is_cryptographic_verified?: boolean;
   signature_type: VisualSignatureType;
   signatory_name?: string;
   signatory_title?: string;
@@ -549,6 +558,10 @@ export interface LegitifyReport {
   dual_rag_citations?: DualRAGCitations;
   signatory_forensics?: {
     signature_detected: boolean;
+    has_visual_signature_mark?: boolean;
+    has_signatory_block?: boolean;
+    has_cryptographic_signature?: boolean;
+    is_cryptographic_verified?: boolean;
     signature_type: VisualSignatureType;
     signatory_name?: string;
     signatory_title?: string;

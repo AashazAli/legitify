@@ -62,6 +62,7 @@ export interface DocumentExtractionResult {
   is_suspicious_offer_letter?: boolean;
   detected_company_name?: string;
   detected_signatory?: string;
+  detected_signatory_title?: string;
   detected_domain?: string;
   detected_email?: string;
   detected_cin?: string;
@@ -566,22 +567,44 @@ export function extractDocumentSignals(
   // Signatory text pattern check — ADVISORY ONLY, never a fraud flag.
   // Full signature forensics is delegated to visualForensicsService.ts
   // A scammer can insert a signature; absence of a text-detectable signatory is NOT proof of fraud.
-  const signatoryBlockMatch = text.match(
-    /(?:hr\s+manager|human\s+resources|authorized\s+signatory|sincerely|regards|yours\s+(?:faithfully|truly)|head\s+-?\s*hr|director|talent\s+acquisition)[,\s:]*\n?\s*([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?(?:\s+[A-Z][a-z]+)+)/i
-  );
   let detectedSignatory: string | undefined;
-  if (signatoryBlockMatch && signatoryBlockMatch[1]) {
-    detectedSignatory = signatoryBlockMatch[1].trim();
-  } else {
-    const altSignMatch = text.match(/(?:signed\s+by|signatory\s*:\s*|name\s*:\s*)([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?(?:\s+[A-Z][a-z]+)+)/i)
-      || text.match(/([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?(?:\s+[A-Z][a-z]+)+)\s*\n\s*(?:HR\s+Manager|Authorized\s+Signatory|Human\s+Resources|Director)/i);
-    if (altSignMatch && altSignMatch[1]) {
-      detectedSignatory = altSignMatch[1].trim();
+  let detectedSignatoryTitle: string | undefined;
+
+  const titleRegex = /(?:Chief\s+(?:Executive|Operating|Technology|People|Human\s+Resources)\s+Officer|Vice\s+President(?:\s*-\s*[A-Za-z\s]+)?|Managing\s+Director|Director(?:\s*[-–]\s*[A-Za-z\s]+)?|Head\s*[-–]\s*(?:Human\s+Resources|HR|Talent\s+Acquisition|People|Operations)|Founder|Co-Founder|Partner|Proprietor|Senior\s+HR\s+Manager|HR\s+Manager|Talent\s+Acquisition(?:\s+Lead)?|Lead\s+Recruiter|Senior\s+Recruiter|Placement\s+Officer|Authorized\s+Signatory)/i;
+
+  // Check inline dash/hyphen/comma format: e.g. "Sudip Das — Founder"
+  const dashMatch = text.match(/(?:(?:sincerely|regards|faithfully|authorized\s+signatory|signed\s+by)[:\s,]*)?\n?\s*([A-Z][a-zA-Z.'-]+(?:\s+[A-Z][a-zA-Z.'-]+){1,3})\s*(?:[—–\-]|,)\s*([A-Za-z\s&/-]{3,40})/i);
+  if (dashMatch && !/(?:limited|ltd|pvt|private|corporation|technologies|solutions)/i.test(dashMatch[1])) {
+    detectedSignatory = dashMatch[1].trim();
+    if (titleRegex.test(dashMatch[2])) {
+      detectedSignatoryTitle = dashMatch[2].trim();
+    }
+  }
+
+  if (!detectedSignatory) {
+    const signatoryBlockMatch = text.match(
+      /(?:hr\s+manager|human\s+resources|authorized\s+signatory|sincerely|regards|yours\s+(?:faithfully|truly)|head\s+-?\s*hr|director|talent\s+acquisition)[,\s:]*\n?\s*([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?(?:\s+[A-Z][a-z]+)+)/i
+    );
+    if (signatoryBlockMatch && signatoryBlockMatch[1] && !/(?:limited|ltd|pvt|private|corporation|technologies|solutions)/i.test(signatoryBlockMatch[1])) {
+      detectedSignatory = signatoryBlockMatch[1].trim();
     } else {
-      const titleMatch = text.match(/\b(HR\s+Manager|Authorized\s+Signatory|Director\s+of\s+HR|Head\s+of\s+Talent|Placement\s+Officer)\b/i);
-      if (titleMatch) {
-        detectedSignatory = titleMatch[1].trim();
+      const altSignMatch = text.match(/(?:signed\s+by|signatory\s*:\s*|name\s*:\s*)([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?(?:\s+[A-Z][a-z]+)+)/i)
+        || text.match(/([A-Z][a-z]+(?:\s+[A-Z]\.?\s*)?(?:\s+[A-Z][a-z]+)+)\s*\n\s*(?:HR\s+Manager|Authorized\s+Signatory|Human\s+Resources|Director|Founder)/i);
+      if (altSignMatch && altSignMatch[1] && !/(?:limited|ltd|pvt|private|corporation|technologies|solutions)/i.test(altSignMatch[1])) {
+        detectedSignatory = altSignMatch[1].trim();
+      } else {
+        const titleMatch = text.match(/\b(HR\s+Manager|Authorized\s+Signatory|Director\s+of\s+HR|Head\s+of\s+Talent|Placement\s+Officer|Founder)\b/i);
+        if (titleMatch) {
+          detectedSignatory = titleMatch[1].trim();
+        }
       }
+    }
+  }
+
+  if (!detectedSignatoryTitle) {
+    const titleMatch = text.match(titleRegex);
+    if (titleMatch) {
+      detectedSignatoryTitle = titleMatch[0].trim();
     }
   }
 
@@ -611,25 +634,21 @@ export function extractDocumentSignals(
     });
   }
 
-  const hasAddress = /(?:address|office|building|tower|sector|plot|bangalore|bengaluru|mumbai|delhi|hyderabad|pune|chennai|noida|gurugram|kolkata)/i.test(textLower);
+  const hasAddress = /(?:address|office|building|tower|sector|plot|suite|road|street|campus|avenue|blvd|lane|zip|pin|pincode|postal|bangalore|bengaluru|mumbai|delhi|hyderabad|pune|chennai|noida|gurugram|kolkata|san\s+francisco|london|singapore|new\s+york)/i.test(textLower);
   const locationCheck = hasAddress ? 1.0 : (text.length > 300 ? 0.0 : 0.5);
   if (!hasAddress && text.length > 300) {
     flags.push({
       rule: "ner_location",
-      severity: "medium",
-      message: "No company location/address identified in the letter.",
-      score: 0.0,
-    });
-    flags.push({
-      rule: "missing_fields",
       severity: "low",
-      message: "Letter is missing: company address.",
+      message: "Physical registered office address unstated in document text.",
       score: 0.0,
     });
   }
 
-  const dates = text.match(/\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/g) || [];
-  const dateCheck = dates.length >= 2 ? 1.0 : (dates.length === 1 ? 0.6 : 0.2);
+  // Robust date extraction supporting numeric, written month, and standard formats
+  const textDates = text.match(/\b(?:(?:0?[1-9]|[12][0-9]|3[01])(?:st|nd|rd|th)?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[\s,]+(?:20\d{2}|19\d{2})|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+(?:0?[1-9]|[12][0-9]|3[01])(?:st|nd|rd|th)?[\s,]+(?:20\d{2}|19\d{2})|\d{1,2}[\/\-\.]\d{1,2}[\/\-\.](?:20\d{2}|\d{2}))\b/gi) || [];
+  const dates = Array.from(new Set(textDates));
+  const dateCheck = dates.length >= 2 ? 1.0 : (dates.length === 1 ? 0.7 : 0.3);
 
   nerVerification = 0.25 * companyCheck + 0.20 * personCheck + 0.25 * contactCheck + 0.15 * locationCheck + 0.15 * dateCheck;
 
@@ -1102,9 +1121,11 @@ export function extractDocumentSignals(
     extracted_claims,
     sanitized_evidence_block: text.slice(0, 1000),
     has_fee_demand: isFeeDemand,
-    is_suspicious_offer_letter: finalVerdict !== "LIKELY GENUINE" || finalPercent < 70 || isFeeDemand || flags.length >= 2,
+    is_suspicious_offer_letter: finalVerdict !== "LIKELY GENUINE" || finalPercent < 70 || isFeeDemand || flags.filter(f => f.severity === 'high' || f.severity === 'critical').length >= 1,
     detected_company_name: detectedCompanyName,
     detected_signatory: detectedSignatory,
+    detected_signatory_title: detectedSignatoryTitle,
+    detected_dates: dates,
     detected_domain: emails[0]?.split('@')[1]?.toLowerCase(),
     detected_email: emails[0],
     detected_cin: text.match(/\b([UL]\d{5}[A-Z]{2}\d{4}[A-Z]{3}\d{6})\b/i)?.[1]?.toUpperCase(),
