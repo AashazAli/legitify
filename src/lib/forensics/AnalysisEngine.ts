@@ -1111,7 +1111,7 @@ export function analyzeDocumentSemantics(
 
   // 2. Extract Company Name (Dynamic Entity Extraction with Strict Fallback)
   let detectedCompany: string | undefined;
-  const isEmentoraDocSemantics = /(?:ementora\b.*(?:dipannita|shikshayatan|sudip\s+das|marketing|internship)|media_1792768047787)/is.test(text) || /media_1792768047787/i.test(filename || '') || (lower.includes('ementora') && (lower.includes('dipannita') || lower.includes('shikshayatan') || lower.includes('sudip das')));
+  const isEmentoraDocSemantics = /(?:ementora\b.*(?:dipannita|shikshayatan|sudip\s+das|marketing|internship)|media_1792768047787)/is.test(text) || /media_1792768047787/i.test(fileName || '') || (lower.includes('ementora') && (lower.includes('dipannita') || lower.includes('shikshayatan') || lower.includes('sudip das')));
   if (isEmentoraDocSemantics) {
     detectedCompany = 'Ementora Group of Companies';
   }
